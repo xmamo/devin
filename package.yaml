@@ -1,0 +1,50 @@
+name: devin
+version: 1.0.0
+synopsis: Devin programming language
+category: Language
+author: Matteo Morena
+
+ghc-options:
+  - -Wextra
+  - -O2
+
+default-extensions:
+  - LambdaCase
+  - OverloadedStrings
+  - OverloadedLabels
+  - GADTs
+  - DeriveFunctor
+  - DeriveFoldable
+  - DeriveTraversable
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src
+
+  dependencies:
+    - transformers
+    - text
+    - haskell-gi-base
+    - gi-gtk-hs
+    - gi-gtksource
+
+executables:
+  devin-exe:
+    main: Main.hs
+    source-dirs: app
+
+    ghc-options:
+      - -threaded
+
+    dependencies:
+      - devin
+
+tests:
+  devin-test:
+    main: Spec.hs
+    source-dirs: test
+
+    dependencies:
+      - devin
