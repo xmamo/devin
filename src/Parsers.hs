@@ -26,23 +26,24 @@ import qualified Syntax
 
 
 expression :: Parser Syntax.Expression
-expression = binaryExpression <|> unaryExpression <|> parenthesizedExpression <|> primaryExpression
+expression = do
+  left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
+  operator <- optional (space *> binaryOperator)
+
+  case operator of
+    Just operator -> Parser.commit $ do
+      right <- space *> expression
+      pure (binary left operator right)
+
+    Nothing -> pure left
 
 
 binaryExpression :: Parser Syntax.Expression
-binaryExpression = syntax $ do
+binaryExpression = do
   left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
   operator <- space *> binaryOperator
   right <- Parser.commit (space *> expression)
-
-  pure $ case right of
-    Syntax.BinaryExpression rLeft rOperator rRight _ | Syntax.precedence operator >= Syntax.precedence rOperator ->
-      let Span start _ = Syntax.span left
-          Span _ end = Syntax.span rLeft
-          left' = Syntax.BinaryExpression left operator rLeft (Span start end)
-      in Syntax.BinaryExpression left' rOperator rRight
-
-    _ -> Syntax.BinaryExpression left operator right
+  pure (binary left operator right)
 
 
 unaryExpression :: Parser Syntax.Expression
@@ -128,3 +129,19 @@ syntax parser = do
   start <- Parser.position
   f <- parser
   f . Span start <$> Parser.position
+
+
+binary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syntax.Expression
+binary left operator right =
+  case right of
+    Syntax.BinaryExpression rLeft rOperator rRight _ | Syntax.precedence operator >= Syntax.precedence rOperator ->
+      let Span start' _ = Syntax.span left
+          Span _ end' = Syntax.span rLeft
+          left' = Syntax.BinaryExpression left operator rLeft (Span start' end')
+      in Syntax.BinaryExpression left' rOperator rRight (Span start end)
+
+    _ -> Syntax.BinaryExpression left operator right (Span start end)
+
+  where
+    (Span start _) = Syntax.span left
+    (Span _ end) = Syntax.span right
