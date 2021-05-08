@@ -135,13 +135,7 @@ binary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syn
 binary left operator right =
   case right of
     Syntax.BinaryExpression rLeft rOperator rRight _ | Syntax.precedence operator >= Syntax.precedence rOperator ->
-      let Span start' _ = Syntax.span left
-          Span _ end' = Syntax.span rLeft
-          left' = Syntax.BinaryExpression left operator rLeft (Span start' end')
-      in Syntax.BinaryExpression left' rOperator rRight (Span start end)
+      let left' = Syntax.BinaryExpression left operator rLeft (Span (Syntax.start left) (Syntax.end rLeft))
+      in Syntax.BinaryExpression left' rOperator rRight (Span (Syntax.start left) (Syntax.end right))
 
-    _ -> Syntax.BinaryExpression left operator right (Span start end)
-
-  where
-    (Span start _) = Syntax.span left
-    (Span _ end) = Syntax.span right
+    _ -> Syntax.BinaryExpression left operator right (Span (Syntax.start left) (Syntax.end right))

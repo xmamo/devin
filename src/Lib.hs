@@ -201,20 +201,18 @@ highlightExpression isBuffer = go
 highlightUnaryOperator :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.UnaryOperator -> m ()
 highlightUnaryOperator isBuffer operator = do
   let buffer = isBuffer `asA` Gtk.TextBuffer
-      (Span start end) = Syntax.span operator
 
-  startTextIter <- #getIterAtOffset buffer (fromIntegral start)
-  endTextIter <- #getIterAtOffset buffer (fromIntegral end)
+  startTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start operator))
+  endTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end operator))
   #applyTagByName buffer "unary-operator" startTextIter endTextIter
 
 
 highlightBinaryOperator :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.BinaryOperator -> m ()
 highlightBinaryOperator isBuffer operator = do
   let buffer = isBuffer `asA` Gtk.TextBuffer
-      (Span start end) = Syntax.span operator
 
-  startTextIter <- #getIterAtOffset buffer (fromIntegral start)
-  endTextIter <- #getIterAtOffset buffer (fromIntegral end)
+  startTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start operator))
+  endTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end operator))
   #applyTagByName buffer "binary-operator" startTextIter endTextIter
 
 
