@@ -5,11 +5,12 @@ category: Language
 author: Matteo Morena
 
 ghc-options:
-  - -Wextra
+  - -Wall
+  - -Wno-name-shadowing
+  - -Wno-unused-do-bind
   - -O2
 
 default-extensions:
-  - LambdaCase
   - OverloadedStrings
   - OverloadedLabels
   - GADTs
