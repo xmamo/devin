@@ -39,11 +39,9 @@ instance Functor Parser where
 instance Applicative Parser where
   pure value = Parser (Result.Success value)
 
-
   parser1 <*> parser2 = Parser $ \input -> case parse parser1 input of
     Result.Success f rest -> f <$> parse parser2 rest
     Result.Failure recoverable position expectations -> Result.Failure recoverable position expectations
-
 
   liftA2 f parser1 parser2 = Parser $ \input -> case parse parser1 input of
     Result.Success value1 rest -> case parse parser2 rest of
@@ -65,7 +63,6 @@ instance MonadFail Parser where
 
 instance Alternative Parser where
   empty = Parser $ \(Input position _) -> Result.Failure True position []
-
 
   -- TODO: This is probably not associative
   parser1 <|> parser2 = Parser $ \input -> case parse parser1 input of
