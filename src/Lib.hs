@@ -40,14 +40,6 @@ onActivate :: Gtk.IsApplication a => a -> IO ()
 onActivate isApplication = do
   let application = isApplication `asA` Gtk.Application
 
-  window <- new Gtk.ApplicationWindow
-    [
-      #application := application,
-      #title := "",
-      #defaultWidth := 640,
-      #defaultHeight := 360
-    ]
-
   sourceView <- new GtkSource.View
     [
       #showLineNumbers := True,
@@ -121,11 +113,14 @@ onActivate isApplication = do
     expression <- MaybeT (readMVar expressionVar)
     highlightExpressionParentheses buffer expression
 
-  scrolledWindow <- new Gtk.ScrolledWindow []
-  #add scrolledWindow sourceView
-
-  #add window scrolledWindow
-  #showAll window
+  #showAll =<< new Gtk.ApplicationWindow
+    [
+      #application := application,
+      #title := "",
+      #defaultWidth := 640,
+      #defaultHeight := 360,
+      #child :=> new Gtk.ScrolledWindow [#child := sourceView]
+    ]
 
 
 highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
