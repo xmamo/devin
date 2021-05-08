@@ -1,36 +1,8 @@
 module Syntax (
   Syntax (..),
-
-  Expression (
-    IntegerExpression,
-    IdentifierExpression,
-    UnaryExpression,
-    BinaryExpression,
-    ParenthesizedExpression
-  ),
-
-  UnaryOperator (
-    PlusOperator,
-    MinusOperator,
-    NotOperator
-  ),
-
-  BinaryOperator (
-    AddOperator,
-    SubtractOperator,
-    MultiplyOperator,
-    DivideOperator,
-    RemainderOperator,
-    EqualOperator,
-    NotEqualOperator,
-    LessOperator,
-    LessOrEqualOperator,
-    GreaterOperator,
-    GreaterOrEqualOperator,
-    AndOperator,
-    OrOperator
-  ),
-
+  Expression (..),
+  UnaryOperator (..),
+  BinaryOperator (..),
   precedence
 ) where
 
@@ -45,72 +17,67 @@ class Syntax a where
   span :: a -> Span
 
 
-instance Syntax Expression where
-  span = span'
-
-
-instance Syntax UnaryOperator where
-  span = span''
-
-
-instance Syntax BinaryOperator where
-  span = span'''
-
-
 data Expression where
-  IntegerExpression :: {
-    integer :: Integer,
-    span' :: Span
-  } -> Expression
-
-  IdentifierExpression :: {
-    identifier :: Text,
-    span' :: Span
-  } -> Expression
-
-  UnaryExpression :: {
-    operator :: UnaryOperator,
-    operand :: Expression,
-    span' :: Span
-  } -> Expression
-
-  BinaryExpression :: {
-    left:: Expression,
-    operator' :: BinaryOperator,
-    right :: Expression,
-    span' :: Span
-  } -> Expression
-
-  ParenthesizedExpression :: {
-    expression :: Expression,
-    span' :: Span
-  } -> Expression
-
+  IntegerExpression :: Integer -> Span -> Expression
+  IdentifierExpression :: Text -> Span -> Expression
+  UnaryExpression :: UnaryOperator -> Expression -> Span -> Expression
+  BinaryExpression :: Expression -> BinaryOperator -> Expression -> Span -> Expression
+  ParenthesizedExpression :: Expression -> Span -> Expression
   deriving (Eq, Show, Read)
+
+
+instance Syntax Expression where
+  span (IntegerExpression _ s) = s
+  span (IdentifierExpression _ s) = s
+  span (UnaryExpression _ _ s) = s
+  span (BinaryExpression _ _ _ s) = s
+  span (ParenthesizedExpression _ s) = s
 
 
 data UnaryOperator where
-  PlusOperator :: {span'' :: Span} -> UnaryOperator
-  MinusOperator :: {span'' :: Span} -> UnaryOperator
-  NotOperator :: {span'' :: Span} -> UnaryOperator
+  PlusOperator :: Span -> UnaryOperator
+  MinusOperator :: Span -> UnaryOperator
+  NotOperator :: Span -> UnaryOperator
   deriving (Eq, Show, Read)
+
+
+instance Syntax UnaryOperator where
+  span (PlusOperator s) = s
+  span (MinusOperator s) = s
+  span (NotOperator s) = s
 
 
 data BinaryOperator where
-  AddOperator :: {span''' :: Span} -> BinaryOperator
-  SubtractOperator :: {span''' :: Span} -> BinaryOperator
-  MultiplyOperator :: {span''' :: Span} -> BinaryOperator
-  DivideOperator :: {span''' :: Span} -> BinaryOperator
-  RemainderOperator :: {span''' :: Span} -> BinaryOperator
-  EqualOperator :: {span''' :: Span} -> BinaryOperator
-  NotEqualOperator :: {span''' :: Span} -> BinaryOperator
-  LessOperator :: {span''' :: Span} -> BinaryOperator
-  LessOrEqualOperator :: {span''' :: Span} -> BinaryOperator
-  GreaterOperator :: {span''' :: Span} -> BinaryOperator
-  GreaterOrEqualOperator :: {span''' :: Span} -> BinaryOperator
-  AndOperator :: {span''' :: Span} -> BinaryOperator
-  OrOperator :: {span''' :: Span} -> BinaryOperator
+  AddOperator :: Span -> BinaryOperator
+  SubtractOperator :: Span -> BinaryOperator
+  MultiplyOperator :: Span -> BinaryOperator
+  DivideOperator :: Span -> BinaryOperator
+  RemainderOperator :: Span -> BinaryOperator
+  EqualOperator :: Span -> BinaryOperator
+  NotEqualOperator :: Span -> BinaryOperator
+  LessOperator :: Span -> BinaryOperator
+  LessOrEqualOperator :: Span -> BinaryOperator
+  GreaterOperator :: Span -> BinaryOperator
+  GreaterOrEqualOperator :: Span -> BinaryOperator
+  AndOperator :: Span -> BinaryOperator
+  OrOperator :: Span -> BinaryOperator
   deriving (Eq, Show, Read)
+
+
+instance Syntax BinaryOperator where
+  span (AddOperator s) = s
+  span (SubtractOperator s) = s
+  span (MultiplyOperator s) = s
+  span (DivideOperator s) = s
+  span (RemainderOperator s) = s
+  span (EqualOperator s) = s
+  span (NotEqualOperator s) = s
+  span (LessOperator s) = s
+  span (LessOrEqualOperator s) = s
+  span (GreaterOperator s) = s
+  span (GreaterOrEqualOperator s) = s
+  span (AndOperator s) = s
+  span (OrOperator s) = s
 
 
 precedence :: BinaryOperator -> Integer
