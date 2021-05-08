@@ -129,54 +129,58 @@ onActivate isApplication = do
 
 
 highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
-highlightExpressionParentheses isBuffer expression = do
-  let buffer = isBuffer `asA` Gtk.TextBuffer
-  textIter <- #getIterAtMark buffer =<< #getInsert buffer
+highlightExpressionParentheses isBuffer expression = void (go expression =<< getInsertTextIter)
+  where
+    buffer = isBuffer `asA` Gtk.TextBuffer
 
-  let go (Syntax.IntegerExpression _ _) = pure False
+    getInsertTextIter = do
+      insertTextMark <- #getInsert buffer
+      #getIterAtMark buffer insertTextMark
 
-      go (Syntax.IdentifierExpression _ _) = pure False
+    go (Syntax.IntegerExpression _ _) _ = pure False
 
-      go (Syntax.UnaryExpression _ operand _) = go operand
+    go (Syntax.IdentifierExpression _ _) _ = pure False
 
-      go (Syntax.BinaryExpression left _ right _) = do
-        done <- go left
+    go (Syntax.UnaryExpression _ operand _) insertTextIter = go operand insertTextIter
 
-        if done then
+    go (Syntax.BinaryExpression left _ right _) insertTextIter = do
+      done <- go left insertTextIter
+
+      if done then
+        pure True
+      else
+        go right insertTextIter
+
+    go (Syntax.ParenthesizedExpression expression (Span start end)) insertTextIter = do
+      done <- go expression insertTextIter
+
+      if done then
+        pure True
+      else do
+        leftStartTextIter <- #getIterAtOffset buffer (fromIntegral start)
+        leftEndTextIter <- #copy leftStartTextIter
+        #forwardChar leftEndTextIter
+
+        rightEndTextIter <- #getIterAtOffset buffer (fromIntegral end)
+        rightStartTextIter <- #copy rightEndTextIter
+        #backwardChar rightStartTextIter
+
+        applyParenthesisTag <- or <$> traverse (#equal insertTextIter)
+          [leftStartTextIter, leftEndTextIter, rightEndTextIter, rightStartTextIter]
+
+        if applyParenthesisTag then do
+          #applyTagByName buffer "parenthesis" leftStartTextIter leftEndTextIter
+          #applyTagByName buffer "parenthesis" rightStartTextIter rightEndTextIter
           pure True
         else
-          go right
-
-      go (Syntax.ParenthesizedExpression expression (Span start end)) = do
-        done <- go expression
-
-        if done then
-          pure True
-        else do
-          leftStartTextIter <- #getIterAtOffset buffer (fromIntegral start)
-          leftEndTextIter <- #copy leftStartTextIter
-          #forwardChar leftEndTextIter
-
-          rightEndTextIter <- #getIterAtOffset buffer (fromIntegral end)
-          rightStartTextIter <- #copy rightEndTextIter
-          #backwardChar rightStartTextIter
-
-          applyParenthesisTag <- or <$> traverse (#equal textIter)
-            [leftStartTextIter, leftEndTextIter, rightEndTextIter, rightStartTextIter]
-
-          if applyParenthesisTag then do
-            #applyTagByName buffer "parenthesis" leftStartTextIter leftEndTextIter
-            #applyTagByName buffer "parenthesis" rightStartTextIter rightEndTextIter
-            pure True
-          else
-            pure False
-
-  void (go expression)
+          pure False
 
 
 highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a ->  Syntax.Expression -> m ()
 highlightExpression isBuffer = go
   where
+    buffer = isBuffer `asA` Gtk.TextBuffer
+
     go (Syntax.IntegerExpression _ (Span start end)) = do
       startTextIter <- #getIterAtOffset buffer (fromIntegral start)
       endTextIter <- #getIterAtOffset buffer (fromIntegral end)
@@ -197,8 +201,6 @@ highlightExpression isBuffer = go
       go right
 
     go (Syntax.ParenthesizedExpression expression _) = go expression
-
-    buffer = isBuffer `asA` Gtk.TextBuffer
 
 
 highlightUnaryOperator :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.UnaryOperator -> m ()
@@ -227,6 +229,9 @@ getStyle ::
 
 getStyle isLanguage isStyleScheme styleId = runMaybeT (go styleId [])
   where
+    language = isLanguage `asA` GtkSource.Language
+    styleScheme = isStyleScheme `asA` GtkSource.StyleScheme
+
     go styleId seen = MaybeT $ do
       style <- #getStyle styleScheme styleId
 
@@ -238,7 +243,3 @@ getStyle isLanguage isStyleScheme styleId = runMaybeT (go styleId [])
           go fallbackStyleId (styleId : seen)
 
         Nothing -> pure Nothing
-
-    language = isLanguage `asA` GtkSource.Language
-
-    styleScheme = isStyleScheme `asA` GtkSource.StyleScheme
