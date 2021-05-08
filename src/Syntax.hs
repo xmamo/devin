@@ -11,10 +11,17 @@ import Prelude hiding (span)
 import Data.Text (Text)
 
 import Span (Span)
+import qualified Span
 
 
 class Syntax a where
   span :: a -> Span
+
+  start :: a -> Int
+  start = Span.start . span
+
+  end :: a -> Int
+  end = Span.end . span
 
 
 data Expression where
