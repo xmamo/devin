@@ -11,6 +11,7 @@ import System.Exit
 import Control.Monad.Trans.Maybe
 
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 import Data.GI.Base
 import qualified Data.GI.Gtk as Gtk
@@ -40,33 +41,26 @@ onActivate :: Gtk.IsApplication a => a -> IO ()
 onActivate isApplication = do
   let application = isApplication `asA` Gtk.Application
 
-  sourceView <- new GtkSource.View
-    [
-      #showLineNumbers := True,
-      #highlightCurrentLine := True,
-      #tabWidth := 4,
-      #monospace := True
-    ]
+  logTextBuffer <- new Gtk.TextBuffer []
 
-  buffer <- unsafeCastTo GtkSource.Buffer =<< #getBuffer sourceView
-  #setHighlightMatchingBrackets buffer False
-
+  buffer <- new GtkSource.Buffer [#highlightMatchingBrackets := False]
   tagTable <- #getTagTable buffer
   styleScheme <- fromJust <$> #getStyleScheme buffer
 
-  languageManager <- GtkSource.languageManagerGetDefault
+  languageManager <- new GtkSource.LanguageManager []
   defaultLanguage <- fromJust <$> #getLanguage languageManager "def"
 
-  let styles =
-        [
-          ("keyword", "def:keyword"),
-          ("identifier", "def:identifier"),
-          ("integer", "def:decimal"),
-          ("unary-operator", "def:operator"),
-          ("binary-operator", "def:operator"),
-          ("parenthesis", "bracket-match"),
-          ("error", "def:error")
-        ]
+  let
+    styles =
+      [
+        ("keyword", "def:keyword"),
+        ("identifier", "def:identifier"),
+        ("integer", "def:decimal"),
+        ("unary-operator", "def:operator"),
+        ("binary-operator", "def:operator"),
+        ("parenthesis", "bracket-match"),
+        ("error", "def:error")
+      ]
 
   for_ styles $ \(tagName, styleId) -> do
     tag <- new GtkSource.Tag [#name := tagName]
@@ -96,13 +90,20 @@ onActivate isApplication = do
           highlightExpression buffer expression
           highlightExpressionParentheses buffer expression
 
-        Result.Failure _ position _ -> Gtk.postGUIASync $ do
+          set logTextBuffer [#text := ""]
+
+        Result.Failure _ position expectations -> Gtk.postGUIASync $ do
           (startTextIter, endTextIter) <- #getBounds buffer
           #removeTagByName buffer "error" startTextIter endTextIter
 
           startTextIter <- #getIterAtOffset buffer (fromIntegral position)
           for_ styles $ \(tagName, _) -> #removeTagByName buffer tagName startTextIter endTextIter
           #applyTagByName buffer "error" startTextIter endTextIter
+
+          line <- (+ 1) <$> #getLine startTextIter
+          column <- (+ 1) <$> #getLineOffset startTextIter
+          let prefix = "[" <> Text.pack (show line) <> ":" <> Text.pack (show column) <> "] "
+          set logTextBuffer [#text := prefix <> expectationsText expectations]
 
     putMVar threadIdVar (Just threadId)
 
@@ -113,14 +114,40 @@ onActivate isApplication = do
     expression <- MaybeT (readMVar expressionVar)
     highlightExpressionParentheses buffer expression
 
-  #showAll =<< new Gtk.ApplicationWindow
+  logTextView <- new Gtk.TextView
+    [
+      #editable := False,
+      #monospace := True,
+      #wrapMode := Gtk.WrapModeWord,
+      #buffer := logTextBuffer
+    ]
+
+  sourceView <- new GtkSource.View
+    [
+      #showLineNumbers := True,
+      #highlightCurrentLine := True,
+      #tabWidth := 4,
+      #monospace := True,
+      #buffer := buffer
+    ]
+
+  scrolledWindow <- new Gtk.ScrolledWindow []
+  #add scrolledWindow sourceView
+
+  paned <- new Gtk.Paned [#orientation := Gtk.OrientationVertical]
+  #pack1 paned scrolledWindow True False
+  #pack2 paned logTextView False False
+
+  window <- new Gtk.ApplicationWindow
     [
       #application := application,
       #title := "",
-      #defaultWidth := 640,
-      #defaultHeight := 360,
-      #child :=> new Gtk.ScrolledWindow [#child := sourceView]
+      #defaultWidth := 800,
+      #defaultHeight := 600
     ]
+
+  #add window paned
+  #showAll window
 
 
 highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
@@ -236,3 +263,13 @@ getStyle isLanguage isStyleScheme styleId = runMaybeT (go styleId [])
           go fallbackStyleId (styleId : seen)
 
         Nothing -> pure Nothing
+
+
+expectationsText :: [Text] -> Text
+expectationsText [] = "Unexpected input"
+expectationsText expectations = "Expected " <> go expectations
+  where
+    go [] = undefined
+    go [expectation] = expectation
+    go [expectation1, expectation2] = expectation1 <> " or " <> expectation2
+    go (head : tail) = head <> ", " <> go tail
