@@ -68,13 +68,13 @@ onActivate isApplication = do
     #apply style tag
     #add tagTable tag
 
-  threadIdVar <- newMVar Nothing
+  threadIdVar <- newMVar =<< forkIO (pure ())
   expressionVar <- newMVar Nothing
 
   on buffer #changed $ do
     text <- fromJust <$> get buffer #text
 
-    traverse_ killThread =<< takeMVar threadIdVar
+    killThread =<< takeMVar threadIdVar
     swapMVar expressionVar Nothing
 
     threadId <- forkIO $ do
@@ -105,7 +105,7 @@ onActivate isApplication = do
           let prefix = "[" <> Text.pack (show line) <> ":" <> Text.pack (show column) <> "] "
           set logTextBuffer [#text := prefix <> expectationsText expectations]
 
-    putMVar threadIdVar (Just threadId)
+    putMVar threadIdVar threadId
 
   on buffer (#notify ::: "cursor-position") . const . void . runMaybeT $ do
     (startTextIter, endTextIter) <- #getBounds buffer
