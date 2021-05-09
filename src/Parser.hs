@@ -90,14 +90,14 @@ satisfy f = Parser $ \(Input position text) -> case Text.uncons text of
 char :: Char -> Parser Char
 char c = Parser $ \(Input position text) -> case Text.stripPrefix (Text.singleton c) text of
   Just rest -> Result.Success c (Input (position + 1) rest)
-  Nothing -> Result.Failure True position ["char " <> Text.pack (show c)]
+  Nothing -> Result.Failure True position [Text.pack (show c)]
 
 
 
 text :: Text -> Parser Text
 text t = Parser $ \(Input position text) -> case Text.stripPrefix t text of
   Just rest -> Result.Success t (Input (position + Text.length t) rest)
-  Nothing -> Result.Failure True position ["text " <> Text.pack (show t)]
+  Nothing -> Result.Failure True position [Text.pack (show t)]
 
 
 position :: Parser Int
