@@ -14,7 +14,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 
 import Data.GI.Base
-import qualified Data.GI.Gtk as Gtk
+import qualified GI.Gtk as Gtk
 import qualified Data.GI.Gtk.Threading as Gtk
 import qualified GI.GtkSource as GtkSource
 

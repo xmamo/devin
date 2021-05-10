@@ -28,6 +28,7 @@ library:
     - transformers
     - text
     - haskell-gi-base
+    - gi-gtk
     - gi-gtk-hs
     - gi-gtksource
 
