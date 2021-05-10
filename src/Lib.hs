@@ -107,7 +107,7 @@ onActivate isApplication = do
 
     putMVar threadIdVar threadId
 
-  on buffer (#notify ::: "cursor-position") . const . void . runMaybeT $ do
+  on buffer (PropertyNotify #cursorPosition) . const . void . runMaybeT $ do
     (startTextIter, endTextIter) <- #getBounds buffer
     #removeTagByName buffer "parenthesis" startTextIter endTextIter
 
