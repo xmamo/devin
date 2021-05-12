@@ -1,4 +1,5 @@
 module Helpers (
+  getInsertTextIter,
   getStyle,
   expectationsText
 ) where
@@ -10,7 +11,16 @@ import Control.Monad.Trans.Maybe
 import Data.Text (Text)
 
 import Data.GI.Base
+import qualified GI.Gtk as Gtk
 import qualified GI.GtkSource as GtkSource
+
+
+getInsertTextIter :: (Gtk.IsTextBuffer a, MonadIO m) => a -> m Gtk.TextIter
+getInsertTextIter isBuffer = do
+  let buffer = isBuffer `asA` Gtk.TextBuffer
+
+  insertTextMark <- #getInsert buffer
+  #getIterAtMark buffer insertTextMark
 
 
 getStyle ::

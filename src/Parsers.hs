@@ -1,13 +1,16 @@
 module Parsers (
-  expression,
-  binaryExpression,
-  unaryExpression,
-  parenthesizedExpression,
-  primaryExpression,
+  identifier,
   identifierExpression,
   integerExpression,
+  primaryExpression,
+  unaryExpression,
+  binaryExpression,
+  assignExpression,
+  parenthesizedExpression,
+  expression,
   unaryOperator,
-  binaryOperator
+  binaryOperator,
+  assignOperator
 ) where
 
 import Data.Char
@@ -25,59 +28,13 @@ import Span (Span (Span))
 import qualified Syntax
 
 
-expression :: Parser Syntax.Expression
-expression = do
-  left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
-  operator <- optional (space *> binaryOperator)
-
-  case operator of
-    Just operator -> Parser.commit $ do
-      right <- space *> expression
-      pure (binary left operator right)
-
-    Nothing -> pure left
-
-
-binaryExpression :: Parser Syntax.Expression
-binaryExpression = do
-  left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
-  operator <- space *> binaryOperator
-  right <- Parser.commit (space *> expression)
-  pure (binary left operator right)
-
-
-unaryExpression :: Parser Syntax.Expression
-unaryExpression = syntax $ do
-  operator <- unaryOperator
-  operand <- Parser.commit(space *> (unaryExpression <|> parenthesizedExpression <|> primaryExpression))
-  pure (Syntax.UnaryExpression operator operand)
-
-
-parenthesizedExpression :: Parser Syntax.Expression
-parenthesizedExpression = syntax $ do
-  Parser.char '('
-  Syntax.ParenthesizedExpression <$> Parser.commit (space *> expression <* space <* Parser.char ')')
-
-
-primaryExpression :: Parser Syntax.Expression
-primaryExpression = identifierExpression <|> integerExpression
-
-
-integerExpression :: Parser Syntax.Expression
-integerExpression = Parser.label "integer" . syntax $ do
-  sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> (-1)) <|> pure 1
-  digits <- some (Parser.satisfy isDigit)
-  let magnitude = foldl' (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
-  pure (Syntax.IntegerExpression (sign * magnitude))
-
-
 -- (?:\p{Nd}[\p{Mn}\p{Mc}]*)*[\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
-identifierExpression :: Parser Syntax.Expression
-identifierExpression = Parser.label "identifier" . syntax $ do
+identifier :: Parser Syntax.Identifier
+identifier = Parser.label "identifier" . syntax $ do
   a <- Text.concat <$> many (gc [nd] <> (Text.concat <$> many (gc [mn, mc])))
   b <- gc [lu, ll, lt, lm, lo, nl, pc]
   c <- Text.concat <$> many (gc [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
-  pure (Syntax.IdentifierExpression (a <> b <> c))
+  pure (Syntax.Identifier (a <> b <> c))
   where
     gc list = Text.singleton <$> Parser.satisfy (\c -> generalCategory c `elem` list)
     lu = UppercaseLetter
@@ -90,6 +47,64 @@ identifierExpression = Parser.label "identifier" . syntax $ do
     nd = DecimalNumber
     nl = LetterNumber
     pc = ConnectorPunctuation
+
+
+integerExpression :: Parser Syntax.Expression
+integerExpression = Parser.label "integer" . syntax $ do
+  sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> (-1)) <|> pure 1
+  digits <- some (Parser.satisfy isDigit)
+  let magnitude = foldl' (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
+  pure (Syntax.IntegerExpression (sign * magnitude))
+
+
+identifierExpression :: Parser Syntax.Expression
+identifierExpression = syntax (Syntax.IdentifierExpression <$> identifier)
+
+
+primaryExpression :: Parser Syntax.Expression
+primaryExpression = identifierExpression <|> integerExpression
+
+
+unaryExpression :: Parser Syntax.Expression
+unaryExpression = syntax $ do
+  operator <- unaryOperator
+  operand <- Parser.commit(space *> (unaryExpression <|> parenthesizedExpression <|> primaryExpression))
+  pure (Syntax.UnaryExpression operator operand)
+
+
+binaryExpression :: Parser Syntax.Expression
+binaryExpression = do
+  left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
+  operator <- space *> binaryOperator
+  right <- Parser.commit (space *> expression)
+  pure (binary left operator right)
+
+
+assignExpression :: Parser Syntax.Expression
+assignExpression = syntax $ do
+  target <- identifier
+  operator <- space *> assignOperator
+  value <- Parser.commit (space *> expression)
+  pure (Syntax.AssignExpression target operator value)
+
+
+parenthesizedExpression :: Parser Syntax.Expression
+parenthesizedExpression = syntax $ do
+  Parser.char '('
+  Syntax.ParenthesizedExpression <$> Parser.commit (space *> expression <* space <* Parser.char ')')
+
+
+expression :: Parser Syntax.Expression
+expression = assignExpression <|> do
+  left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
+  operator <- optional (space *> binaryOperator)
+
+  case operator of
+    Just operator -> Parser.commit $ do
+      right <- space *> expression
+      pure (binary left operator right)
+
+    Nothing -> pure left
 
 
 unaryOperator :: Parser Syntax.UnaryOperator
@@ -120,6 +135,18 @@ binaryOperator = syntax $ asum
   ]
 
 
+assignOperator :: Parser Syntax.AssignOperator
+assignOperator = syntax $ asum
+  [
+    Parser.char '=' $> Syntax.AssignOperator,
+    Parser.text "+=" $> Syntax.AddAssignOperator,
+    Parser.text "-=" $> Syntax.SubtractAssignOperator,
+    Parser.text "*=" $> Syntax.MultiplyAssignOperator,
+    Parser.text "/=" $> Syntax.DivideAssignOperator,
+    Parser.text "%=" $> Syntax.RemainderAssignOperator
+  ]
+
+
 space :: Parser Text
 space = Text.concat <$> many (Text.singleton <$> Parser.satisfy isSpace)
 
@@ -132,10 +159,12 @@ syntax parser = do
 
 
 binary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syntax.Expression
-binary left operator right =
-  case right of
-    Syntax.BinaryExpression rLeft rOperator rRight _ | Syntax.precedence operator >= Syntax.precedence rOperator ->
-      let left' = Syntax.BinaryExpression left operator rLeft (Span (Syntax.start left) (Syntax.end rLeft))
-      in Syntax.BinaryExpression left' rOperator rRight (Span (Syntax.start left) (Syntax.end right))
 
-    _ -> Syntax.BinaryExpression left operator right (Span (Syntax.start left) (Syntax.end right))
+binary Syntax.BinaryExpression {} _ _ = undefined
+
+binary left operator right @ (Syntax.BinaryExpression rLeft rOperator rRight _)
+  | Syntax.precedence operator >= Syntax.precedence rOperator =
+    let left' = Syntax.BinaryExpression left operator rLeft (Span (Syntax.start left) (Syntax.end rLeft))
+    in Syntax.BinaryExpression left' rOperator rRight (Span (Syntax.start left) (Syntax.end right))
+
+binary left operator right = Syntax.BinaryExpression left operator right (Span (Syntax.start left) (Syntax.end right))

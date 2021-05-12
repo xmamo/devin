@@ -10,6 +10,7 @@ import System.Exit
 
 import Control.Monad.Trans.Maybe
 
+import Data.Text (Text)
 import qualified Data.Text as Text
 
 import Data.GI.Base
@@ -24,6 +25,8 @@ import qualified Parser
 import qualified Parsers
 
 import Span (Span (Span))
+
+import Syntax (Syntax)
 import qualified Syntax
 
 import qualified Helpers
@@ -57,10 +60,9 @@ onActivate isApplication = do
         ("keyword", "def:keyword"),
         ("identifier", "def:identifier"),
         ("integer", "def:decimal"),
-        ("unary-operator", "def:operator"),
-        ("binary-operator", "def:operator"),
-        ("parenthesis", "bracket-match"),
-        ("error", "def:error")
+        ("operator", "def:operator"),
+        ("error", "def:error"),
+        ("parenthesis", "bracket-match")
       ]
 
   for_ styles $ \(tagName, styleId) -> do
@@ -152,13 +154,9 @@ onActivate isApplication = do
 
 
 highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
-highlightExpressionParentheses isBuffer expression = void (go expression =<< getInsertTextIter)
+highlightExpressionParentheses isBuffer expression = void (go expression =<< Helpers.getInsertTextIter buffer)
   where
     buffer = isBuffer `asA` Gtk.TextBuffer
-
-    getInsertTextIter = do
-      insertTextMark <- #getInsert buffer
-      #getIterAtMark buffer insertTextMark
 
     go (Syntax.IntegerExpression _ _) _ = pure False
 
@@ -173,6 +171,8 @@ highlightExpressionParentheses isBuffer expression = void (go expression =<< get
         pure True
       else
         go right insertTextIter
+
+    go (Syntax.AssignExpression _ _ value _) insertTextIter = go value insertTextIter
 
     go (Syntax.ParenthesizedExpression expression (Span start end)) insertTextIter = do
       done <- go expression insertTextIter
@@ -204,41 +204,31 @@ highlightExpression isBuffer = go
   where
     buffer = isBuffer `asA` Gtk.TextBuffer
 
-    go (Syntax.IntegerExpression _ (Span start end)) = do
-      startTextIter <- #getIterAtOffset buffer (fromIntegral start)
-      endTextIter <- #getIterAtOffset buffer (fromIntegral end)
-      #applyTagByName buffer "integer" startTextIter endTextIter
+    go integer @ Syntax.IntegerExpression {} = highlight buffer "integer" integer
 
-    go (Syntax.IdentifierExpression _ (Span start end)) = do
-      startTextIter <- #getIterAtOffset buffer (fromIntegral start)
-      endTextIter <- #getIterAtOffset buffer (fromIntegral end)
-      #applyTagByName buffer "identifier" startTextIter endTextIter
+    go (Syntax.IdentifierExpression identifier _) = highlight buffer "identifier" identifier
 
     go (Syntax.UnaryExpression operator operand _) = do
-      highlightUnaryOperator buffer operator
+      highlight buffer "operator" operator
       go operand
 
     go (Syntax.BinaryExpression left operator right _) = do
       go left
-      highlightBinaryOperator buffer operator
+      highlight buffer "operator" operator
       go right
+
+    go (Syntax.AssignExpression identifier operator value _) = do
+      highlight buffer "identifier" identifier
+      highlight buffer "operator" operator
+      go value
 
     go (Syntax.ParenthesizedExpression expression _) = go expression
 
 
-highlightUnaryOperator :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.UnaryOperator -> m ()
-highlightUnaryOperator isBuffer operator = do
+highlight :: (Gtk.IsTextBuffer a, Syntax b, MonadIO m) => a -> Text -> b -> m ()
+highlight isBuffer tagName syntax = do
   let buffer = isBuffer `asA` Gtk.TextBuffer
 
-  startTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start operator))
-  endTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end operator))
-  #applyTagByName buffer "unary-operator" startTextIter endTextIter
-
-
-highlightBinaryOperator :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.BinaryOperator -> m ()
-highlightBinaryOperator isBuffer operator = do
-  let buffer = isBuffer `asA` Gtk.TextBuffer
-
-  startTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start operator))
-  endTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end operator))
-  #applyTagByName buffer "binary-operator" startTextIter endTextIter
+  startTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start syntax))
+  endTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end syntax))
+  #applyTagByName buffer tagName startTextIter endTextIter

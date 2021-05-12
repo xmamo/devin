@@ -1,8 +1,10 @@
 module Syntax (
   Syntax (..),
+  Identifier(..),
   Expression (..),
   UnaryOperator (..),
   BinaryOperator (..),
+  AssignOperator (..),
   precedence
 ) where
 
@@ -24,21 +26,19 @@ class Syntax a where
   end = Span.end . span
 
 
-data Expression where
-  IntegerExpression :: Integer -> Span -> Expression
-  IdentifierExpression :: Text -> Span -> Expression
-  UnaryExpression :: UnaryOperator -> Expression -> Span -> Expression
-  BinaryExpression :: Expression -> BinaryOperator -> Expression -> Span -> Expression
-  ParenthesizedExpression :: Expression -> Span -> Expression
+data Identifier where
+  Identifier :: Text -> Span -> Identifier
   deriving (Eq, Show, Read)
 
 
-instance Syntax Expression where
-  span (IntegerExpression _ s) = s
-  span (IdentifierExpression _ s) = s
-  span (UnaryExpression _ _ s) = s
-  span (BinaryExpression _ _ _ s) = s
-  span (ParenthesizedExpression _ s) = s
+data Expression where
+  IntegerExpression :: Integer -> Span -> Expression
+  IdentifierExpression :: Identifier -> Span -> Expression
+  UnaryExpression :: UnaryOperator -> Expression -> Span -> Expression
+  BinaryExpression :: Expression -> BinaryOperator -> Expression -> Span -> Expression
+  AssignExpression :: Identifier -> AssignOperator -> Expression -> Span -> Expression
+  ParenthesizedExpression :: Expression -> Span -> Expression
+  deriving (Eq, Show, Read)
 
 
 data UnaryOperator where
@@ -46,12 +46,6 @@ data UnaryOperator where
   MinusOperator :: Span -> UnaryOperator
   NotOperator :: Span -> UnaryOperator
   deriving (Eq, Show, Read)
-
-
-instance Syntax UnaryOperator where
-  span (PlusOperator s) = s
-  span (MinusOperator s) = s
-  span (NotOperator s) = s
 
 
 data BinaryOperator where
@@ -69,6 +63,44 @@ data BinaryOperator where
   AndOperator :: Span -> BinaryOperator
   OrOperator :: Span -> BinaryOperator
   deriving (Eq, Show, Read)
+
+
+data AssignOperator where
+  AssignOperator :: Span -> AssignOperator
+  AddAssignOperator :: Span -> AssignOperator
+  SubtractAssignOperator :: Span -> AssignOperator
+  MultiplyAssignOperator :: Span -> AssignOperator
+  DivideAssignOperator :: Span -> AssignOperator
+  RemainderAssignOperator :: Span -> AssignOperator
+  deriving (Eq, Show, Read)
+
+
+instance Syntax Identifier where
+  span (Identifier _ s) = s
+
+
+instance Syntax Expression where
+  span (IntegerExpression _ s) = s
+  span (IdentifierExpression _ s) = s
+  span (UnaryExpression _ _ s) = s
+  span (BinaryExpression _ _ _ s) = s
+  span (AssignExpression _ _ _ s) = s
+  span (ParenthesizedExpression _ s) = s
+
+
+instance Syntax UnaryOperator where
+  span (PlusOperator s) = s
+  span (MinusOperator s) = s
+  span (NotOperator s) = s
+
+
+instance Syntax AssignOperator where
+  span (AssignOperator s) = s
+  span (AddAssignOperator s) = s
+  span (SubtractAssignOperator s) = s
+  span (MultiplyAssignOperator s) = s
+  span (DivideAssignOperator s) = s
+  span (RemainderAssignOperator s) = s
 
 
 instance Syntax BinaryOperator where
