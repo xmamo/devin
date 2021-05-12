@@ -10,7 +10,6 @@ import System.Exit
 
 import Control.Monad.Trans.Maybe
 
-import Data.Text (Text)
 import qualified Data.Text as Text
 
 import Data.GI.Base
@@ -26,6 +25,8 @@ import qualified Parsers
 
 import Span (Span (Span))
 import qualified Syntax
+
+import qualified Helpers
 
 
 main :: IO ()
@@ -64,7 +65,7 @@ onActivate isApplication = do
 
   for_ styles $ \(tagName, styleId) -> do
     tag <- new GtkSource.Tag [#name := tagName]
-    style <- fromJust <$> getStyle defaultLanguage styleScheme styleId
+    style <- fromJust <$> Helpers.getStyle defaultLanguage styleScheme styleId
     #apply style tag
     #add tagTable tag
 
@@ -103,7 +104,7 @@ onActivate isApplication = do
           line <- (+ 1) <$> #getLine startTextIter
           column <- (+ 1) <$> #getLineOffset startTextIter
           let prefix = "[" <> Text.pack (show line) <> ":" <> Text.pack (show column) <> "] "
-          set logTextBuffer [#text := prefix <> expectationsText expectations]
+          set logTextBuffer [#text := prefix <> Helpers.expectationsText expectations]
 
     putMVar threadIdVar threadId
 
@@ -241,35 +242,3 @@ highlightBinaryOperator isBuffer operator = do
   startTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start operator))
   endTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end operator))
   #applyTagByName buffer "binary-operator" startTextIter endTextIter
-
-
-getStyle ::
-  (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b, MonadIO m) =>
-  a -> b -> Text -> m (Maybe GtkSource.Style)
-
-getStyle isLanguage isStyleScheme styleId = runMaybeT (go styleId [])
-  where
-    language = isLanguage `asA` GtkSource.Language
-    styleScheme = isStyleScheme `asA` GtkSource.StyleScheme
-
-    go styleId seen = MaybeT $ do
-      style <- #getStyle styleScheme styleId
-
-      case style of
-        Just style -> pure (Just style)
-
-        Nothing | styleId `notElem` seen -> runMaybeT $ do
-          fallbackStyleId <- MaybeT (#getStyleFallback language styleId)
-          go fallbackStyleId (styleId : seen)
-
-        Nothing -> pure Nothing
-
-
-expectationsText :: [Text] -> Text
-expectationsText [] = "Unexpected input"
-expectationsText expectations = "Expected " <> go expectations
-  where
-    go [] = undefined
-    go [expectation] = expectation
-    go [expectation1, expectation2] = expectation1 <> " or " <> expectation2
-    go (head : tail) = head <> ", " <> go tail
