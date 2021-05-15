@@ -9,8 +9,10 @@ ghc-options:
   - -Wno-name-shadowing
   - -Wno-unused-do-bind
   - -O2
+  - -foptimal-applicative-do
 
 default-extensions:
+  - ApplicativeDo
   - OverloadedStrings
   - OverloadedLabels
   - GADTs
