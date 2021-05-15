@@ -68,40 +68,40 @@ primaryExpression = identifierExpression <|> integerExpression
 unaryExpression :: Parser Syntax.Expression
 unaryExpression = syntax $ do
   operator <- unaryOperator
-  operand <- Parser.commit(space *> (unaryExpression <|> parenthesizedExpression <|> primaryExpression))
+  operand <- Parser.commit(s *> (unaryExpression <|> parenthesizedExpression <|> primaryExpression))
   pure (Syntax.UnaryExpression operator operand)
 
 
 binaryExpression :: Parser Syntax.Expression
 binaryExpression = do
   left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
-  operator <- space *> binaryOperator
-  right <- Parser.commit (space *> expression)
+  operator <- s *> binaryOperator
+  right <- Parser.commit (s *> expression)
   pure (binary left operator right)
 
 
 assignExpression :: Parser Syntax.Expression
 assignExpression = syntax $ do
   target <- identifier
-  operator <- space *> assignOperator
-  value <- Parser.commit (space *> expression)
+  operator <- s *> assignOperator
+  value <- Parser.commit (s *> expression)
   pure (Syntax.AssignExpression target operator value)
 
 
 parenthesizedExpression :: Parser Syntax.Expression
 parenthesizedExpression = syntax $ do
   Parser.char '('
-  Syntax.ParenthesizedExpression <$> Parser.commit (space *> expression <* space <* Parser.char ')')
+  Syntax.ParenthesizedExpression <$> Parser.commit (s *> expression <* s <* Parser.char ')')
 
 
 expression :: Parser Syntax.Expression
 expression = assignExpression <|> do
   left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
-  operator <- optional (space *> binaryOperator)
+  operator <- optional (s *> binaryOperator)
 
   case operator of
     Just operator -> Parser.commit $ do
-      right <- space *> expression
+      right <- s *> expression
       pure (binary left operator right)
 
     Nothing -> pure left
@@ -147,8 +147,8 @@ assignOperator = syntax $ asum
   ]
 
 
-space :: Parser Text
-space = Text.concat <$> many (Text.singleton <$> Parser.satisfy isSpace)
+s :: Parser Text
+s = Text.concat <$> many (Text.singleton <$> Parser.satisfy isSpace)
 
 
 syntax :: Parser (Span -> a) -> Parser a
