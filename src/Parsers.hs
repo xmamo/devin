@@ -100,16 +100,21 @@ parenthesizedExpression = syntax $ do
 
 
 expression :: Parser Syntax.Expression
-expression = assignExpression <|> do
-  left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
-  operator <- optional (s *> binaryOperator)
+expression = asum
+  [
+    assignExpression,
 
-  case operator of
-    Just operator -> Parser.commit $ do
-      right <- s *> expression
-      pure (binary left operator right)
+    do
+      left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
+      operator <- optional (s *> binaryOperator)
 
-    Nothing -> pure left
+      case operator of
+        Just operator -> Parser.commit $ do
+          right <- s *> expression
+          pure (binary left operator right)
+
+        Nothing -> pure left
+  ]
 
 
 unaryOperator :: Parser Syntax.UnaryOperator
