@@ -2,6 +2,7 @@ module Syntax (
   Syntax (..),
   Token (..),
   Identifier(..),
+  Statement (..),
   Expression (..),
   UnaryOperator (..),
   BinaryOperator (..),
@@ -34,6 +35,16 @@ data Token where
 
 data Identifier where
   Identifier :: Text -> Span -> Identifier
+  deriving (Eq, Show, Read)
+
+
+data Statement where
+  ExpressionStatement :: Expression -> Span -> Statement
+  IfStatement :: Token -> Expression -> [Statement] -> Span -> Statement
+  IfElseStatement :: Token -> Expression -> [Statement] -> Token -> [Statement] -> Span -> Statement
+  WhileStatement :: Token -> Expression -> [Statement] -> Span -> Statement
+  DoWhileStatement :: Token -> [Statement] -> Token -> Expression -> Span -> Statement
+  ReturnStatement :: Token -> Expression -> Span -> Statement
   deriving (Eq, Show, Read)
 
 
@@ -87,6 +98,15 @@ instance Syntax Token where
 
 instance Syntax Identifier where
   span (Identifier _ s) = s
+
+
+instance Syntax Statement where
+  span (ExpressionStatement _ s) = s
+  span (IfStatement _ _ _ s) = s
+  span (IfElseStatement _ _ _ _ _ s) = s
+  span (WhileStatement _ _ _ s) = s
+  span (DoWhileStatement _ _ _ _ s) = s
+  span (ReturnStatement _ _ s) = s
 
 
 instance Syntax Expression where
