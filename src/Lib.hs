@@ -24,8 +24,6 @@ import qualified Result
 import qualified Parser
 import qualified Parsers
 
-import Span (Span (Span))
-
 import Syntax (Syntax)
 import qualified Syntax
 
@@ -174,26 +172,24 @@ highlightExpressionParentheses isBuffer expression = void (go expression =<< Hel
 
     go (Syntax.AssignExpression _ _ value _) insertTextIter = go value insertTextIter
 
-    go (Syntax.ParenthesizedExpression expression (Span start end)) insertTextIter = do
+    go (Syntax.ParenthesizedExpression open expression close _) insertTextIter = do
       done <- go expression insertTextIter
 
       if done then
         pure True
       else do
-        leftStartTextIter <- #getIterAtOffset buffer (fromIntegral start)
-        leftEndTextIter <- #copy leftStartTextIter
-        #forwardChar leftEndTextIter
+        openStartTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start open))
+        openEndTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end open))
 
-        rightEndTextIter <- #getIterAtOffset buffer (fromIntegral end)
-        rightStartTextIter <- #copy rightEndTextIter
-        #backwardChar rightStartTextIter
+        closeStartTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start close))
+        closeEndTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end close))
 
         applyParenthesisTag <- or <$> traverse (#equal insertTextIter)
-          [leftStartTextIter, leftEndTextIter, rightEndTextIter, rightStartTextIter]
+          [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
 
         if applyParenthesisTag then do
-          #applyTagByName buffer "parenthesis" leftStartTextIter leftEndTextIter
-          #applyTagByName buffer "parenthesis" rightStartTextIter rightEndTextIter
+          #applyTagByName buffer "parenthesis" openStartTextIter openEndTextIter
+          #applyTagByName buffer "parenthesis" closeStartTextIter closeEndTextIter
           pure True
         else
           pure False
@@ -222,7 +218,7 @@ highlightExpression isBuffer = go
       highlight buffer "operator" operator
       go value
 
-    go (Syntax.ParenthesizedExpression expression _) = go expression
+    go (Syntax.ParenthesizedExpression _ expression _ _) = go expression
 
 
 highlight :: (Gtk.IsTextBuffer a, Syntax b, MonadIO m) => a -> Text -> b -> m ()

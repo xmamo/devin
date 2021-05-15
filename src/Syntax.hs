@@ -37,7 +37,7 @@ data Expression where
   UnaryExpression :: UnaryOperator -> Expression -> Span -> Expression
   BinaryExpression :: Expression -> BinaryOperator -> Expression -> Span -> Expression
   AssignExpression :: Identifier -> AssignOperator -> Expression -> Span -> Expression
-  ParenthesizedExpression :: Expression -> Span -> Expression
+  ParenthesizedExpression :: Span -> Expression -> Span -> Span -> Expression
   deriving (Eq, Show, Read)
 
 
@@ -89,7 +89,7 @@ instance Syntax Expression where
   span (UnaryExpression _ _ s) = s
   span (BinaryExpression _ _ _ s) = s
   span (AssignExpression _ _ _ s) = s
-  span (ParenthesizedExpression _ s) = s
+  span (ParenthesizedExpression _ _ _ s) = s
 
 
 instance Syntax UnaryOperator where

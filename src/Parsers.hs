@@ -13,6 +13,7 @@ module Parsers (
   assignOperator
 ) where
 
+import Prelude hiding (span)
 import Data.Char
 import Data.Foldable
 import Data.Functor
@@ -90,8 +91,12 @@ assignExpression = syntax $ do
 
 parenthesizedExpression :: Parser Syntax.Expression
 parenthesizedExpression = syntax $ do
-  Parser.char '('
-  Syntax.ParenthesizedExpression <$> Parser.commit (s *> expression <* s <* Parser.char ')')
+  open <- span (Parser.char '(')
+
+  Parser.commit $ do
+    e <- s *> expression
+    close <- span (Parser.char ')')
+    pure (Syntax.ParenthesizedExpression open e close)
 
 
 expression :: Parser Syntax.Expression
@@ -149,6 +154,13 @@ assignOperator = syntax $ asum
 
 s :: Parser Text
 s = Text.concat <$> many (Text.singleton <$> Parser.satisfy isSpace)
+
+
+span :: Parser a -> Parser Span
+span parser = do
+  start <- Parser.position
+  parser
+  Span start <$> Parser.position
 
 
 syntax :: Parser (Span -> a) -> Parser a
