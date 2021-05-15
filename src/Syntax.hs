@@ -1,5 +1,6 @@
 module Syntax (
   Syntax (..),
+  Token (..),
   Identifier(..),
   Expression (..),
   UnaryOperator (..),
@@ -26,6 +27,11 @@ class Syntax a where
   end = Span.end . span
 
 
+data Token where
+  Token :: Span -> Token
+  deriving (Eq, Show, Read)
+
+
 data Identifier where
   Identifier :: Text -> Span -> Identifier
   deriving (Eq, Show, Read)
@@ -37,7 +43,7 @@ data Expression where
   UnaryExpression :: UnaryOperator -> Expression -> Span -> Expression
   BinaryExpression :: Expression -> BinaryOperator -> Expression -> Span -> Expression
   AssignExpression :: Identifier -> AssignOperator -> Expression -> Span -> Expression
-  ParenthesizedExpression :: Span -> Expression -> Span -> Span -> Expression
+  ParenthesizedExpression :: Token -> Expression -> Token -> Span -> Expression
   deriving (Eq, Show, Read)
 
 
@@ -75,8 +81,8 @@ data AssignOperator where
   deriving (Eq, Show, Read)
 
 
-instance Syntax Span where
-  span s = s
+instance Syntax Token where
+  span (Token s) = s
 
 
 instance Syntax Identifier where

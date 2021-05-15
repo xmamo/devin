@@ -91,11 +91,11 @@ assignExpression = syntax $ do
 
 parenthesizedExpression :: Parser Syntax.Expression
 parenthesizedExpression = syntax $ do
-  open <- span (Parser.char '(')
+  open <- token (Parser.char '(')
 
   Parser.commit $ do
     e <- s *> expression
-    close <- span (Parser.char ')')
+    close <- token (Parser.char ')')
     pure (Syntax.ParenthesizedExpression open e close)
 
 
@@ -156,11 +156,11 @@ s :: Parser Text
 s = Text.concat <$> many (Text.singleton <$> Parser.satisfy isSpace)
 
 
-span :: Parser a -> Parser Span
-span parser = do
+token :: Parser a -> Parser Syntax.Token
+token parser = do
   start <- Parser.position
   parser
-  Span start <$> Parser.position
+  Syntax.Token . Span start <$> Parser.position
 
 
 syntax :: Parser (Span -> a) -> Parser a
@@ -170,12 +170,12 @@ syntax parser = do
   f . Span start <$> Parser.position
 
 
-keyword :: Text -> Parser Span
+keyword :: Text -> Parser Syntax.Token
 keyword k = Parser.label ("keyword " <> k) $ do
   (Syntax.Identifier name span) <- identifier
 
   if name == k then
-    pure span
+    pure (Syntax.Token span)
   else
     empty
 
