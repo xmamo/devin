@@ -158,6 +158,16 @@ syntax parser = do
   f . Span start <$> Parser.position
 
 
+keyword :: Text -> Parser Span
+keyword k = Parser.label ("keyword " <> k) $ do
+  (Syntax.Identifier name span) <- identifier
+
+  if name == k then
+    pure span
+  else
+    empty
+
+
 binary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syntax.Expression
 
 binary Syntax.BinaryExpression {} _ _ = undefined

@@ -75,6 +75,10 @@ data AssignOperator where
   deriving (Eq, Show, Read)
 
 
+instance Syntax Span where
+  span s = s
+
+
 instance Syntax Identifier where
   span (Identifier _ s) = s
 
