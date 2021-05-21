@@ -149,7 +149,7 @@ statement = asum
 
 integerExpression :: Parser Syntax.Expression
 integerExpression = Parser.label "integer" . syntax $ do
-  sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> (-1)) <|> pure 1
+  sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> -1) <|> pure 1
   digits <- some (Parser.satisfy isDigit)
   let magnitude = foldl' (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
   pure (Syntax.IntegerExpression (sign * magnitude))
