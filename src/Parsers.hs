@@ -235,8 +235,8 @@ binaryOperator = syntax $ asum
     Parser.char '<' $> Syntax.LessOperator,
     Parser.text ">=" $> Syntax.GreaterOrEqualOperator,
     Parser.char '>' $> Syntax.GreaterOperator,
-    Parser.char '&' $> Syntax.AndOperator,
-    Parser.char '|' $> Syntax.OrOperator
+    keyword "and" $> Syntax.AndOperator,
+    keyword "or" $> Syntax.OrOperator
   ]
 
 
