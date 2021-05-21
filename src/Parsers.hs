@@ -1,5 +1,7 @@
 module Parsers (
   identifier,
+  declareStatement,
+  declareAndAssignStatement,
   expressionStatement,
   ifStatement,
   ifElseStatement,
@@ -56,6 +58,26 @@ identifier = Parser.label "identifier" . syntax $ do
     nd = DecimalNumber
     nl = LetterNumber
     pc = ConnectorPunctuation
+
+
+declareStatement :: Parser Syntax.Statement
+declareStatement = syntax $ do
+  varKeyword <- keyword "var"
+  variable <- s *> identifier
+  terminator <- Parser.commit (s *> token (Parser.char ';'))
+  pure (Syntax.DeclareStatement varKeyword variable terminator)
+
+
+declareAndAssignStatement :: Parser Syntax.Statement
+declareAndAssignStatement = syntax $ do
+  varKeyword <- keyword "var"
+  variable <- s *> identifier
+  equalSign <- s *> token (Parser.char '=')
+
+  Parser.commit $ do
+    value <- s *> expression
+    terminator <- s *> token (Parser.char ';')
+    pure (Syntax.DeclareAndAssignStatement varKeyword variable equalSign value terminator)
 
 
 expressionStatement :: Parser Syntax.Statement
@@ -124,6 +146,21 @@ blockStatement = syntax $ do
 statement :: Parser Syntax.Statement
 statement = asum
   [
+    syntax $ do
+      varKeyword <- keyword "var"
+      variable <- s *> identifier <* s
+      equalSign <- optional (token (Parser.char '='))
+
+      case equalSign of
+        Just equalSign -> Parser.commit $ do
+          value <- s *> expression
+          terminator <- s *> token (Parser.char ';')
+          pure (Syntax.DeclareAndAssignStatement varKeyword variable equalSign value terminator)
+
+        Nothing -> do
+          terminator <- Parser.commit (s *> token (Parser.char ';'))
+          pure (Syntax.DeclareStatement varKeyword variable terminator),
+
     syntax $ do
       ifKeyword <- keyword "if"
       predicate <- s *> expression

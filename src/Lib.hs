@@ -155,6 +155,15 @@ highlightStatement isBuffer = go
   where
     buffer = isBuffer `asA` Gtk.TextBuffer
 
+    go (Syntax.DeclareStatement varKeyword variable _ _) = do
+      highlightWith buffer "keyword" varKeyword
+      highlightWith buffer "identifier" variable
+
+    go (Syntax.DeclareAndAssignStatement varKeyword variable _ value _ _) = do
+      highlightWith buffer "keyword" varKeyword
+      highlightWith buffer "identifier" variable
+      highlightExpression buffer value
+
     go (Syntax.ExpressionStatement value _ _) = highlightExpression buffer value
 
     go (Syntax.IfStatement ifKeyword predicate trueBranch _) = do
@@ -217,6 +226,10 @@ highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.
 highlightStatementParentheses isBuffer statement insertTextIter = go statement
   where
     buffer = isBuffer `asA` Gtk.TextBuffer
+
+    go Syntax.DeclareStatement {} = pure False
+
+    go (Syntax.DeclareAndAssignStatement _ _ _ value _ _) = highlightExpressionParentheses buffer value insertTextIter
 
     go (Syntax.ExpressionStatement value _ _) = highlightExpressionParentheses buffer value insertTextIter
 
