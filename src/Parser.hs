@@ -4,6 +4,7 @@ module Parser (
   char,
   text,
   position,
+  separatedBy,
   label,
   commit
 ) where
@@ -102,6 +103,15 @@ text t = Parser $ \(Input position text) -> case Text.stripPrefix t text of
 
 position :: Parser Int
 position = Parser $ \(Input position text) -> Result.Success position (Input position text)
+
+
+separatedBy :: Parser a -> Parser b -> Parser [a]
+separatedBy parser separator = do
+  parsed <- optional parser
+
+  case parsed of
+    Just parsed -> (parsed :) <$> many (separator *> parser)
+    Nothing -> pure []
 
 
 label :: Text -> Parser a -> Parser a

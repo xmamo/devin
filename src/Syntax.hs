@@ -39,12 +39,13 @@ data Identifier where
 
 
 data Statement where
-  ExpressionStatement :: Expression -> Span -> Statement
-  IfStatement :: Token -> Expression -> [Statement] -> Span -> Statement
-  IfElseStatement :: Token -> Expression -> [Statement] -> Token -> [Statement] -> Span -> Statement
-  WhileStatement :: Token -> Expression -> [Statement] -> Span -> Statement
-  DoWhileStatement :: Token -> [Statement] -> Token -> Expression -> Span -> Statement
-  ReturnStatement :: Token -> Expression -> Span -> Statement
+  ExpressionStatement :: Expression -> Token -> Span -> Statement
+  IfStatement :: Token -> Expression -> Statement -> Span -> Statement
+  IfElseStatement :: Token -> Expression -> Statement -> Token -> Statement -> Span -> Statement
+  WhileStatement :: Token -> Expression -> Statement -> Span -> Statement
+  DoWhileStatement :: Token -> Statement -> Token -> Expression -> Token -> Span -> Statement
+  ReturnStatement :: Token -> Expression -> Token -> Span -> Statement
+  BlockStatement :: Token -> [Statement] -> Token -> Span -> Statement
   deriving (Eq, Show, Read)
 
 
@@ -101,12 +102,13 @@ instance Syntax Identifier where
 
 
 instance Syntax Statement where
-  span (ExpressionStatement _ s) = s
+  span (ExpressionStatement _ _ s) = s
   span (IfStatement _ _ _ s) = s
   span (IfElseStatement _ _ _ _ _ s) = s
   span (WhileStatement _ _ _ s) = s
-  span (DoWhileStatement _ _ _ _ s) = s
-  span (ReturnStatement _ _ s) = s
+  span (DoWhileStatement _ _ _ _ _ s) = s
+  span (ReturnStatement _ _ _ s) = s
+  span (BlockStatement _ _ _ s) = s
 
 
 instance Syntax Expression where

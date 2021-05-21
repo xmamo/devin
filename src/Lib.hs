@@ -5,6 +5,7 @@ import Control.Monad.IO.Class
 import Data.Functor
 import Data.Foldable
 import Data.Maybe
+import Data.Traversable
 import System.Environment
 import System.Exit
 
@@ -70,26 +71,26 @@ onActivate isApplication = do
     #add tagTable tag
 
   threadIdVar <- newMVar =<< forkIO (pure ())
-  expressionVar <- newMVar Nothing
+  statementVar <- newMVar Nothing
 
   on buffer #changed $ do
     text <- fromJust <$> get buffer #text
 
     killThread =<< takeMVar threadIdVar
-    swapMVar expressionVar Nothing
+    swapMVar statementVar Nothing
 
     threadId <- forkIO $ do
-      let expression = Parser.parse Parsers.expression (Input 0 text)
+      let statement = Parser.parse Parsers.statement (Input 0 text)
 
-      case expression of
-        Result.Success expression _ -> Gtk.postGUIASync $ do
-          swapMVar expressionVar (Just expression)
+      case statement of
+        Result.Success statement _ -> Gtk.postGUIASync $ do
+          swapMVar statementVar (Just statement)
 
           (startTextIter, endTextIter) <- #getBounds buffer
           for_ styles $ \(tagName, _) -> #removeTagByName buffer tagName startTextIter endTextIter
 
-          highlightExpression buffer expression
-          highlightExpressionParentheses buffer expression
+          highlightStatement buffer statement
+          highlightStatementParentheses buffer statement
 
           set logTextBuffer [#text := ""]
 
@@ -112,8 +113,8 @@ onActivate isApplication = do
     (startTextIter, endTextIter) <- #getBounds buffer
     #removeTagByName buffer "parenthesis" startTextIter endTextIter
 
-    expression <- MaybeT (readMVar expressionVar)
-    highlightExpressionParentheses buffer expression
+    statement <- MaybeT (readMVar statementVar)
+    highlightStatementParentheses buffer statement
 
   logTextView <- new Gtk.TextView
     [
@@ -151,8 +152,142 @@ onActivate isApplication = do
   #showAll window
 
 
-highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
-highlightExpressionParentheses isBuffer expression = void (go expression =<< Helpers.getInsertTextIter buffer)
+highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m ()
+highlightStatement isBuffer = go
+  where
+    buffer = isBuffer `asA` Gtk.TextBuffer
+
+    go (Syntax.ExpressionStatement value _ _) = highlightExpression buffer value
+
+    go (Syntax.IfStatement ifKeyword predicate trueBranch _) = do
+      highlight buffer "keyword" ifKeyword
+      highlightExpression buffer predicate
+      highlightStatement buffer trueBranch
+
+    go (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch _) = do
+      highlight buffer "keyword" ifKeyword
+      highlightExpression buffer predicate
+      highlightStatement buffer trueBranch
+      highlight buffer "keyword" elseKeyword
+      highlightStatement buffer falseBranch
+
+    go (Syntax.WhileStatement whileKeyword predicate body _) = do
+      highlight buffer "keyword" whileKeyword
+      highlightExpression buffer predicate
+      highlightStatement buffer body
+
+    go (Syntax.DoWhileStatement doKeyword body whileKeyword predicate _ _) = do
+      highlight buffer "keyword" doKeyword
+      highlightStatement buffer body
+      highlight buffer "keyword" whileKeyword
+      highlightExpression buffer predicate
+
+    go (Syntax.ReturnStatement returnKeyword value _ _) = do
+      highlight buffer "keyword" returnKeyword
+      highlightExpression buffer value
+
+    go (Syntax.BlockStatement _ statements _ _) = for_ statements (highlightStatement buffer)
+
+
+highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
+highlightExpression isBuffer = go
+  where
+    buffer = isBuffer `asA` Gtk.TextBuffer
+
+    go integer @ Syntax.IntegerExpression {} = highlight buffer "integer" integer
+
+    go (Syntax.IdentifierExpression identifier _) = highlight buffer "identifier" identifier
+
+    go (Syntax.UnaryExpression operator operand _) = do
+      highlight buffer "operator" operator
+      go operand
+
+    go (Syntax.BinaryExpression left operator right _) = do
+      go left
+      highlight buffer "operator" operator
+      go right
+
+    go (Syntax.AssignExpression identifier operator value _) = do
+      highlight buffer "identifier" identifier
+      highlight buffer "operator" operator
+      go value
+
+    go (Syntax.ParenthesizedExpression _ expression _ _) = go expression
+
+
+highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m ()
+highlightStatementParentheses isBuffer statement = void (go statement =<< Helpers.getInsertTextIter buffer)
+  where
+    buffer = isBuffer `asA` Gtk.TextBuffer
+
+    go :: MonadIO m => Syntax.Statement -> Gtk.TextIter -> m Bool
+
+    go (Syntax.ExpressionStatement value _ _) _ = highlightExpressionParentheses buffer value
+
+    go (Syntax.IfStatement _ predicate trueBranch _) insertTextIter = do
+      done <- highlightExpressionParentheses buffer predicate
+
+      if done then
+        pure True
+      else
+        go trueBranch insertTextIter
+
+    go (Syntax.IfElseStatement _ predicate trueBranch _ falseBranch _) insertTextIter = do
+      done <- highlightExpressionParentheses buffer predicate
+
+      if done then
+        pure True
+      else do
+        done <- go trueBranch insertTextIter
+
+        if done then
+          pure True
+        else
+          go falseBranch insertTextIter
+
+    go (Syntax.WhileStatement _ predicate body _) insertTextIter = do
+      done <- highlightExpressionParentheses buffer predicate
+
+      if done then
+        pure True
+      else
+        go body insertTextIter
+
+    go (Syntax.DoWhileStatement _ body _ predicate _ _) insertTextIter = do
+      done <- go body insertTextIter
+
+      if done then
+        pure True
+      else
+        highlightExpressionParentheses buffer predicate
+
+    go (Syntax.ReturnStatement _ value _ _) _ = highlightExpressionParentheses buffer value
+
+    go (Syntax.BlockStatement open statements close _) insertTextIter = do
+      done <- or <$> for statements (\s -> go s insertTextIter)
+
+      if done then
+        pure True
+      else do
+        openStartTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start open))
+        openEndTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end open))
+
+        closeStartTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start close))
+        closeEndTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end close))
+
+        applyParenthesisTag <- or <$> traverse (#equal insertTextIter)
+          [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
+
+        if applyParenthesisTag then do
+          #applyTagByName buffer "parenthesis" openStartTextIter openEndTextIter
+          #applyTagByName buffer "parenthesis" closeStartTextIter closeEndTextIter
+          pure True
+        else
+          pure False
+
+
+highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m Bool
+highlightExpressionParentheses isBuffer expression = go expression =<< Helpers.getInsertTextIter buffer
   where
     buffer = isBuffer `asA` Gtk.TextBuffer
 
@@ -193,32 +328,6 @@ highlightExpressionParentheses isBuffer expression = void (go expression =<< Hel
           pure True
         else
           pure False
-
-
-highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a ->  Syntax.Expression -> m ()
-highlightExpression isBuffer = go
-  where
-    buffer = isBuffer `asA` Gtk.TextBuffer
-
-    go integer @ Syntax.IntegerExpression {} = highlight buffer "integer" integer
-
-    go (Syntax.IdentifierExpression identifier _) = highlight buffer "identifier" identifier
-
-    go (Syntax.UnaryExpression operator operand _) = do
-      highlight buffer "operator" operator
-      go operand
-
-    go (Syntax.BinaryExpression left operator right _) = do
-      go left
-      highlight buffer "operator" operator
-      go right
-
-    go (Syntax.AssignExpression identifier operator value _) = do
-      highlight buffer "identifier" identifier
-      highlight buffer "operator" operator
-      go value
-
-    go (Syntax.ParenthesizedExpression _ expression _ _) = go expression
 
 
 highlight :: (Gtk.IsTextBuffer a, Syntax b, MonadIO m) => a -> Text -> b -> m ()

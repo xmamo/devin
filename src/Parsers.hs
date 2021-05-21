@@ -1,5 +1,13 @@
 module Parsers (
   identifier,
+  expressionStatement,
+  ifStatement,
+  ifElseStatement,
+  whileStatement,
+  doWhileStatement,
+  returnStatement,
+  blockStatement,
+  statement,
   identifierExpression,
   integerExpression,
   primaryExpression,
@@ -50,6 +58,95 @@ identifier = Parser.label "identifier" . syntax $ do
     pc = ConnectorPunctuation
 
 
+expressionStatement :: Parser Syntax.Statement
+expressionStatement = syntax $ do
+  value <- expression
+  terminator <- s *> token (Parser.char ';')
+  pure (Syntax.ExpressionStatement value terminator)
+
+
+ifStatement :: Parser Syntax.Statement
+ifStatement = syntax $ do
+  ifKeyword <- keyword "if"
+  predicate <- s *> expression
+  trueBranch <- Parser.commit (s *> statement)
+  pure (Syntax.IfStatement ifKeyword predicate trueBranch)
+
+
+ifElseStatement :: Parser Syntax.Statement
+ifElseStatement = syntax $ do
+  ifKeyword <- keyword "if"
+  predicate <- s *> expression
+  trueBranch <- Parser.commit (s *> statement)
+  elseKeyword <- s *> keyword "else"
+  falseBranch <- Parser.commit (s *> statement)
+  pure (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch)
+
+
+whileStatement :: Parser Syntax.Statement
+whileStatement = syntax $ do
+  whileKeyword <- keyword "while"
+  predicate <- s *> expression
+  body <- Parser.commit (s *> statement)
+  pure (Syntax.WhileStatement whileKeyword predicate body)
+
+
+doWhileStatement :: Parser Syntax.Statement
+doWhileStatement = syntax $ do
+  doKeyword <- keyword "do"
+  body <- s *> statement
+
+  Parser.commit $ do
+    whileKeyword <- s *> keyword "while"
+    predicate <- s *> expression
+    terminator <- s *> token (Parser.char ';')
+    pure (Syntax.DoWhileStatement doKeyword body whileKeyword predicate terminator)
+
+
+returnStatement :: Parser Syntax.Statement
+returnStatement = syntax $ do
+  returnKeyword <- keyword "return"
+  value <- s*> expression
+  terminator <- Parser.commit (s *> token (Parser.char ';'))
+  pure (Syntax.ReturnStatement returnKeyword value terminator)
+
+
+blockStatement :: Parser Syntax.Statement
+blockStatement = syntax $ do
+  open <- token (Parser.char '{')
+
+  Parser.commit $ do
+    statements <- s *> Parser.separatedBy statement s
+    close <- s *> token (Parser.char '}')
+    pure (Syntax.BlockStatement open statements close)
+
+
+statement :: Parser Syntax.Statement
+statement = asum
+  [
+    expressionStatement,
+
+    syntax (do
+      ifKeyword <- keyword "if"
+      predicate <- s *> expression
+      trueBranch <- Parser.commit (s *> statement)
+      elseKeyword <- optional (s *> keyword "else")
+
+      case elseKeyword of
+        Just elseKeyword -> do
+          falseBranch <- Parser.commit (s *> statement)
+          pure (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch)
+
+        Nothing -> pure (Syntax.IfStatement ifKeyword predicate trueBranch)
+    ),
+
+    whileStatement,
+    doWhileStatement,
+    returnStatement,
+    blockStatement
+  ]
+
+
 integerExpression :: Parser Syntax.Expression
 integerExpression = Parser.label "integer" . syntax $ do
   sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> (-1)) <|> pure 1
@@ -94,9 +191,9 @@ parenthesizedExpression = syntax $ do
   open <- token (Parser.char '(')
 
   Parser.commit $ do
-    e <- s *> expression
-    close <- token (Parser.char ')')
-    pure (Syntax.ParenthesizedExpression open e close)
+    value <- s *> expression
+    close <- s *> token (Parser.char ')')
+    pure (Syntax.ParenthesizedExpression open value close)
 
 
 expression :: Parser Syntax.Expression
@@ -109,8 +206,8 @@ expression = asum
       operator <- optional (s *> binaryOperator)
 
       case operator of
-        Just operator -> Parser.commit $ do
-          right <- s *> expression
+        Just operator -> do
+          right <- Parser.commit (s *> expression)
           pure (binary left operator right)
 
         Nothing -> pure left
@@ -165,14 +262,16 @@ token :: Parser a -> Parser Syntax.Token
 token parser = do
   start <- Parser.position
   parser
-  Syntax.Token . Span start <$> Parser.position
+  end <- Parser.position
+  pure (Syntax.Token (Span start end))
 
 
 syntax :: Parser (Span -> a) -> Parser a
 syntax parser = do
   start <- Parser.position
   f <- parser
-  f . Span start <$> Parser.position
+  end <- Parser.position
+  pure (f (Span start end))
 
 
 keyword :: Text -> Parser Syntax.Token
