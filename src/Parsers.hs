@@ -124,7 +124,7 @@ blockStatement = syntax $ do
 statement :: Parser Syntax.Statement
 statement = asum
   [
-    syntax (do
+    syntax $ do
       ifKeyword <- keyword "if"
       predicate <- s *> expression
       trueBranch <- Parser.commit (s *> statement)
@@ -135,8 +135,7 @@ statement = asum
           falseBranch <- Parser.commit (s *> statement)
           pure (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch)
 
-        Nothing -> pure (Syntax.IfStatement ifKeyword predicate trueBranch)
-    ),
+        Nothing -> pure (Syntax.IfStatement ifKeyword predicate trueBranch),
 
     whileStatement,
     doWhileStatement,
