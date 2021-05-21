@@ -101,8 +101,8 @@ onActivate isApplication = do
           for_ styles $ \(tagName, _) -> #removeTagByName buffer tagName startTextIter endTextIter
           #applyTagByName buffer "error" startTextIter endTextIter
 
-          line <- (+ 1) <$> #getLine startTextIter
-          column <- (+ 1) <$> #getLineOffset startTextIter
+          line <- (+ 1) . toInteger <$> #getLine startTextIter
+          column <- (+ 1) . toInteger <$> #getLineOffset startTextIter
           let prefix = "[" <> Text.pack (show line) <> ":" <> Text.pack (show column) <> "] "
           set logTextBuffer [#text := prefix <> Helpers.expectationsText expectations]
 
