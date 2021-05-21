@@ -1,0 +1,8 @@
+- ignore:
+    name: Use <$>
+
+- suggest:
+    name: Use String
+
+- suggest:
+    name: Redundant do
