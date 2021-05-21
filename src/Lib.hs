@@ -5,7 +5,6 @@ import Control.Monad.IO.Class
 import Data.Functor
 import Data.Foldable
 import Data.Maybe
-import Data.Traversable
 import System.Environment
 import System.Exit
 
@@ -215,8 +214,8 @@ highlightExpression isBuffer = go
     go (Syntax.ParenthesizedExpression _ expression _ _) = go expression
 
 
-highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m ()
-highlightStatementParentheses isBuffer statement = void (go statement =<< Helpers.getInsertTextIter buffer)
+highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m Bool
+highlightStatementParentheses isBuffer statement = go statement =<< Helpers.getInsertTextIter buffer
   where
     buffer = isBuffer `asA` Gtk.TextBuffer
 
@@ -264,7 +263,7 @@ highlightStatementParentheses isBuffer statement = void (go statement =<< Helper
     go (Syntax.ReturnStatement _ value _ _) _ = highlightExpressionParentheses buffer value
 
     go (Syntax.BlockStatement open statements close _) insertTextIter = do
-      done <- or <$> for statements (\s -> go s insertTextIter)
+      done <- foldlM (\a s -> if a then pure True else go s insertTextIter) False statements
 
       if done then
         pure True
@@ -275,7 +274,7 @@ highlightStatementParentheses isBuffer statement = void (go statement =<< Helper
         closeStartTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start close))
         closeEndTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end close))
 
-        applyParenthesisTag <- or <$> traverse (#equal insertTextIter)
+        applyParenthesisTag <- foldlM (\a i -> if a then pure True else #equal insertTextIter i) False
           [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
 
         if applyParenthesisTag then do
@@ -319,7 +318,7 @@ highlightExpressionParentheses isBuffer expression = go expression =<< Helpers.g
         closeStartTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start close))
         closeEndTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end close))
 
-        applyParenthesisTag <- or <$> traverse (#equal insertTextIter)
+        applyParenthesisTag <- foldlM (\a i -> if a then pure True else #equal insertTextIter i) False
           [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
 
         if applyParenthesisTag then do
