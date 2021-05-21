@@ -61,7 +61,7 @@ identifier = Parser.label "identifier" . syntax $ do
 expressionStatement :: Parser Syntax.Statement
 expressionStatement = syntax $ do
   value <- expression
-  terminator <- s *> token (Parser.char ';')
+  terminator <- Parser.commit (s *> token (Parser.char ';'))
   pure (Syntax.ExpressionStatement value terminator)
 
 
@@ -124,8 +124,6 @@ blockStatement = syntax $ do
 statement :: Parser Syntax.Statement
 statement = asum
   [
-    expressionStatement,
-
     syntax (do
       ifKeyword <- keyword "if"
       predicate <- s *> expression
@@ -143,7 +141,8 @@ statement = asum
     whileStatement,
     doWhileStatement,
     returnStatement,
-    blockStatement
+    blockStatement,
+    expressionStatement
   ]
 
 
