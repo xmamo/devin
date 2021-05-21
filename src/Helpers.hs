@@ -1,5 +1,6 @@
 module Helpers (
   getInsertTextIter,
+  getLineColumn,
   getStyle,
   expectationsText
 ) where
@@ -21,6 +22,27 @@ getInsertTextIter isBuffer = do
 
   insertTextMark <- #getInsert buffer
   #getIterAtMark buffer insertTextMark
+
+
+getLineColumn :: (Num a, MonadIO m) => Gtk.TextIter -> m (a, a)
+getLineColumn textIter = do
+  line <- (1 +) . fromIntegral <$> #getLine textIter
+
+  textIter' <- #copy textIter
+  #setLineOffset textIter' 0
+
+  let
+    go column = do
+      result <- #compare textIter' textIter
+
+      if result >= 0 then
+        pure column
+      else do
+        #forwardCursorPosition textIter'
+        go (column + 1)
+
+  column <- go 1
+  pure (line, column)
 
 
 getStyle ::
