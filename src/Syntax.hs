@@ -151,7 +151,7 @@ instance Syntax BinaryOperator where
   span (OrOperator s) = s
 
 
-precedence :: BinaryOperator -> Integer
+precedence :: BinaryOperator -> Int
 precedence (AddOperator _) = 4
 precedence (SubtractOperator _) = 4
 precedence (MultiplyOperator _) = 5
