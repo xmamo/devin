@@ -7,10 +7,11 @@ module Syntax (
   UnaryOperator (..),
   BinaryOperator (..),
   AssignOperator (..),
-  precedence
+  comparePrecedence
 ) where
 
 import Prelude hiding (span)
+import Data.Ord
 
 import Data.Text (Text)
 
@@ -177,17 +178,19 @@ instance Syntax BinaryOperator where
   span (OrOperator s) = s
 
 
-precedence :: Num a => BinaryOperator -> a
-precedence (AddOperator _) = 4
-precedence (SubtractOperator _) = 4
-precedence (MultiplyOperator _) = 5
-precedence (DivideOperator _) = 5
-precedence (RemainderOperator _) = 5
-precedence (EqualOperator _) = 2
-precedence (NotEqualOperator _) = 2
-precedence (LessOperator _) = 3
-precedence (LessOrEqualOperator _) = 3
-precedence (GreaterOperator _) = 3
-precedence (GreaterOrEqualOperator _) = 3
-precedence (AndOperator _) = 1
-precedence (OrOperator _) = 1
+comparePrecedence :: BinaryOperator -> BinaryOperator -> Ordering
+comparePrecedence = comparing precedence
+  where
+    precedence (AddOperator _) = 4
+    precedence (SubtractOperator _) = 4
+    precedence (MultiplyOperator _) = 5
+    precedence (DivideOperator _) = 5
+    precedence (RemainderOperator _) = 5
+    precedence (EqualOperator _) = 2
+    precedence (NotEqualOperator _) = 2
+    precedence (LessOperator _) = 3
+    precedence (LessOrEqualOperator _) = 3
+    precedence (GreaterOperator _) = 3
+    precedence (GreaterOrEqualOperator _) = 3
+    precedence (AndOperator _) = 1
+    precedence (OrOperator _) = 1

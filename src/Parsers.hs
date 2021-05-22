@@ -43,10 +43,10 @@ import qualified Syntax
 identifier :: Parser Syntax.Identifier
 identifier = Parser.label "identifier" . syntax $ do
   start <- gc [lu, ll, lt, lm, lo, nl, pc]
-  continue <- Text.concat <$> many (gc [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
-  pure (Syntax.Identifier (start <> continue))
+  continue <- Text.pack <$> many (gc [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
+  pure (Syntax.Identifier (Text.cons start continue))
   where
-    gc list = Text.singleton <$> Parser.satisfy (\c -> generalCategory c `elem` list)
+    gc list = Parser.satisfy (\c -> generalCategory c `elem` list)
     lu = UppercaseLetter
     ll = LowercaseLetter
     lt = TitlecaseLetter
@@ -323,7 +323,7 @@ binary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syn
 binary Syntax.BinaryExpression {} _ _ = undefined
 
 binary left operator (Syntax.BinaryExpression rLeft rOperator rRight)
-  | Syntax.precedence operator >= Syntax.precedence rOperator =
+  | Syntax.comparePrecedence operator rOperator >= EQ =
     Syntax.BinaryExpression (Syntax.BinaryExpression left operator rLeft) rOperator rRight
 
 binary left operator right = Syntax.BinaryExpression left operator right
