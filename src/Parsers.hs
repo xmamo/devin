@@ -61,22 +61,22 @@ identifier = Parser.label "identifier" . syntax $ do
 
 declareStatement :: Parser Syntax.Statement
 declareStatement = do
-  varKeyword <- keyword "var"
+  t <- identifier
   variable <- s *> identifier
-  terminator <- Parser.commit (s *> token (Parser.char ';'))
-  pure (Syntax.DeclareStatement varKeyword variable terminator)
+  terminator <- s *> token (Parser.char ';')
+  pure (Syntax.DeclareStatement t variable terminator)
 
 
 declareAndAssignStatement :: Parser Syntax.Statement
 declareAndAssignStatement = do
-  varKeyword <- keyword "var"
+  t <- identifier
   variable <- s *> identifier
   equalSign <- s *> token (Parser.char '=')
 
   Parser.commit $ do
     value <- s *> expression
     terminator <- s *> token (Parser.char ';')
-    pure (Syntax.DeclareAndAssignStatement varKeyword variable equalSign value terminator)
+    pure (Syntax.DeclareAndAssignStatement t variable equalSign value terminator)
 
 
 expressionStatement :: Parser Syntax.Statement
@@ -146,7 +146,7 @@ statement :: Parser Syntax.Statement
 statement = asum
   [
     do
-      varKeyword <- keyword "var"
+      t <- identifier
       variable <- s *> identifier <* s
       equalSign <- optional (token (Parser.char '='))
 
@@ -154,11 +154,11 @@ statement = asum
         Just equalSign -> Parser.commit $ do
           value <- s *> expression
           terminator <- s *> token (Parser.char ';')
-          pure (Syntax.DeclareAndAssignStatement varKeyword variable equalSign value terminator)
+          pure (Syntax.DeclareAndAssignStatement t variable equalSign value terminator)
 
         Nothing -> do
-          terminator <- Parser.commit (s *> token (Parser.char ';'))
-          pure (Syntax.DeclareStatement varKeyword variable terminator),
+          terminator <- s *> token (Parser.char ';')
+          pure (Syntax.DeclareStatement t variable terminator),
 
     do
       ifKeyword <- keyword "if"

@@ -42,8 +42,8 @@ data Identifier where
 
 
 data Statement where
-  DeclareStatement :: Token -> Identifier -> Token -> Statement
-  DeclareAndAssignStatement :: Token -> Identifier -> Token -> Expression -> Token -> Statement
+  DeclareStatement :: Identifier -> Identifier -> Token -> Statement
+  DeclareAndAssignStatement :: Identifier -> Identifier -> Token -> Expression -> Token -> Statement
   ExpressionStatement :: Expression -> Token -> Statement
   IfStatement :: Token -> Expression -> Statement -> Statement
   IfElseStatement :: Token -> Expression -> Statement -> Token -> Statement -> Statement
@@ -107,8 +107,8 @@ instance Syntax Identifier where
 
 
 instance Syntax Statement where
-  start (DeclareStatement varKeyword _ _) = start varKeyword
-  start (DeclareAndAssignStatement varKeyword _ _ _ _) = start varKeyword
+  start (DeclareStatement t _ _) = start t
+  start (DeclareAndAssignStatement t _ _ _ _) = start t
   start (ExpressionStatement value _) = start value
   start (IfStatement ifKeyword _ _) = start ifKeyword
   start (IfElseStatement ifKeyword _ _ _ _) = start ifKeyword

@@ -56,6 +56,7 @@ onActivate isApplication = do
     styles =
       [
         ("keyword", "def:keyword"),
+        ("type", "def:type"),
         ("identifier", "def:identifier"),
         ("integer", "def:decimal"),
         ("operator", "def:operator"),
@@ -156,12 +157,12 @@ highlightStatement isBuffer = go
   where
     buffer = isBuffer `asA` Gtk.TextBuffer
 
-    go (Syntax.DeclareStatement varKeyword variable _) = do
-      highlightWith buffer "keyword" varKeyword
+    go (Syntax.DeclareStatement t variable _) = do
+      highlightWith buffer "type" t
       highlightWith buffer "identifier" variable
 
-    go (Syntax.DeclareAndAssignStatement varKeyword variable _ value _) = do
-      highlightWith buffer "keyword" varKeyword
+    go (Syntax.DeclareAndAssignStatement t variable _ value _) = do
+      highlightWith buffer "type" t
       highlightWith buffer "identifier" variable
       highlightExpression buffer value
 
