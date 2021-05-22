@@ -39,13 +39,12 @@ import Span (Span (Span))
 import qualified Syntax
 
 
--- (?:\p{Nd}[\p{Mn}\p{Mc}]*)*[\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
+-- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
 identifier :: Parser Syntax.Identifier
 identifier = Parser.label "identifier" . syntax $ do
-  a <- Text.concat <$> many (gc [nd] <> (Text.concat <$> many (gc [mn, mc])))
-  b <- gc [lu, ll, lt, lm, lo, nl, pc]
-  c <- Text.concat <$> many (gc [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
-  pure (Syntax.Identifier (a <> b <> c))
+  start <- gc [lu, ll, lt, lm, lo, nl, pc]
+  continue <- Text.concat <$> many (gc [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
+  pure (Syntax.Identifier (start <> continue))
   where
     gc list = Text.singleton <$> Parser.satisfy (\c -> generalCategory c `elem` list)
     lu = UppercaseLetter
