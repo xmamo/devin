@@ -26,7 +26,7 @@ newtype Parser a where
 
 
 instance Semigroup a => Semigroup (Parser a) where
-  parser1 <> parser2 = liftA2 (<>) parser1 parser2
+  parser1 <> parser2 = (<>) <$> parser1 <*> parser2
 
 
 instance Monoid a => Monoid (Parser a) where
@@ -42,13 +42,6 @@ instance Applicative Parser where
 
   parser1 <*> parser2 = Parser $ \input -> case parse parser1 input of
     Result.Success f rest -> f <$> parse parser2 rest
-    Result.Failure recoverable position expectations -> Result.Failure recoverable position expectations
-
-  liftA2 f parser1 parser2 = Parser $ \input -> case parse parser1 input of
-    Result.Success value1 rest -> case parse parser2 rest of
-      Result.Success value2 rest -> Result.Success (f value1 value2) rest
-      Result.Failure recoverable position expectations -> Result.Failure recoverable position expectations
-
     Result.Failure recoverable position expectations -> Result.Failure recoverable position expectations
 
 
