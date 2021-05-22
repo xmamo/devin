@@ -124,6 +124,7 @@ onActivate isApplication = do
 
   sourceView <- new GtkSource.View
     [
+      #autoIndent := True,
       #showLineNumbers := True,
       #highlightCurrentLine := True,
       #tabWidth := 4,
