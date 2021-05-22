@@ -1,4 +1,4 @@
-module Lib (main) where
+module Main (main) where
 
 import Control.Concurrent
 import Control.Monad.IO.Class

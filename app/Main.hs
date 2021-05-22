@@ -1,7 +1,3 @@
 module Main (main) where
 
-import qualified Lib
-
-
-main :: IO ()
-main = Lib.main
+import "devin" Main (main)

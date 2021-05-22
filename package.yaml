@@ -25,25 +25,26 @@ default-extensions:
 
 dependencies:
   - base
+  - transformers
+  - text
+  - haskell-gi-base
+  - gi-gtk
+  - gi-gtk-hs
+  - gi-gtksource
 
 library:
   source-dirs: src
 
-  dependencies:
-    - transformers
-    - text
-    - haskell-gi-base
-    - gi-gtk
-    - gi-gtk-hs
-    - gi-gtksource
-
 executables:
-  devin-exe:
+  devin:
     main: Main.hs
     source-dirs: app
 
     ghc-options:
       - -threaded
+
+    default-extensions:
+      - PackageImports
 
     dependencies:
       - devin
