@@ -200,13 +200,13 @@ primaryExpression = identifierExpression <|> integerExpression
 unaryExpression :: Parser Syntax.Expression
 unaryExpression = do
   operator <- unaryOperator
-  operand <- Parser.commit(s *> (unaryExpression <|> parenthesizedExpression <|> primaryExpression))
+  operand <- Parser.commit(s *> (primaryExpression <|> unaryExpression <|> parenthesizedExpression))
   pure (Syntax.UnaryExpression operator operand)
 
 
 binaryExpression :: Parser Syntax.Expression
 binaryExpression = do
-  left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
+  left <- primaryExpression <|> unaryExpression <|> parenthesizedExpression
   operator <- s *> binaryOperator
   right <- Parser.commit (s *> expression)
   pure (binary left operator right)
@@ -236,7 +236,7 @@ expression = asum
     assignExpression,
 
     do
-      left <- unaryExpression <|> parenthesizedExpression <|> primaryExpression
+      left <- primaryExpression <|> unaryExpression <|> parenthesizedExpression
       operator <- optional (s *> binaryOperator)
 
       case operator of
