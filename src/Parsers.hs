@@ -61,7 +61,7 @@ identifier = Parser.label "identifier" . syntax $ do
 
 
 declareStatement :: Parser Syntax.Statement
-declareStatement = syntax $ do
+declareStatement = do
   varKeyword <- keyword "var"
   variable <- s *> identifier
   terminator <- Parser.commit (s *> token (Parser.char ';'))
@@ -69,7 +69,7 @@ declareStatement = syntax $ do
 
 
 declareAndAssignStatement :: Parser Syntax.Statement
-declareAndAssignStatement = syntax $ do
+declareAndAssignStatement = do
   varKeyword <- keyword "var"
   variable <- s *> identifier
   equalSign <- s *> token (Parser.char '=')
@@ -81,14 +81,14 @@ declareAndAssignStatement = syntax $ do
 
 
 expressionStatement :: Parser Syntax.Statement
-expressionStatement = syntax $ do
+expressionStatement = do
   value <- expression
   terminator <- Parser.commit (s *> token (Parser.char ';'))
   pure (Syntax.ExpressionStatement value terminator)
 
 
 ifStatement :: Parser Syntax.Statement
-ifStatement = syntax $ do
+ifStatement = do
   ifKeyword <- keyword "if"
   predicate <- s *> expression
   trueBranch <- Parser.commit (s *> statement)
@@ -96,7 +96,7 @@ ifStatement = syntax $ do
 
 
 ifElseStatement :: Parser Syntax.Statement
-ifElseStatement = syntax $ do
+ifElseStatement = do
   ifKeyword <- keyword "if"
   predicate <- s *> expression
   trueBranch <- Parser.commit (s *> statement)
@@ -106,7 +106,7 @@ ifElseStatement = syntax $ do
 
 
 whileStatement :: Parser Syntax.Statement
-whileStatement = syntax $ do
+whileStatement = do
   whileKeyword <- keyword "while"
   predicate <- s *> expression
   body <- Parser.commit (s *> statement)
@@ -114,7 +114,7 @@ whileStatement = syntax $ do
 
 
 doWhileStatement :: Parser Syntax.Statement
-doWhileStatement = syntax $ do
+doWhileStatement = do
   doKeyword <- keyword "do"
   body <- s *> statement
 
@@ -126,7 +126,7 @@ doWhileStatement = syntax $ do
 
 
 returnStatement :: Parser Syntax.Statement
-returnStatement = syntax $ do
+returnStatement = do
   returnKeyword <- keyword "return"
   value <- s*> expression
   terminator <- Parser.commit (s *> token (Parser.char ';'))
@@ -134,7 +134,7 @@ returnStatement = syntax $ do
 
 
 blockStatement :: Parser Syntax.Statement
-blockStatement = syntax $ do
+blockStatement = do
   open <- token (Parser.char '{')
 
   Parser.commit $ do
@@ -146,7 +146,7 @@ blockStatement = syntax $ do
 statement :: Parser Syntax.Statement
 statement = asum
   [
-    syntax $ do
+    do
       varKeyword <- keyword "var"
       variable <- s *> identifier <* s
       equalSign <- optional (token (Parser.char '='))
@@ -161,7 +161,7 @@ statement = asum
           terminator <- Parser.commit (s *> token (Parser.char ';'))
           pure (Syntax.DeclareStatement varKeyword variable terminator),
 
-    syntax $ do
+    do
       ifKeyword <- keyword "if"
       predicate <- s *> expression
       trueBranch <- Parser.commit (s *> statement)
@@ -191,7 +191,7 @@ integerExpression = Parser.label "integer" . syntax $ do
 
 
 identifierExpression :: Parser Syntax.Expression
-identifierExpression = syntax (Syntax.IdentifierExpression <$> identifier)
+identifierExpression = Syntax.IdentifierExpression <$> identifier
 
 
 primaryExpression :: Parser Syntax.Expression
@@ -199,7 +199,7 @@ primaryExpression = identifierExpression <|> integerExpression
 
 
 unaryExpression :: Parser Syntax.Expression
-unaryExpression = syntax $ do
+unaryExpression = do
   operator <- unaryOperator
   operand <- Parser.commit(s *> (unaryExpression <|> parenthesizedExpression <|> primaryExpression))
   pure (Syntax.UnaryExpression operator operand)
@@ -214,7 +214,7 @@ binaryExpression = do
 
 
 assignExpression :: Parser Syntax.Expression
-assignExpression = syntax $ do
+assignExpression = do
   target <- identifier
   operator <- s *> assignOperator
   value <- Parser.commit (s *> expression)
@@ -222,7 +222,7 @@ assignExpression = syntax $ do
 
 
 parenthesizedExpression :: Parser Syntax.Expression
-parenthesizedExpression = syntax $ do
+parenthesizedExpression = do
   open <- token (Parser.char '(')
 
   Parser.commit $ do
@@ -323,9 +323,8 @@ binary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syn
 
 binary Syntax.BinaryExpression {} _ _ = undefined
 
-binary left operator right @ (Syntax.BinaryExpression rLeft rOperator rRight _)
+binary left operator (Syntax.BinaryExpression rLeft rOperator rRight)
   | Syntax.precedence operator >= Syntax.precedence rOperator =
-    let left' = Syntax.BinaryExpression left operator rLeft (Span (Syntax.start left) (Syntax.end rLeft))
-    in Syntax.BinaryExpression left' rOperator rRight (Span (Syntax.start left) (Syntax.end right))
+    Syntax.BinaryExpression (Syntax.BinaryExpression left operator rLeft) rOperator rRight
 
-binary left operator right = Syntax.BinaryExpression left operator right (Span (Syntax.start left) (Syntax.end right))
+binary left operator right = Syntax.BinaryExpression left operator right

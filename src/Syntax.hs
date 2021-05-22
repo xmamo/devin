@@ -14,18 +14,21 @@ import Prelude hiding (span)
 
 import Data.Text (Text)
 
-import Span (Span)
+import Span (Span (Span))
 import qualified Span
 
 
 class Syntax a where
   span :: a -> Span
+  span syntax = Span (start syntax) (end syntax)
 
   start :: a -> Int
   start = Span.start . span
 
   end :: a -> Int
   end = Span.end . span
+
+  {-# MINIMAL span | start, end #-}
 
 
 data Token where
@@ -39,25 +42,25 @@ data Identifier where
 
 
 data Statement where
-  DeclareStatement :: Token -> Identifier -> Token -> Span -> Statement
-  DeclareAndAssignStatement :: Token -> Identifier -> Token -> Expression -> Token -> Span -> Statement
-  ExpressionStatement :: Expression -> Token -> Span -> Statement
-  IfStatement :: Token -> Expression -> Statement -> Span -> Statement
-  IfElseStatement :: Token -> Expression -> Statement -> Token -> Statement -> Span -> Statement
-  WhileStatement :: Token -> Expression -> Statement -> Span -> Statement
-  DoWhileStatement :: Token -> Statement -> Token -> Expression -> Token -> Span -> Statement
-  ReturnStatement :: Token -> Expression -> Token -> Span -> Statement
-  BlockStatement :: Token -> [Statement] -> Token -> Span -> Statement
+  DeclareStatement :: Token -> Identifier -> Token -> Statement
+  DeclareAndAssignStatement :: Token -> Identifier -> Token -> Expression -> Token -> Statement
+  ExpressionStatement :: Expression -> Token -> Statement
+  IfStatement :: Token -> Expression -> Statement -> Statement
+  IfElseStatement :: Token -> Expression -> Statement -> Token -> Statement -> Statement
+  WhileStatement :: Token -> Expression -> Statement-> Statement
+  DoWhileStatement :: Token -> Statement -> Token -> Expression -> Token -> Statement
+  ReturnStatement :: Token -> Expression -> Token -> Statement
+  BlockStatement :: Token -> [Statement] -> Token -> Statement
   deriving (Eq, Show, Read)
 
 
 data Expression where
   IntegerExpression :: Integer -> Span -> Expression
-  IdentifierExpression :: Identifier -> Span -> Expression
-  UnaryExpression :: UnaryOperator -> Expression -> Span -> Expression
-  BinaryExpression :: Expression -> BinaryOperator -> Expression -> Span -> Expression
-  AssignExpression :: Identifier -> AssignOperator -> Expression -> Span -> Expression
-  ParenthesizedExpression :: Token -> Expression -> Token -> Span -> Expression
+  IdentifierExpression :: Identifier -> Expression
+  UnaryExpression :: UnaryOperator -> Expression -> Expression
+  BinaryExpression :: Expression -> BinaryOperator -> Expression -> Expression
+  AssignExpression :: Identifier -> AssignOperator -> Expression -> Expression
+  ParenthesizedExpression :: Token -> Expression -> Token -> Expression
   deriving (Eq, Show, Read)
 
 
@@ -104,24 +107,43 @@ instance Syntax Identifier where
 
 
 instance Syntax Statement where
-  span (DeclareStatement _ _ _ s) = s
-  span (DeclareAndAssignStatement _ _ _ _ _ s) = s
-  span (ExpressionStatement _ _ s) = s
-  span (IfStatement _ _ _ s) = s
-  span (IfElseStatement _ _ _ _ _ s) = s
-  span (WhileStatement _ _ _ s) = s
-  span (DoWhileStatement _ _ _ _ _ s) = s
-  span (ReturnStatement _ _ _ s) = s
-  span (BlockStatement _ _ _ s) = s
+  start (DeclareStatement varKeyword _ _) = start varKeyword
+  start (DeclareAndAssignStatement varKeyword _ _ _ _) = start varKeyword
+  start (ExpressionStatement value _) = start value
+  start (IfStatement ifKeyword _ _) = start ifKeyword
+  start (IfElseStatement ifKeyword _ _ _ _) = start ifKeyword
+  start (WhileStatement whileKeyword _ _) = start whileKeyword
+  start (DoWhileStatement doKeyword _ _ _ _) = start doKeyword
+  start (ReturnStatement returnKeyword _ _) = start returnKeyword
+  start (BlockStatement open _ _) = start open
+
+  end (DeclareStatement _ _ terminator) = end terminator
+  end (DeclareAndAssignStatement _ _ _ _ terminator) = end terminator
+  end (ExpressionStatement _ terminator) = end terminator
+  end (IfStatement _ _ trueBranch) = end trueBranch
+  end (IfElseStatement _ _ _ _ falseBranch) = end falseBranch
+  end (WhileStatement _ _ body) = end body
+  end (DoWhileStatement _ _ _ _ body) = end body
+  end (ReturnStatement _ _ terminator) = end terminator
+  end (BlockStatement _ _ close) = end close
 
 
 instance Syntax Expression where
   span (IntegerExpression _ s) = s
-  span (IdentifierExpression _ s) = s
-  span (UnaryExpression _ _ s) = s
-  span (BinaryExpression _ _ _ s) = s
-  span (AssignExpression _ _ _ s) = s
-  span (ParenthesizedExpression _ _ _ s) = s
+  span (IdentifierExpression variable) = span variable
+  span expression = Span (start expression) (end expression)
+
+  start (UnaryExpression operator _) = start operator
+  start (BinaryExpression left _ _) = start left
+  start (AssignExpression target _ _) = start target
+  start (ParenthesizedExpression open _ _) = start open
+  start expression = Span.start (span expression)
+
+  end (UnaryExpression _ operand) = end operand
+  end (BinaryExpression _ _ right) = end right
+  end (AssignExpression _ _ value) = end value
+  end (ParenthesizedExpression _ _ close) = end close
+  end expression = Span.end (span expression)
 
 
 instance Syntax UnaryOperator where

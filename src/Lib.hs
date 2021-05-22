@@ -156,45 +156,45 @@ highlightStatement isBuffer = go
   where
     buffer = isBuffer `asA` Gtk.TextBuffer
 
-    go (Syntax.DeclareStatement varKeyword variable _ _) = do
+    go (Syntax.DeclareStatement varKeyword variable _) = do
       highlightWith buffer "keyword" varKeyword
       highlightWith buffer "identifier" variable
 
-    go (Syntax.DeclareAndAssignStatement varKeyword variable _ value _ _) = do
+    go (Syntax.DeclareAndAssignStatement varKeyword variable _ value _) = do
       highlightWith buffer "keyword" varKeyword
       highlightWith buffer "identifier" variable
       highlightExpression buffer value
 
-    go (Syntax.ExpressionStatement value _ _) = highlightExpression buffer value
+    go (Syntax.ExpressionStatement value _) = highlightExpression buffer value
 
-    go (Syntax.IfStatement ifKeyword predicate trueBranch _) = do
+    go (Syntax.IfStatement ifKeyword predicate trueBranch) = do
       highlightWith buffer "keyword" ifKeyword
       highlightExpression buffer predicate
       highlightStatement buffer trueBranch
 
-    go (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch _) = do
+    go (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch) = do
       highlightWith buffer "keyword" ifKeyword
       highlightExpression buffer predicate
       highlightStatement buffer trueBranch
       highlightWith buffer "keyword" elseKeyword
       highlightStatement buffer falseBranch
 
-    go (Syntax.WhileStatement whileKeyword predicate body _) = do
+    go (Syntax.WhileStatement whileKeyword predicate body) = do
       highlightWith buffer "keyword" whileKeyword
       highlightExpression buffer predicate
       highlightStatement buffer body
 
-    go (Syntax.DoWhileStatement doKeyword body whileKeyword predicate _ _) = do
+    go (Syntax.DoWhileStatement doKeyword body whileKeyword predicate _) = do
       highlightWith buffer "keyword" doKeyword
       highlightStatement buffer body
       highlightWith buffer "keyword" whileKeyword
       highlightExpression buffer predicate
 
-    go (Syntax.ReturnStatement returnKeyword value _ _) = do
+    go (Syntax.ReturnStatement returnKeyword value _) = do
       highlightWith buffer "keyword" returnKeyword
       highlightExpression buffer value
 
-    go (Syntax.BlockStatement _ statements _ _) = for_ statements (highlightStatement buffer)
+    go (Syntax.BlockStatement _ statements _) = for_ statements (highlightStatement buffer)
 
 
 highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
@@ -204,23 +204,23 @@ highlightExpression isBuffer = go
 
     go integer @ Syntax.IntegerExpression {} = highlightWith buffer "integer" integer
 
-    go (Syntax.IdentifierExpression identifier _) = highlightWith buffer "identifier" identifier
+    go (Syntax.IdentifierExpression identifier) = highlightWith buffer "identifier" identifier
 
-    go (Syntax.UnaryExpression operator operand _) = do
+    go (Syntax.UnaryExpression operator operand) = do
       highlightWith buffer "operator" operator
       go operand
 
-    go (Syntax.BinaryExpression left operator right _) = do
+    go (Syntax.BinaryExpression left operator right) = do
       go left
       highlightWith buffer "operator" operator
       go right
 
-    go (Syntax.AssignExpression identifier operator value _) = do
+    go (Syntax.AssignExpression identifier operator value) = do
       highlightWith buffer "identifier" identifier
       highlightWith buffer "operator" operator
       go value
 
-    go (Syntax.ParenthesizedExpression _ expression _ _) = go expression
+    go (Syntax.ParenthesizedExpression _ expression _) = go expression
 
 
 highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> Gtk.TextIter -> m Bool
@@ -230,11 +230,11 @@ highlightStatementParentheses isBuffer statement insertTextIter = go statement
 
     go Syntax.DeclareStatement {} = pure False
 
-    go (Syntax.DeclareAndAssignStatement _ _ _ value _ _) = highlightExpressionParentheses buffer value insertTextIter
+    go (Syntax.DeclareAndAssignStatement _ _ _ value _) = highlightExpressionParentheses buffer value insertTextIter
 
-    go (Syntax.ExpressionStatement value _ _) = highlightExpressionParentheses buffer value insertTextIter
+    go (Syntax.ExpressionStatement value _) = highlightExpressionParentheses buffer value insertTextIter
 
-    go (Syntax.IfStatement _ predicate trueBranch _) = do
+    go (Syntax.IfStatement _ predicate trueBranch) = do
       done <- highlightExpressionParentheses buffer predicate insertTextIter
 
       if done then
@@ -242,7 +242,7 @@ highlightStatementParentheses isBuffer statement insertTextIter = go statement
       else
         go trueBranch
 
-    go (Syntax.IfElseStatement _ predicate trueBranch _ falseBranch _) = do
+    go (Syntax.IfElseStatement _ predicate trueBranch _ falseBranch) = do
       done <- highlightExpressionParentheses buffer predicate insertTextIter
 
       if done then
@@ -255,7 +255,7 @@ highlightStatementParentheses isBuffer statement insertTextIter = go statement
         else
           go falseBranch
 
-    go (Syntax.WhileStatement _ predicate body _) = do
+    go (Syntax.WhileStatement _ predicate body) = do
       done <- highlightExpressionParentheses buffer predicate insertTextIter
 
       if done then
@@ -263,7 +263,7 @@ highlightStatementParentheses isBuffer statement insertTextIter = go statement
       else
         go body
 
-    go (Syntax.DoWhileStatement _ body _ predicate _ _) = do
+    go (Syntax.DoWhileStatement _ body _ predicate _) = do
       done <- go body
 
       if done then
@@ -271,9 +271,9 @@ highlightStatementParentheses isBuffer statement insertTextIter = go statement
       else
         highlightExpressionParentheses buffer predicate insertTextIter
 
-    go (Syntax.ReturnStatement _ value _ _) = highlightExpressionParentheses buffer value insertTextIter
+    go (Syntax.ReturnStatement _ value _) = highlightExpressionParentheses buffer value insertTextIter
 
-    go (Syntax.BlockStatement open statements close _) = do
+    go (Syntax.BlockStatement open statements close) = do
       done <- foldlM (\a s -> if a then pure True else go s) False statements
 
       if done then
@@ -289,11 +289,11 @@ highlightExpressionParentheses isBuffer expression insertTextIter = go expressio
 
     go (Syntax.IntegerExpression _ _) = pure False
 
-    go (Syntax.IdentifierExpression _ _) = pure False
+    go (Syntax.IdentifierExpression _) = pure False
 
-    go (Syntax.UnaryExpression _ operand _) = go operand
+    go (Syntax.UnaryExpression _ operand) = go operand
 
-    go (Syntax.BinaryExpression left _ right _) = do
+    go (Syntax.BinaryExpression left _ right) = do
       done <- go left
 
       if done then
@@ -301,9 +301,9 @@ highlightExpressionParentheses isBuffer expression insertTextIter = go expressio
       else
         go right
 
-    go (Syntax.AssignExpression _ _ value _) = go value
+    go (Syntax.AssignExpression _ _ value) = go value
 
-    go (Syntax.ParenthesizedExpression open expression close _) = do
+    go (Syntax.ParenthesizedExpression open expression close) = do
       done <- go expression
 
       if done then
