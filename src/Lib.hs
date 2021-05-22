@@ -316,11 +316,11 @@ highlightParentheses :: (Gtk.IsTextBuffer a, Syntax b, Syntax c, MonadIO m) => a
 highlightParentheses isBuffer open close insertTextIter = do
   let buffer = isBuffer `asA` Gtk.TextBuffer
 
-  openStartTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start open))
-  openEndTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end open))
+  openStartTextIter <- #getIterAtOffset buffer (Syntax.start open)
+  openEndTextIter <- #getIterAtOffset buffer (Syntax.end open)
 
-  closeStartTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start close))
-  closeEndTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end close))
+  closeStartTextIter <- #getIterAtOffset buffer (Syntax.start close)
+  closeEndTextIter <- #getIterAtOffset buffer (Syntax.end close)
 
   applyParenthesisTag <- foldlM (\a i -> if a then pure True else #equal insertTextIter i) False
     [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
@@ -337,6 +337,6 @@ highlightWith :: (Gtk.IsTextBuffer a, Syntax b, MonadIO m) => a -> Text -> b -> 
 highlightWith isBuffer tagName syntax = do
   let buffer = isBuffer `asA` Gtk.TextBuffer
 
-  startTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.start syntax))
-  endTextIter <- #getIterAtOffset buffer (fromIntegral (Syntax.end syntax))
+  startTextIter <- #getIterAtOffset buffer (Syntax.start syntax)
+  endTextIter <- #getIterAtOffset buffer (Syntax.end syntax)
   #applyTagByName buffer tagName startTextIter endTextIter

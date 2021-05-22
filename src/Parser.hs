@@ -16,6 +16,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 
 import Input (Input (Input))
+import qualified Input
 
 import Result (Result)
 import qualified Result
@@ -94,8 +95,8 @@ text t = Parser $ \(Input position text) -> case Text.stripPrefix t text of
   Nothing -> Result.Failure True position [Text.pack (show t)]
 
 
-position :: Parser Int
-position = Parser $ \(Input position text) -> Result.Success position (Input position text)
+position :: Num a => Parser a
+position = Parser $ \input -> Result.Success (Input.position input) input
 
 
 separatedBy :: Parser a -> Parser b -> Parser [a]

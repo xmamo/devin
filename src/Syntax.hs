@@ -22,10 +22,10 @@ class Syntax a where
   span :: a -> Span
   span syntax = Span (start syntax) (end syntax)
 
-  start :: a -> Int
+  start :: Num b => a -> b
   start = Span.start . span
 
-  end :: a -> Int
+  end :: Num b => a -> b
   end = Span.end . span
 
   {-# MINIMAL span | start, end #-}
@@ -177,7 +177,7 @@ instance Syntax BinaryOperator where
   span (OrOperator s) = s
 
 
-precedence :: BinaryOperator -> Int
+precedence :: Num a => BinaryOperator -> a
 precedence (AddOperator _) = 4
 precedence (SubtractOperator _) = 4
 precedence (MultiplyOperator _) = 5
