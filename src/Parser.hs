@@ -1,16 +1,21 @@
 module Parser (
-  Parser (..),
+  Parser,
+  ParserT (..),
+  parse,
   satisfy,
   char,
   text,
   position,
   separatedBy,
+  separatedBy1,
   label,
   commit
 ) where
 
+import Data.Functor.Identity
 import Data.List
 import Control.Applicative
+import Control.Monad
 
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -22,99 +27,104 @@ import Result (Result)
 import qualified Result
 
 
-newtype Parser a where
-  Parser :: {parse :: Input -> Result a} -> Parser a
+type Parser = ParserT Identity
 
 
-instance Semigroup a => Semigroup (Parser a) where
+newtype ParserT m a where
+  ParserT :: {parseT :: Input -> m (Result a)} -> ParserT m a
+
+
+instance (Monad m, Semigroup a) => Semigroup (ParserT m a) where
   parser1 <> parser2 = (<>) <$> parser1 <*> parser2
 
 
-instance Monoid a => Monoid (Parser a) where
+instance (Monad m, Monoid a) => Monoid (ParserT m a) where
   mempty = pure mempty
 
 
-instance Functor Parser where
-  fmap f parser = Parser (fmap f . parse parser)
+instance Functor m => Functor (ParserT m) where
+  fmap f parser = ParserT ((fmap f <$>) . parseT parser)
 
 
-instance Applicative Parser where
-  pure value = Parser (Result.Success value)
+instance Monad m => Applicative (ParserT m) where
+  pure value = ParserT $ \input -> pure (Result.Success value input)
 
-  parser1 <*> parser2 = Parser $ \input -> case parse parser1 input of
-    Result.Success f rest -> f <$> parse parser2 rest
-    Result.Failure recoverable position expectations -> Result.Failure recoverable position expectations
-
-
-instance Monad Parser where
-  parser >>= f = Parser $ \input -> case parse parser input of
-    Result.Success value rest -> parse (f value) rest
-    Result.Failure recoverable position expectations -> Result.Failure recoverable position expectations
+  parser1 <*> parser2 = ParserT $ parseT parser1 >=> \case
+    Result.Success f rest -> fmap f <$> parseT parser2 rest
+    Result.Failure recoverable position expectations -> pure (Result.Failure recoverable position expectations)
 
 
-instance MonadFail Parser where
-  fail label = Parser $ \(Input position _) -> Result.Failure True position [Text.pack label]
+instance Monad m => Monad (ParserT m) where
+  parser >>= f = ParserT $ parseT parser >=> \case
+    Result.Success value rest -> parseT (f value) rest
+    Result.Failure recoverable position expectations -> pure (Result.Failure recoverable position expectations)
 
 
-instance Alternative Parser where
-  empty = Parser $ \(Input position _) -> Result.Failure True position []
+instance Monad m => MonadFail (ParserT m) where
+  fail label = ParserT $ \(Input position _) -> pure (Result.Failure True position [Text.pack label])
+
+
+instance Monad m => Alternative (ParserT m) where
+  empty = ParserT $ \(Input position _) -> pure (Result.Failure True position [])
 
   -- TODO: This is probably not associative
-  parser1 <|> parser2 = Parser $ \input -> case parse parser1 input of
-    Result.Success value rest -> Result.Success value rest
+  parser1 <|> parser2 = ParserT $ \input -> parseT parser1 input >>= \case
+    Result.Success value rest -> pure (Result.Success value rest)
 
-    Result.Failure True position1 expectations1 -> case parse parser2 input of
-      Result.Success value rest -> Result.Success value rest
+    Result.Failure True position1 expectations1 -> parseT parser2 input >>= \case
+      Result.Success value rest -> pure (Result.Success value rest)
 
       Result.Failure recoverable2 position2 expectations2 -> case compare position1 position2 of
-        LT | null expectations2 && not (null expectations1) -> Result.Failure recoverable2 position1 expectations1
-        LT -> Result.Failure recoverable2 position2 expectations2
-        EQ -> Result.Failure recoverable2 position2 (expectations1 `union` expectations2)
-        GT | null expectations1 && not (null expectations1) -> Result.Failure recoverable2 position2 expectations2
-        GT -> Result.Failure recoverable2 position1 expectations1
+        LT | null expectations2 && not (null expectations1) -> pure (Result.Failure recoverable2 position1 expectations1)
+        LT -> pure (Result.Failure recoverable2 position2 expectations2)
+        EQ -> pure (Result.Failure recoverable2 position2 (expectations1 `union` expectations2))
+        GT | null expectations1 && not (null expectations1) -> pure (Result.Failure recoverable2 position2 expectations2)
+        GT -> pure (Result.Failure recoverable2 position1 expectations1)
 
-    Result.Failure False position expectations -> Result.Failure False position expectations
-
-
-satisfy :: (Char -> Bool) -> Parser Char
-satisfy f = Parser $ \(Input position text) -> case Text.uncons text of
-  Just (head, tail) | f head -> Result.Success head (Input (position + 1) tail)
-  _ -> Result.Failure True position []
+    Result.Failure False position expectations -> pure (Result.Failure False position expectations)
 
 
-char :: Char -> Parser Char
-char c = Parser $ \(Input position text) -> case Text.stripPrefix (Text.singleton c) text of
-  Just rest -> Result.Success c (Input (position + 1) rest)
-  Nothing -> Result.Failure True position [Text.pack (show c)]
+parse :: Parser a -> Input -> Result a
+parse parser input = runIdentity (parseT parser input)
 
 
-
-text :: Text -> Parser Text
-text t = Parser $ \(Input position text) -> case Text.stripPrefix t text of
-  Just rest -> Result.Success t (Input (position + Text.length t) rest)
-  Nothing -> Result.Failure True position [Text.pack (show t)]
-
-
-position :: Num a => Parser a
-position = Parser $ \input -> Result.Success (Input.position input) input
+satisfy :: Applicative m => (Char -> Bool) -> ParserT m Char
+satisfy f = ParserT $ \(Input position text) -> case Text.uncons text of
+  Just (head, tail) | f head -> pure (Result.Success head (Input (position + 1) tail))
+  _ -> pure (Result.Failure True position [])
 
 
-separatedBy :: Parser a -> Parser b -> Parser [a]
-separatedBy parser separator = do
-  parsed <- optional parser
-
-  case parsed of
-    Just parsed -> (parsed :) <$> many (separator *> parser)
-    Nothing -> pure []
+char :: Applicative m => Char -> ParserT m Char
+char c = ParserT $ \(Input position text) -> case Text.stripPrefix (Text.singleton c) text of
+  Just rest -> pure (Result.Success c (Input (position + 1) rest))
+  Nothing -> pure (Result.Failure True position [Text.pack (show c)])
 
 
-label :: Text -> Parser a -> Parser a
-label l parser = Parser $ \(Input position text) -> case parse parser (Input position text) of
-  Result.Success value rest -> Result.Success value rest
-  Result.Failure recoverable _ _ -> Result.Failure recoverable position [l]
+text :: Applicative m => Text -> ParserT m Text
+text t = ParserT $ \(Input position text) -> case Text.stripPrefix t text of
+  Just rest -> pure (Result.Success t (Input (position + Text.length t) rest))
+  Nothing -> pure (Result.Failure True position [Text.pack (show t)])
 
 
-commit :: Parser a -> Parser a
-commit parser = Parser $ \input -> case parse parser input of
-  Result.Success value rest -> Result.Success value rest
-  Result.Failure _ position expectations -> Result.Failure False position expectations
+position :: Applicative m => Num a => ParserT m a
+position = ParserT $ \input -> pure (Result.Success (Input.position input) input)
+
+
+separatedBy :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
+separatedBy parser separator = separatedBy1 parser separator <|> pure []
+
+
+separatedBy1 :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
+separatedBy1 parser separator = (:) <$> parser <*> many (separator *> parser)
+
+
+label :: Monad m => Text -> ParserT m a -> ParserT m a
+label l parser = ParserT $ \input@(Input position _) -> parseT parser input >>= \case
+  Result.Success value rest -> pure (Result.Success value rest)
+  Result.Failure recoverable _ _ -> pure (Result.Failure recoverable position [l])
+
+
+commit :: Monad m => ParserT m a -> ParserT m a
+commit parser = ParserT $ parseT parser >=> \case
+  Result.Success value rest -> pure (Result.Success value rest)
+  Result.Failure _ position expectations -> pure (Result.Failure False position expectations)
