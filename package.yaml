@@ -28,6 +28,7 @@ dependencies:
   - transformers
   - text
   - haskell-gi-base
+  - gi-gio
   - gi-gtk
   - gi-gtk-hs
   - gi-gtksource

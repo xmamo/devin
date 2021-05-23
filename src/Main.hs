@@ -1,8 +1,8 @@
 module Main (main) where
 
 import Control.Concurrent
+import Control.Monad
 import Control.Monad.IO.Class
-import Data.Functor
 import Data.Foldable
 import Data.Maybe
 import System.Environment
@@ -15,6 +15,7 @@ import qualified Data.Text as Text
 
 import Data.GI.Base
 import Data.GI.Base.GType
+import qualified GI.Gio as Gio
 import qualified GI.Gtk as Gtk
 import qualified Data.GI.Gtk.Threading as Gtk
 import qualified GI.GtkSource as GtkSource
@@ -40,7 +41,7 @@ main = do
   exitWith (if status == 0 then ExitSuccess else ExitFailure (fromIntegral status))
 
 
-onActivate :: Gtk.IsApplication a => a -> IO ()
+onActivate :: Gtk.IsApplication a => a -> Gio.ApplicationActivateCallback
 onActivate isApplication = do
   let application = isApplication `asA` Gtk.Application
 
@@ -108,7 +109,7 @@ onActivate isApplication = do
       #child := outerPaned
     ]
 
-  -- Set up codeTextBuffer:
+  -- Set up codeSourceView:
 
   codeTextBuffer <- unsafeCastTo GtkSource.Buffer =<< #getBuffer codeSourceView
   #setHighlightMatchingBrackets codeTextBuffer False
@@ -162,7 +163,7 @@ onActivate isApplication = do
           highlightStatementParentheses codeTextBuffer statement =<< Helpers.getInsertTextIter codeTextBuffer
 
           #clear codeTreeStore
-          displayStatement codeTextBuffer codeTreeStore statement
+          displayStatement codeTextBuffer codeTreeStore Nothing statement
 
           set logTextBuffer [#text := ""]
 
@@ -175,7 +176,7 @@ onActivate isApplication = do
           #applyTagByName codeTextBuffer "error" startTextIter endTextIter
 
           (line, column) <- Helpers.getLineColumn startTextIter
-          let prefix = "[" <> Text.pack (show line) <> ":" <> Text.pack (show column) <> "] "
+          let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
           set logTextBuffer [#text := prefix <> Helpers.expectationsText expectations]
 
     putMVar threadIdVar threadId
@@ -383,174 +384,203 @@ highlight isTextBuffer tagName syntax = do
   #applyTagByName textBuffer tagName startTextIter endTextIter
 
 
-displayStatement :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Syntax.Statement -> IO ()
-displayStatement isTextBuffer isTreeStore = go Nothing
+displayStatement ::
+  (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement -> IO (Maybe Gtk.TreeIter)
+
+displayStatement isTextBuffer isTreeStore = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
     treeStore = isTreeStore `asA` Gtk.TreeStore
 
-    go parentTreeIter s@(Syntax.DeclareStatement t variable terminator) = void $ do
-      let (Syntax.Identifier tName _) = t
-          (Syntax.Identifier variableName _) = variable
+    go parentTreeIter s@(Syntax.DeclareStatement t variable terminator) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "DeclareStatement" False
+      display textBuffer treeStore childTreeIter t "Identifier" True
+      display textBuffer treeStore childTreeIter variable "Identifier" True
+      display textBuffer treeStore childTreeIter terminator "Token" True
+      pure childTreeIter
 
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "DeclareStatement" ""
-      display textBuffer treeStore childTreeIter t "Identifier" tName
-      display textBuffer treeStore childTreeIter variable "Identifier" variableName
-      display textBuffer treeStore childTreeIter terminator "Token" ";"
-
-    go parentTreeIter s@(Syntax.DeclareAndAssignStatement t variable equalSign value terminator) = void $ do
-      let (Syntax.Identifier tName _) = t
-          (Syntax.Identifier variableName _) = variable
-
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "DeclareAndAssignStatement" ""
-      display textBuffer treeStore childTreeIter t "Identifier" tName
-      display textBuffer treeStore childTreeIter variable "Identifier" variableName
-      display textBuffer treeStore childTreeIter equalSign "Token" "="
+    go parentTreeIter s@(Syntax.DeclareAndAssignStatement t variable equalSign value terminator) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "DeclareAndAssignStatement" False
+      display textBuffer treeStore childTreeIter t "Identifier" True
+      display textBuffer treeStore childTreeIter variable "Identifier" True
+      display textBuffer treeStore childTreeIter equalSign "Token" True
       displayExpression textBuffer treeStore childTreeIter value
-      display textBuffer treeStore childTreeIter terminator "Token" ";"
+      display textBuffer treeStore childTreeIter terminator "Token" True
+      pure childTreeIter
 
-    go parentTreeIter s@(Syntax.ExpressionStatement value terminator) = void $ do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "ExpressionStatement" ""
+    go parentTreeIter s@(Syntax.ExpressionStatement value terminator) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "ExpressionStatement" False
       displayExpression textBuffer treeStore childTreeIter value
-      display textBuffer treeStore childTreeIter terminator "Token" ";"
+      display textBuffer treeStore childTreeIter terminator "Token" True
+      pure childTreeIter
 
     go parentTreeIter s@(Syntax.IfStatement ifKeyword predicate trueBranch) = do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "IfStatement" ""
-      display textBuffer treeStore childTreeIter ifKeyword "Token" "if"
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "IfStatement" False
+      display textBuffer treeStore childTreeIter ifKeyword "Token" True
       displayExpression textBuffer treeStore childTreeIter predicate
       go childTreeIter trueBranch
+      pure childTreeIter
 
     go parentTreeIter s@(Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch) = do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "IfStatement" ""
-      display textBuffer treeStore childTreeIter ifKeyword "Token" "if"
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "IfStatement" False
+      display textBuffer treeStore childTreeIter ifKeyword "Token" True
       displayExpression textBuffer treeStore childTreeIter predicate
       go childTreeIter trueBranch
-      display textBuffer treeStore childTreeIter elseKeyword "Token" "else"
+      display textBuffer treeStore childTreeIter elseKeyword "Token" True
       go childTreeIter falseBranch
+      pure childTreeIter
 
     go parentTreeIter s@(Syntax.WhileStatement whileKeyword predicate body) = do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "WhileStatement" ""
-      display textBuffer treeStore childTreeIter whileKeyword "Token" "while"
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "WhileStatement" False
+      display textBuffer treeStore childTreeIter whileKeyword "Token" True
       displayExpression textBuffer treeStore childTreeIter predicate
       go childTreeIter body
+      pure childTreeIter
 
-    go parentTreeIter s@(Syntax.DoWhileStatement doKeyword body whileKeyword predicate terminator) = void $ do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "DoWhileStatement" ""
-      display textBuffer treeStore childTreeIter doKeyword "Token" "do"
+    go parentTreeIter s@(Syntax.DoWhileStatement doKeyword body whileKeyword predicate terminator) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "DoWhileStatement" False
+      display textBuffer treeStore childTreeIter doKeyword "Token" True
       go childTreeIter body
-      display textBuffer treeStore childTreeIter whileKeyword "Token" "while"
+      display textBuffer treeStore childTreeIter whileKeyword "Token" True
       displayExpression textBuffer treeStore childTreeIter predicate
-      display textBuffer treeStore childTreeIter terminator "Token" ";"
+      display textBuffer treeStore childTreeIter terminator "Token" True
+      pure childTreeIter
 
-    go parentTreeIter s@(Syntax.ReturnStatement returnKeyword value terminator) = void $ do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "ReturnStatement" ""
-      display textBuffer treeStore childTreeIter returnKeyword "Token" "return"
+    go parentTreeIter s@(Syntax.ReturnStatement returnKeyword value terminator) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "ReturnStatement" False
+      display textBuffer treeStore childTreeIter returnKeyword "Token" True
       displayExpression textBuffer treeStore childTreeIter value
-      display textBuffer treeStore childTreeIter terminator "Token" ";"
+      display textBuffer treeStore childTreeIter terminator "Token" True
+      pure childTreeIter
 
-    go parentTreeIter s@(Syntax.BlockStatement open statements close) = void $ do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "BlockStatement" ""
-      display textBuffer treeStore childTreeIter open "Token" "{"
+    go parentTreeIter s@(Syntax.BlockStatement open statements close) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "BlockStatement" False
+      display textBuffer treeStore childTreeIter open "Token" True
       for_ statements (go childTreeIter)
-      display textBuffer treeStore childTreeIter close "Token" "}"
+      display textBuffer treeStore childTreeIter close "Token" True
+      pure childTreeIter
 
 
-displayExpression :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression -> IO ()
-displayExpression isTextBuffer isTreeStore parentTreeIter = go parentTreeIter
+displayExpression ::
+  (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression -> IO (Maybe Gtk.TreeIter)
+
+displayExpression isTextBuffer isTreeStore = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
     treeStore = isTreeStore `asA` Gtk.TreeStore
 
-    go parentTreeIter e@(Syntax.IntegerExpression value _) =
-      void (display textBuffer treeStore parentTreeIter e "IntegerExpression" (Text.pack (show value)))
+    go parentTreeIter e@Syntax.IntegerExpression{} =
+      display textBuffer treeStore parentTreeIter e "IntegerExpression" True
 
-    go parentTreeIter e@(Syntax.IdentifierExpression identifier) = void $ do
-      let (Syntax.Identifier identifierName _) = identifier
-
-      childTreeIter <- display textBuffer treeStore parentTreeIter e "IdentifierExpression" ""
-      display textBuffer treeStore childTreeIter identifier "Identifier" identifierName
+    go parentTreeIter e@(Syntax.IdentifierExpression identifier) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter e "IdentifierExpression" False
+      display textBuffer treeStore childTreeIter identifier "Identifier" True
+      pure childTreeIter
 
     go parentTreeIter e@(Syntax.UnaryExpression operator operand) = do
-      childTreeIter <- display textBuffer treeStore parentTreeIter e "UnaryExpression" ""
+      childTreeIter <- display textBuffer treeStore parentTreeIter e "UnaryExpression" False
       displayUnaryOperator textBuffer treeStore childTreeIter operator
       go childTreeIter operand
+      pure childTreeIter
 
     go parentTreeIter e@(Syntax.BinaryExpression left operator right) = do
-      childTreeIter <- display textBuffer treeStore parentTreeIter e "BinaryExpression" ""
+      childTreeIter <- display textBuffer treeStore parentTreeIter e "BinaryExpression" False
       go childTreeIter left
       displayBinaryOperator textBuffer treeStore childTreeIter operator
       go childTreeIter right
+      pure childTreeIter
 
     go parentTreeIter e@(Syntax.AssignExpression target operator value) = do
-      let (Syntax.Identifier targetName _) = target
-
-      childTreeIter <- display textBuffer treeStore parentTreeIter e "AssignExpression" ""
-      display textBuffer treeStore childTreeIter target "Identifier" targetName
+      childTreeIter <- display textBuffer treeStore parentTreeIter e "AssignExpression" False
+      display textBuffer treeStore childTreeIter target "Identifier" True
       displayAssignOperator textBuffer treeStore childTreeIter operator
       go childTreeIter value
+      pure childTreeIter
 
-    go parentTreeIter e@(Syntax.ParenthesizedExpression open expression close) = void $ do
-      childTreeIter <- display textBuffer treeStore parentTreeIter e "ParenthesizedExpression" ""
-      display textBuffer treeStore childTreeIter open "Token" "("
+    go parentTreeIter e@(Syntax.ParenthesizedExpression open expression close) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter e "ParenthesizedExpression" False
+      display textBuffer treeStore childTreeIter open "Token" True
       go childTreeIter expression
-      display textBuffer treeStore childTreeIter close "Token" ")"
+      display textBuffer treeStore childTreeIter close "Token" True
+      pure childTreeIter
 
 
-displayUnaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator -> IO ()
+displayUnaryOperator ::
+  (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator -> IO (Maybe Gtk.TreeIter)
+
 displayUnaryOperator isTextBuffer isTreeStore parentTreeIter operator =
-  void (display isTextBuffer isTreeStore parentTreeIter operator label literal)
+  display isTextBuffer isTreeStore parentTreeIter operator label True
   where
-    (label, literal) = case operator of
-      Syntax.PlusOperator{} -> ("PlusOperator", "+")
-      Syntax.MinusOperator{} -> ("MinusOperator", "-")
-      Syntax.NotOperator{} -> ("NotOperator", "!")
+    label = case operator of
+      Syntax.PlusOperator{} -> "PlusOperator"
+      Syntax.MinusOperator{} -> "MinusOperator"
+      Syntax.NotOperator{} -> "NotOperator"
 
 
-displayBinaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator -> IO ()
+displayBinaryOperator ::
+  (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator -> IO (Maybe Gtk.TreeIter)
+
 displayBinaryOperator isTextBuffer isTreeStore parentTreeIter operator =
-  void (display isTextBuffer isTreeStore parentTreeIter operator label literal)
+  display isTextBuffer isTreeStore parentTreeIter operator label True
   where
-    (label, literal) = case operator of
-      Syntax.AddOperator{} -> ("AddOperator", "+")
-      Syntax.SubtractOperator{} -> ("SubtractOperator", "-")
-      Syntax.MultiplyOperator{} -> ("MultiplyOperator", "*")
-      Syntax.DivideOperator{} -> ("DivideOperator", "/")
-      Syntax.RemainderOperator{} -> ("RemainderOperator", "%")
-      Syntax.EqualOperator{} -> ("EqualOperator", "==")
-      Syntax.NotEqualOperator{} -> ("NotEqualOperator", "!=")
-      Syntax.LessOperator{} -> ("LessOperator", "<")
-      Syntax.LessOrEqualOperator{} -> ("LessOrEqualOperator", "<=")
-      Syntax.GreaterOperator{} -> ("GreaterOperator", ">")
-      Syntax.GreaterOrEqualOperator{} -> ("GreaterOrEqualOperator", ">=")
-      Syntax.AndOperator{} -> ("AndOperator", "&")
-      Syntax.OrOperator{} -> ("OrOperator", "|")
+    label = case operator of
+      Syntax.AddOperator{} -> "AddOperator"
+      Syntax.SubtractOperator{} -> "SubtractOperator"
+      Syntax.MultiplyOperator{} -> "MultiplyOperator"
+      Syntax.DivideOperator{} -> "DivideOperator"
+      Syntax.RemainderOperator{} -> "RemainderOperator"
+      Syntax.EqualOperator{} -> "EqualOperator"
+      Syntax.NotEqualOperator{} -> "NotEqualOperator"
+      Syntax.LessOperator{} -> "LessOperator"
+      Syntax.LessOrEqualOperator{} -> "LessOrEqualOperator"
+      Syntax.GreaterOperator{} -> "GreaterOperator"
+      Syntax.GreaterOrEqualOperator{} -> "GreaterOrEqualOperator"
+      Syntax.AndOperator{} -> "AndOperator"
+      Syntax.OrOperator{} -> "OrOperator"
 
 
-displayAssignOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator -> IO ()
+displayAssignOperator ::
+  (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator -> IO (Maybe Gtk.TreeIter)
+
 displayAssignOperator isTextBuffer isTreeStore parentTreeIter operator =
-  void (display isTextBuffer isTreeStore parentTreeIter operator label literal)
+  display isTextBuffer isTreeStore parentTreeIter operator label True
   where
-    (label, literal) = case operator of
-      Syntax.AssignOperator{} -> ("AssignOperator", "=")
-      Syntax.AddAssignOperator{} -> ("AddAssignOperator", "+=")
-      Syntax.SubtractAssignOperator{} -> ("SubtractAssignOperator", "-=")
-      Syntax.MultiplyAssignOperator{} -> ("MultiplyAssignOperator", "*=")
-      Syntax.DivideAssignOperator{} -> ("DivideAssignOperator", "/=")
-      Syntax.RemainderAssignOperator{} -> ("RemainderAssignOperator", "%=")
+    label = case operator of
+      Syntax.AssignOperator{} -> "AssignOperator"
+      Syntax.AddAssignOperator{} -> "AddAssignOperator"
+      Syntax.SubtractAssignOperator{} -> "SubtractAssignOperator"
+      Syntax.MultiplyAssignOperator{} -> "MultiplyAssignOperator"
+      Syntax.DivideAssignOperator{} -> "DivideAssignOperator"
+      Syntax.RemainderAssignOperator{} -> "RemainderAssignOperator"
 
 
-display :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax c) => a -> b -> Maybe Gtk.TreeIter -> c -> Text -> Text -> IO (Maybe Gtk.TreeIter)
-display isTextBuffer isTreeStore parentTreeIter syntax label value = do
+display ::
+  (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax c) =>
+  a -> b -> Maybe Gtk.TreeIter -> c -> Text -> Bool -> IO (Maybe Gtk.TreeIter)
+
+display isTextBuffer isTreeStore parentTreeIter syntax label isLeaf = do
   let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
       treeStore = isTreeStore `asA` Gtk.TreeStore
 
-  (startLine, startColumn) <- Helpers.getLineColumn =<< #getIterAtOffset textBuffer (Syntax.start syntax)
-  (endLine, endColumn) <- Helpers.getLineColumn =<< #getIterAtOffset textBuffer (Syntax.end syntax)
+  startTextIter <- #getIterAtOffset textBuffer (Syntax.start syntax)
+  endTextIter <- #getIterAtOffset textBuffer (Syntax.end syntax)
+
+  (startLine, startColumn) <- Helpers.getLineColumn startTextIter
+  (endLine, endColumn) <- Helpers.getLineColumn endTextIter
   let span = "[" ++ show startLine ++ ":" ++ show startColumn ++ "-" ++ show endLine ++ ":" ++ show endColumn ++ "]"
 
   childTreeIter <- #append treeStore parentTreeIter
+
   #setValue treeStore childTreeIter 0 =<< toGValue (Just span)
   #setValue treeStore childTreeIter 1 =<< toGValue (Just label)
-  #setValue treeStore childTreeIter 2 =<< toGValue (Just value)
+
+  when isLeaf $ do
+    slice <- #getSlice textBuffer startTextIter endTextIter True
+    #setValue treeStore childTreeIter 2 =<< toGValue (Just slice)
 
   pure (Just childTreeIter)
