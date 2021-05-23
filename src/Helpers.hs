@@ -17,11 +17,11 @@ import qualified GI.GtkSource as GtkSource
 
 
 getInsertTextIter :: (Gtk.IsTextBuffer a, MonadIO m) => a -> m Gtk.TextIter
-getInsertTextIter isBuffer = do
-  let buffer = isBuffer `asA` Gtk.TextBuffer
+getInsertTextIter isTextBuffer = do
+  let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-  insertTextMark <- #getInsert buffer
-  #getIterAtMark buffer insertTextMark
+  insertTextMark <- #getInsert textBuffer
+  #getIterAtMark textBuffer insertTextMark
 
 
 getLineColumn :: (Num a, MonadIO m) => Gtk.TextIter -> m (a, a)

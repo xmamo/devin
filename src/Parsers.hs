@@ -221,13 +221,8 @@ assignExpression = do
 
 
 parenthesizedExpression :: Parser Syntax.Expression
-parenthesizedExpression = do
-  open <- token (Parser.char '(')
-
-  Parser.commit $ do
-    value <- s *> expression
-    close <- s *> token (Parser.char ')')
-    pure (Syntax.ParenthesizedExpression open value close)
+parenthesizedExpression =
+  Syntax.ParenthesizedExpression <$> token (Parser.char '(') <*> (s *> expression) <*> (s *> token (Parser.char ')'))
 
 
 expression :: Parser Syntax.Expression
@@ -320,7 +315,7 @@ keyword k = Parser.label ("keyword " <> k) $ do
 
 binary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syntax.Expression
 
-binary Syntax.BinaryExpression {} _ _ = undefined
+binary Syntax.BinaryExpression{} _ _ = undefined
 
 binary left operator (Syntax.BinaryExpression rLeft rOperator rRight)
   | Syntax.comparePrecedence operator rOperator >= EQ =

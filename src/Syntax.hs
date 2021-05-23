@@ -131,7 +131,7 @@ instance Syntax Statement where
 
 instance Syntax Expression where
   span (IntegerExpression _ s) = s
-  span (IdentifierExpression variable) = span variable
+  span (IdentifierExpression identifier) = span identifier
   span expression = Span (start expression) (end expression)
 
   start (UnaryExpression operator _) = start operator
