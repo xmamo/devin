@@ -1,4 +1,5 @@
 module Parsers (
+  comment,
   identifier,
   declareStatement,
   declareAndAssignStatement,
@@ -23,20 +24,39 @@ module Parsers (
   assignOperator
 ) where
 
-import Prelude hiding (span)
 import Data.Char
 import Data.Foldable
 import Data.Functor
 import Control.Applicative
 
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Writer
+
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import Parser (Parser)
+import Parser (ParserT)
 import qualified Parser
 
 import Span (Span (Span))
 import qualified Syntax
+
+import qualified Helpers
+
+
+type Parser = ParserT (Writer [Syntax.Comment])
+
+
+comment :: Parser Syntax.Comment
+comment = do
+  start <- Parser.position
+  Parser.text "//"
+  many (Parser.satisfy (not . Helpers.isNewline))
+  end <- Parser.position
+
+  let comment = Syntax.Comment (Span start end)
+  lift (tell [comment])
+  pure (Syntax.Comment (Span start end))
 
 
 -- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
@@ -283,8 +303,8 @@ assignOperator = syntax $ asum
   ]
 
 
-s :: Parser Text
-s = Text.concat <$> many (Text.singleton <$> Parser.satisfy isSpace)
+s :: Parser ()
+s = void (many (void (some (Parser.satisfy isSpace)) <|> void comment))
 
 
 token :: Parser a -> Parser Syntax.Token

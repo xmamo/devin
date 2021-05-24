@@ -1,8 +1,9 @@
 module Helpers (
+  isNewline,
+  expectationsText,
   getInsertTextIter,
   getLineColumn,
-  getStyle,
-  expectationsText
+  getStyle
 ) where
 
 import Control.Monad.IO.Class
@@ -14,6 +15,26 @@ import Data.Text (Text)
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
 import qualified GI.GtkSource as GtkSource
+
+
+isNewline :: Char -> Bool
+isNewline '\n' = True
+isNewline '\v' = True
+isNewline '\r' = True
+isNewline '\x85' = True
+isNewline '\x2028' = True
+isNewline '\x2029' = True
+isNewline _ = False
+
+
+expectationsText :: [Text] -> Text
+expectationsText [] = "Unexpected input"
+expectationsText expectations = "Expected " <> go expectations
+  where
+    go [] = undefined
+    go [expectation] = expectation
+    go [expectation1, expectation2] = expectation1 <> " or " <> expectation2
+    go (head : tail) = head <> ", " <> go tail
 
 
 getInsertTextIter :: (Gtk.IsTextBuffer a, MonadIO m) => a -> m Gtk.TextIter
@@ -65,13 +86,3 @@ getStyle isLanguage isStyleScheme styleId = runMaybeT (go styleId [])
           go fallbackStyleId (styleId : seen)
 
         Nothing -> pure Nothing
-
-
-expectationsText :: [Text] -> Text
-expectationsText [] = "Unexpected input"
-expectationsText expectations = "Expected " <> go expectations
-  where
-    go [] = undefined
-    go [expectation] = expectation
-    go [expectation1, expectation2] = expectation1 <> " or " <> expectation2
-    go (head : tail) = head <> ", " <> go tail

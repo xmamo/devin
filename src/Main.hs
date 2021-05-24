@@ -9,6 +9,7 @@ import System.Environment
 import System.Exit
 
 import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Writer
 
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -47,6 +48,7 @@ onActivate isApplication = do
 
       styleIds =
         [
+          ("comment", "def:comment"),
           ("keyword", "def:keyword"),
           ("identifier", "def:identifier"),
           ("type", "def:type"),
@@ -150,7 +152,7 @@ onActivate isApplication = do
     swapMVar statementVar Nothing
 
     threadId <- forkIO $ do
-      let statement = Parser.parse Parsers.statement (Input 0 text)
+      let (statement, comments) = runWriter (Parser.parseT Parsers.statement (Input 0 text))
 
       case statement of
         Result.Success statement _ -> Gtk.postGUIASync $ do
@@ -159,6 +161,7 @@ onActivate isApplication = do
           (startTextIter, endTextIter) <- #getBounds codeTextBuffer
           for_ styleIds $ \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
 
+          for_ comments (highlight codeTextBuffer "comment")
           highlightStatement codeTextBuffer statement
           highlightStatementParentheses codeTextBuffer statement =<< Helpers.getInsertTextIter codeTextBuffer
 

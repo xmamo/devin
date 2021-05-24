@@ -1,5 +1,6 @@
 module Syntax (
   Syntax (..),
+  Comment (..),
   Token (..),
   Identifier(..),
   Statement (..),
@@ -10,8 +11,8 @@ module Syntax (
   comparePrecedence
 ) where
 
-import Prelude hiding (span)
 import Data.Ord
+import Prelude hiding (span)
 
 import Data.Text (Text)
 
@@ -30,6 +31,11 @@ class Syntax a where
   end = Span.end . span
 
   {-# MINIMAL span | start, end #-}
+
+
+data Comment where
+  Comment :: Span -> Comment
+  deriving (Eq, Show, Read)
 
 
 data Token where
@@ -97,6 +103,10 @@ data AssignOperator where
   DivideAssignOperator :: Span -> AssignOperator
   RemainderAssignOperator :: Span -> AssignOperator
   deriving (Eq, Show, Read)
+
+
+instance Syntax Comment where
+  span (Comment s) = s
 
 
 instance Syntax Token where
