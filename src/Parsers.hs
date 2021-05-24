@@ -375,7 +375,7 @@ keyword k = Parser.label ("keyword " <> k) $ do
 
 symbol :: Text -> Parser Syntax.Token
 symbol s = Parser.label s . syntax $ do
-  s' <- Text.pack <$> some (Parser.satisfy isSymbol)
+  s' <- Text.pack <$> some (Parser.satisfy (\c -> isSymbol c || generalCategory c == OtherPunctuation))
 
   if s' == s then
     pure Syntax.Token
