@@ -1,6 +1,9 @@
 - ignore:
     name: Use <$>
 
+- ignore:
+    name: Avoid lambda using `infix`
+
 - suggest:
     name: Use String
 

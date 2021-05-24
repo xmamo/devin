@@ -17,6 +17,8 @@ import Data.List
 import Control.Applicative
 import Control.Monad
 
+import Control.Monad.Trans.Class
+
 import Data.Text (Text)
 import qualified Data.Text as Text
 
@@ -82,6 +84,10 @@ instance Monad m => Alternative (ParserT m) where
         GT -> pure (Result.Failure recoverable2 position1 expectations1)
 
     Result.Failure False position expectations -> pure (Result.Failure False position expectations)
+
+
+instance MonadTrans ParserT where
+  lift ma = ParserT $ \input -> (\a -> Result.Success a input) <$> ma
 
 
 parse :: Parser a -> Input -> Result a
