@@ -11,8 +11,9 @@ module Parsers (
   returnStatement,
   blockStatement,
   statement,
-  identifierExpression,
   integerExpression,
+  identifierExpression,
+  callExpression,
   primaryExpression,
   unaryExpression,
   binaryExpression,
@@ -200,8 +201,27 @@ identifierExpression :: Parser Syntax.Expression
 identifierExpression = Syntax.IdentifierExpression <$> identifier
 
 
+callExpression :: Parser Syntax.Expression
+callExpression = do
+  target <- identifier
+  open <- s *> charToken '('
+
+  Parser.commit $ do
+    first <- optional (s *> expression)
+
+    arguments <- case first of
+      Just first -> do
+        rest <- many ((,) <$> (s *> charToken ',') <*> Parser.commit (s *> expression))
+        pure (Just (first, rest))
+
+      Nothing -> pure Nothing
+
+    close <- s *> charToken ')'
+    pure (Syntax.CallExpression target open arguments close)
+
+
 primaryExpression :: Parser Syntax.Expression
-primaryExpression = identifierExpression <|> integerExpression
+primaryExpression = callExpression <|> identifierExpression <|> integerExpression
 
 
 unaryExpression :: Parser Syntax.Expression

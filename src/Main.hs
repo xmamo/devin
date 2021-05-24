@@ -276,6 +276,10 @@ highlightExpression isTextBuffer = go
 
     go (Syntax.IdentifierExpression identifier) = highlight textBuffer "identifier" identifier
 
+    go (Syntax.CallExpression target _ arguments _) = do
+      highlight textBuffer "identifier" target
+      highlightArguments arguments
+
     go (Syntax.UnaryExpression operator operand) = do
       highlight textBuffer "operator" operator
       go operand
@@ -291,6 +295,12 @@ highlightExpression isTextBuffer = go
       go value
 
     go (Syntax.ParenthesizedExpression _ expression _) = go expression
+
+    highlightArguments Nothing = pure ()
+
+    highlightArguments (Just (first, rest)) = do
+      highlightExpression textBuffer first
+      for_ rest (highlightExpression textBuffer . snd)
 
 
 highlightDeclarationParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration -> Gtk.TextIter -> m Bool
@@ -379,6 +389,14 @@ highlightExpressionParentheses isTextBuffer expression insertTextIter = go expre
 
     go (Syntax.IdentifierExpression _) = pure False
 
+    go (Syntax.CallExpression _ open arguments close) = do
+      done <- highlightArgumentsParentheses arguments
+
+      if done then
+        pure True
+      else
+        highlightParentheses textBuffer open close insertTextIter
+
     go (Syntax.UnaryExpression _ operand) = go operand
 
     go (Syntax.BinaryExpression left _ right) = do
@@ -398,6 +416,16 @@ highlightExpressionParentheses isTextBuffer expression insertTextIter = go expre
         pure True
       else
         highlightParentheses textBuffer open close insertTextIter
+
+    highlightArgumentsParentheses Nothing = pure False
+
+    highlightArgumentsParentheses (Just (first, rest)) = do
+      done <- go first
+
+      if done then
+        pure True
+      else
+        foldlM (\a (_, e) -> if a then pure True else go e) False rest
 
 
 highlightParentheses :: (Gtk.IsTextBuffer a, Syntax b, Syntax c, MonadIO m) => a -> b -> c -> Gtk.TextIter -> m Bool
@@ -561,6 +589,14 @@ displayExpression isTextBuffer isTreeStore = go
       display textBuffer treeStore childTreeIter identifier "Identifier" True
       pure childTreeIter
 
+    go parentTreeIter e@(Syntax.CallExpression target open arguments close) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter e "CallExpression" False
+      display textBuffer treeStore childTreeIter target "Identifier" True
+      display textBuffer treeStore childTreeIter open "Token" True
+      displayArguments childTreeIter arguments
+      display textBuffer treeStore childTreeIter close "Token" True
+      pure childTreeIter
+
     go parentTreeIter e@(Syntax.UnaryExpression operator operand) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter e "UnaryExpression" False
       displayUnaryOperator textBuffer treeStore childTreeIter operator
@@ -587,6 +623,17 @@ displayExpression isTextBuffer isTreeStore = go
       go childTreeIter expression
       display textBuffer treeStore childTreeIter close "Token" True
       pure childTreeIter
+
+    displayArguments parentTreeIter Nothing = pure parentTreeIter
+
+    displayArguments parentTreeIter (Just (first, rest)) = do
+      go parentTreeIter first
+
+      for_ rest $ \(separator, argument) -> do
+        display textBuffer treeStore parentTreeIter separator "Token" True
+        go parentTreeIter argument
+
+      pure parentTreeIter
 
 
 displayUnaryOperator ::

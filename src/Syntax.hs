@@ -22,6 +22,7 @@ import qualified Span
 
 
 type Parameters = Maybe ((Identifier, Identifier), [(Token, Identifier, Identifier)])
+type Arguments = Maybe (Expression, [(Token, Expression)])
 
 
 class Syntax a where
@@ -58,6 +59,7 @@ data Statement where
 data Expression where
   IntegerExpression :: Integer -> Span -> Expression
   IdentifierExpression :: Identifier -> Expression
+  CallExpression :: Identifier -> Token -> Arguments -> Token -> Expression
   UnaryExpression :: UnaryOperator -> Expression -> Expression
   BinaryExpression :: Expression -> BinaryOperator -> Expression -> Expression
   AssignExpression :: Identifier -> AssignOperator -> Expression -> Expression
@@ -158,12 +160,14 @@ instance Syntax Expression where
   span (IdentifierExpression identifier) = span identifier
   span expression = Span (start expression) (end expression)
 
+  start (CallExpression target _ _ _) = start target
   start (UnaryExpression operator _) = start operator
   start (BinaryExpression left _ _) = start left
   start (AssignExpression target _ _) = start target
   start (ParenthesizedExpression open _ _) = start open
   start expression = Span.start (span expression)
 
+  end (CallExpression _ _ _ close) = end close
   end (UnaryExpression _ operand) = end operand
   end (BinaryExpression _ _ right) = end right
   end (AssignExpression _ _ value) = end value
