@@ -15,7 +15,6 @@ module Parsers (
   integerExpression,
   identifierExpression,
   callExpression,
-  primaryExpression,
   unaryExpression,
   binaryExpression,
   assignExpression,
@@ -225,20 +224,34 @@ callExpression = do
     pure (Syntax.CallExpression target open arguments close)
 
 
-primaryExpression :: Parser Syntax.Expression
-primaryExpression = callExpression <|> identifierExpression <|> integerExpression
+operandExpression :: Parser Syntax.Expression
+operandExpression = asum
+  [
+    parenthesizedExpression,
+    integerExpression,
+    callExpression,
+    unaryExpression,
+    identifierExpression
+  ]
 
 
 unaryExpression :: Parser Syntax.Expression
 unaryExpression = do
   operator <- unaryOperator
-  operand <- Parser.commit(s *> (primaryExpression <|> unaryExpression <|> parenthesizedExpression))
-  pure (Syntax.UnaryExpression operator operand)
+
+  case operator of
+    Syntax.NotOperator{} -> do
+      operand <- s *> operandExpression
+      pure (Syntax.UnaryExpression operator operand)
+
+    _ -> do
+      operand <- Parser.commit (s *> operandExpression)
+      pure (Syntax.UnaryExpression operator operand)
 
 
 binaryExpression :: Parser Syntax.Expression
 binaryExpression = do
-  left <- primaryExpression <|> unaryExpression <|> parenthesizedExpression
+  left <- operandExpression
   operator <- s *> binaryOperator
   right <- Parser.commit (s *> expression)
   pure (binary left operator right)
@@ -262,7 +275,7 @@ expression = asum
     assignExpression,
 
     do
-      left <- primaryExpression <|> unaryExpression <|> parenthesizedExpression
+      left <- operandExpression
       operator <- optional (s *> binaryOperator)
 
       case operator of
@@ -279,7 +292,7 @@ unaryOperator = syntax $ asum
   [
     Parser.char '+' $> Syntax.PlusOperator,
     Parser.char '-' $> Syntax.MinusOperator,
-    Parser.char '!' $> Syntax.NotOperator
+    keyword "not" $> Syntax.NotOperator
   ]
 
 
