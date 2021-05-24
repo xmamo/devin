@@ -61,7 +61,7 @@ variableAssignDeclaration :: Parser Syntax.Declaration
 variableAssignDeclaration = do
   t <- identifier
   variable <- s *> identifier
-  equalSign <- s *> charToken '='
+  equalSign <- s *> symbol "="
 
   Parser.commit $ do
     value <- s *> expression
@@ -223,7 +223,7 @@ assignExpression :: Parser Syntax.Expression
 assignExpression = do
   target <- identifier
   operator <- s *> assignOperator
-  value <- s *> expression
+  value <- Parser.commit (s *> expression)
   pure (Syntax.AssignExpression target operator value)
 
 
@@ -261,17 +261,17 @@ unaryOperator = syntax $ asum
 binaryOperator :: Parser Syntax.BinaryOperator
 binaryOperator = syntax $ asum
   [
-    Parser.char '+' $> Syntax.AddOperator,
-    Parser.char '-' $> Syntax.SubtractOperator,
-    Parser.char '*' $> Syntax.MultiplyOperator,
-    Parser.char '/' $> Syntax.DivideOperator,
-    Parser.char '%' $> Syntax.DivideOperator,
-    Parser.text "==" $> Syntax.EqualOperator,
-    Parser.text "!=" $> Syntax.NotEqualOperator,
-    Parser.text "<=" $> Syntax.LessOrEqualOperator,
-    Parser.char '<' $> Syntax.LessOperator,
-    Parser.text ">=" $> Syntax.GreaterOrEqualOperator,
-    Parser.char '>' $> Syntax.GreaterOperator,
+    symbol "+" $> Syntax.AddOperator,
+    symbol "-" $> Syntax.SubtractOperator,
+    symbol "*" $> Syntax.MultiplyOperator,
+    symbol "/" $> Syntax.DivideOperator,
+    symbol "%" $> Syntax.DivideOperator,
+    symbol "==" $> Syntax.EqualOperator,
+    symbol "!=" $> Syntax.NotEqualOperator,
+    symbol "<" $> Syntax.LessOperator,
+    symbol "<=" $> Syntax.LessOrEqualOperator,
+    symbol ">" $> Syntax.GreaterOperator,
+    symbol ">=" $> Syntax.GreaterOrEqualOperator,
     keyword "and" $> Syntax.AndOperator,
     keyword "or" $> Syntax.OrOperator
   ]
@@ -280,12 +280,12 @@ binaryOperator = syntax $ asum
 assignOperator :: Parser Syntax.AssignOperator
 assignOperator = syntax $ asum
   [
-    Parser.char '=' $> Syntax.AssignOperator,
-    Parser.text "+=" $> Syntax.AddAssignOperator,
-    Parser.text "-=" $> Syntax.SubtractAssignOperator,
-    Parser.text "*=" $> Syntax.MultiplyAssignOperator,
-    Parser.text "/=" $> Syntax.DivideAssignOperator,
-    Parser.text "%=" $> Syntax.RemainderAssignOperator
+    symbol "=" $> Syntax.AssignOperator,
+    symbol "+=" $> Syntax.AddAssignOperator,
+    symbol "-=" $> Syntax.SubtractAssignOperator,
+    symbol "*=" $> Syntax.MultiplyAssignOperator,
+    symbol "/=" $> Syntax.DivideAssignOperator,
+    symbol "%=" $> Syntax.RemainderAssignOperator
   ]
 
 
@@ -321,8 +321,28 @@ comment = do
   pure (Syntax.Comment (Span start end))
 
 
-s :: Parser ()
-s = void (many (void (some (Parser.satisfy isSpace)) <|> void comment))
+s :: Parser Syntax.Token
+s = token (many (void (some (Parser.satisfy isSpace)) <|> void comment))
+
+
+keyword :: Text -> Parser Syntax.Token
+keyword k = Parser.label ("keyword " <> k) $ do
+  (Syntax.Identifier name span) <- identifier
+
+  if name == k then
+    pure (Syntax.Token span)
+  else
+    empty
+
+
+symbol :: Text -> Parser Syntax.Token
+symbol s = Parser.label s . syntax $ do
+  s' <- Text.pack <$> some (Parser.satisfy isSymbol)
+
+  if s' == s then
+    pure Syntax.Token
+  else
+    empty
 
 
 token :: Parser a -> Parser Syntax.Token
@@ -343,16 +363,6 @@ syntax parser = do
   f <- parser
   end <- Parser.position
   pure (f (Span start end))
-
-
-keyword :: Text -> Parser Syntax.Token
-keyword k = Parser.label ("keyword " <> k) $ do
-  (Syntax.Identifier name span) <- identifier
-
-  if name == k then
-    pure (Syntax.Token span)
-  else
-    empty
 
 
 binary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syntax.Expression
