@@ -1,13 +1,14 @@
 module Syntax (
   Syntax (..),
-  Comment (..),
-  Token (..),
-  Identifier(..),
+  Declaration (..),
   Statement (..),
   Expression (..),
   UnaryOperator (..),
   BinaryOperator (..),
   AssignOperator (..),
+  Identifier(..),
+  Token (..),
+  Comment (..),
   comparePrecedence
 ) where
 
@@ -18,6 +19,9 @@ import Data.Text (Text)
 
 import Span (Span (Span))
 import qualified Span
+
+
+type Parameters = Maybe ((Identifier, Identifier), [(Token, Identifier, Identifier)])
 
 
 class Syntax a where
@@ -33,31 +37,21 @@ class Syntax a where
   {-# MINIMAL span | start, end #-}
 
 
-data Comment where
-  Comment :: Span -> Comment
-  deriving (Eq, Show, Read)
-
-
-data Token where
-  Token :: Span -> Token
-  deriving (Eq, Show, Read)
-
-
-data Identifier where
-  Identifier :: Text -> Span -> Identifier
+data Declaration where
+  VariableDeclaration :: Identifier -> Identifier -> Token -> Declaration
+  VariableAssignDeclaration :: Identifier -> Identifier -> Token -> Expression -> Token -> Declaration
+  FunctionDeclaration :: Identifier -> Identifier -> Token -> Parameters -> Token -> Statement -> Declaration
   deriving (Eq, Show, Read)
 
 
 data Statement where
-  DeclareStatement :: Identifier -> Identifier -> Token -> Statement
-  DeclareAndAssignStatement :: Identifier -> Identifier -> Token -> Expression -> Token -> Statement
   ExpressionStatement :: Expression -> Token -> Statement
   IfStatement :: Token -> Expression -> Statement -> Statement
   IfElseStatement :: Token -> Expression -> Statement -> Token -> Statement -> Statement
   WhileStatement :: Token -> Expression -> Statement-> Statement
   DoWhileStatement :: Token -> Statement -> Token -> Expression -> Token -> Statement
   ReturnStatement :: Token -> Expression -> Token -> Statement
-  BlockStatement :: Token -> [Statement] -> Token -> Statement
+  BlockStatement :: Token -> [Either Declaration Statement] -> Token -> Statement
   deriving (Eq, Show, Read)
 
 
@@ -105,21 +99,43 @@ data AssignOperator where
   deriving (Eq, Show, Read)
 
 
-instance Syntax Comment where
-  span (Comment s) = s
+data Identifier where
+  Identifier :: Text -> Span -> Identifier
+  deriving (Eq, Show, Read)
 
 
-instance Syntax Token where
-  span (Token s) = s
+data Token where
+  Token :: Span -> Token
+  deriving (Eq, Show, Read)
 
 
-instance Syntax Identifier where
-  span (Identifier _ s) = s
+data Comment where
+  Comment :: Span -> Comment
+  deriving (Eq, Show, Read)
+
+
+instance (Syntax a, Syntax b) => Syntax (Either a b) where
+  span (Left a) = span a
+  span (Right a) = span a
+
+  start (Left a) = start a
+  start (Right a) = start a
+
+  end (Left a) = end a
+  end (Right a) = end a
+
+
+instance Syntax Declaration where
+  start (VariableDeclaration t _ _) = start t
+  start (VariableAssignDeclaration t _ _ _ _) = start t
+  start (FunctionDeclaration t _ _ _ _ _) = start t
+
+  end (VariableDeclaration _ _ terminator) = end terminator
+  end (VariableAssignDeclaration _ _ _ _ terminator) = end terminator
+  end (FunctionDeclaration _ _ _ _ _ body) = end body
 
 
 instance Syntax Statement where
-  start (DeclareStatement t _ _) = start t
-  start (DeclareAndAssignStatement t _ _ _ _) = start t
   start (ExpressionStatement value _) = start value
   start (IfStatement ifKeyword _ _) = start ifKeyword
   start (IfElseStatement ifKeyword _ _ _ _) = start ifKeyword
@@ -128,8 +144,6 @@ instance Syntax Statement where
   start (ReturnStatement returnKeyword _ _) = start returnKeyword
   start (BlockStatement open _ _) = start open
 
-  end (DeclareStatement _ _ terminator) = end terminator
-  end (DeclareAndAssignStatement _ _ _ _ terminator) = end terminator
   end (ExpressionStatement _ terminator) = end terminator
   end (IfStatement _ _ trueBranch) = end trueBranch
   end (IfElseStatement _ _ _ _ falseBranch) = end falseBranch
@@ -186,6 +200,18 @@ instance Syntax BinaryOperator where
   span (GreaterOrEqualOperator s) = s
   span (AndOperator s) = s
   span (OrOperator s) = s
+
+
+instance Syntax Identifier where
+  span (Identifier _ s) = s
+
+
+instance Syntax Token where
+  span (Token s) = s
+
+
+instance Syntax Comment where
+  span (Comment s) = s
 
 
 comparePrecedence :: BinaryOperator -> BinaryOperator -> Ordering

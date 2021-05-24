@@ -143,30 +143,30 @@ onActivate isApplication = do
   -- Register listeners:
 
   threadIdVar <- newMVar =<< forkIO (pure ())
-  statementVar <- newMVar Nothing
+  declarationVar <- newMVar Nothing
 
   on codeTextBuffer #changed $ do
     text <- fromJust <$> get codeTextBuffer #text
 
     killThread =<< takeMVar threadIdVar
-    swapMVar statementVar Nothing
+    swapMVar declarationVar Nothing
 
     threadId <- forkIO $ do
-      let (statement, comments) = runWriter (Parser.parseT Parsers.statement (Input 0 text))
+      let (statement, comments) = runWriter (Parser.parseT Parsers.declaration (Input 0 text))
 
       case statement of
-        Result.Success statement _ -> Gtk.postGUIASync $ do
-          swapMVar statementVar (Just statement)
+        Result.Success declaration _ -> Gtk.postGUIASync $ do
+          swapMVar declarationVar (Just declaration)
 
           (startTextIter, endTextIter) <- #getBounds codeTextBuffer
           for_ styleIds $ \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
 
           for_ comments (highlight codeTextBuffer "comment")
-          highlightStatement codeTextBuffer statement
-          highlightStatementParentheses codeTextBuffer statement =<< Helpers.getInsertTextIter codeTextBuffer
+          highlightDeclaration codeTextBuffer declaration
+          highlightDeclarationParentheses codeTextBuffer declaration =<< Helpers.getInsertTextIter codeTextBuffer
 
           #clear codeTreeStore
-          displayStatement codeTextBuffer codeTreeStore Nothing statement
+          displayDeclaration codeTextBuffer codeTreeStore Nothing declaration
 
           set logTextBuffer [#text := ""]
 
@@ -188,27 +188,49 @@ onActivate isApplication = do
     (startTextIter, endTextIter) <- #getBounds codeTextBuffer
     #removeTagByName codeTextBuffer "parenthesis" startTextIter endTextIter
 
-    statement <- MaybeT (readMVar statementVar)
-    highlightStatementParentheses codeTextBuffer statement =<< Helpers.getInsertTextIter codeTextBuffer
+    declaration <- MaybeT (readMVar declarationVar)
+    highlightDeclarationParentheses codeTextBuffer declaration =<< Helpers.getInsertTextIter codeTextBuffer
 
   -- Display the UI:
 
   #showAll window
 
 
+highlightDeclaration :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration -> m ()
+highlightDeclaration isTextBuffer = go
+  where
+    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
+
+    go (Syntax.VariableDeclaration t variable _) = do
+      highlight textBuffer "type" t
+      highlight textBuffer "identifier" variable
+
+    go (Syntax.VariableAssignDeclaration t variable _ value _) = do
+      highlight textBuffer "type" t
+      highlight textBuffer "identifier" variable
+      highlightExpression textBuffer value
+
+    go (Syntax.FunctionDeclaration t name _ parameters _ body) = do
+      highlight textBuffer "type" t
+      highlight textBuffer "identifier" name
+      highlightParameters parameters
+      highlightStatement textBuffer body
+
+    highlightParameters Nothing = pure ()
+
+    highlightParameters (Just ((t, name), rest)) = do
+      highlight textBuffer "type" t
+      highlight textBuffer "type" name
+
+      for_ rest $ \(_, t, name) -> do
+        highlight textBuffer "type" t
+        highlight textBuffer "type" name
+
+
 highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m ()
 highlightStatement isTextBuffer = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
-    go (Syntax.DeclareStatement t variable _) = do
-      highlight textBuffer "type" t
-      highlight textBuffer "identifier" variable
-
-    go (Syntax.DeclareAndAssignStatement t variable _ value _) = do
-      highlight textBuffer "type" t
-      highlight textBuffer "identifier" variable
-      highlightExpression textBuffer value
 
     go (Syntax.ExpressionStatement value _) = highlightExpression textBuffer value
 
@@ -239,7 +261,10 @@ highlightStatement isTextBuffer = go
       highlight textBuffer "keyword" returnKeyword
       highlightExpression textBuffer value
 
-    go (Syntax.BlockStatement _ statements _) = for_ statements (highlightStatement textBuffer)
+    go (Syntax.BlockStatement _ elements _) = for_ elements highlightElement
+
+    highlightElement (Left declaration) = highlightDeclaration textBuffer declaration
+    highlightElement (Right statement) = go statement
 
 
 highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
@@ -268,14 +293,29 @@ highlightExpression isTextBuffer = go
     go (Syntax.ParenthesizedExpression _ expression _) = go expression
 
 
+highlightDeclarationParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration -> Gtk.TextIter -> m Bool
+highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go declaration
+  where
+    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
+
+    go Syntax.VariableDeclaration{} = pure False
+
+    go (Syntax.VariableAssignDeclaration _ _ _ value _) =
+      highlightExpressionParentheses textBuffer value insertTextIter
+
+    go (Syntax.FunctionDeclaration _ _ open _ close body) = do
+      done <- highlightParentheses textBuffer open close insertTextIter
+
+      if done then
+        pure True
+      else
+        highlightStatementParentheses textBuffer body insertTextIter
+
+
 highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> Gtk.TextIter -> m Bool
 highlightStatementParentheses isTextBuffer statement insertTextIter = go statement
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
-    go Syntax.DeclareStatement{} = pure False
-
-    go (Syntax.DeclareAndAssignStatement _ _ _ value _) = highlightExpressionParentheses textBuffer value insertTextIter
 
     go (Syntax.ExpressionStatement value _) = highlightExpressionParentheses textBuffer value insertTextIter
 
@@ -318,13 +358,16 @@ highlightStatementParentheses isTextBuffer statement insertTextIter = go stateme
 
     go (Syntax.ReturnStatement _ value _) = highlightExpressionParentheses textBuffer value insertTextIter
 
-    go (Syntax.BlockStatement open statements close) = do
-      done <- foldlM (\a s -> if a then pure True else go s) False statements
+    go (Syntax.BlockStatement open elements close) = do
+      done <- foldlM (\a e -> if a then pure True else highlightElementParentheses e) False elements
 
       if done then
         pure True
       else
         highlightParentheses textBuffer open close insertTextIter
+
+    highlightElementParentheses (Left declaration) = highlightDeclarationParentheses textBuffer declaration insertTextIter
+    highlightElementParentheses (Right statement) = go statement
 
 
 highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> Gtk.TextIter -> m Bool
@@ -387,6 +430,55 @@ highlight isTextBuffer tagName syntax = do
   #applyTagByName textBuffer tagName startTextIter endTextIter
 
 
+displayDeclaration ::
+  (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.Declaration -> IO (Maybe Gtk.TreeIter)
+
+displayDeclaration isTextBuffer isTreeStore = go
+  where
+    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
+    treeStore = isTreeStore `asA` Gtk.TreeStore
+
+    go parentTreeIter d@(Syntax.VariableDeclaration t variable terminator) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter d "VariableDeclaration" False
+      display textBuffer treeStore childTreeIter t "Identifier" True
+      display textBuffer treeStore childTreeIter variable "Identifier" True
+      display textBuffer treeStore childTreeIter terminator "Token" True
+      pure childTreeIter
+
+    go parentTreeIter d@(Syntax.VariableAssignDeclaration t variable equalSign value terminator) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter d "VariableAssignDeclaration" False
+      display textBuffer treeStore childTreeIter t "Identifier" True
+      display textBuffer treeStore childTreeIter variable "Identifier" True
+      display textBuffer treeStore childTreeIter equalSign "Token" True
+      displayExpression textBuffer treeStore childTreeIter value
+      display textBuffer treeStore childTreeIter terminator "Token" True
+      pure childTreeIter
+
+    go parentTreeIter d@(Syntax.FunctionDeclaration name t open parameters close body) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter d "FunctionDeclaration" False
+      display textBuffer treeStore childTreeIter name "Identifier" True
+      display textBuffer treeStore childTreeIter t "Identifier" True
+      display textBuffer treeStore childTreeIter open "Token" True
+      displayParameters childTreeIter parameters
+      display textBuffer treeStore childTreeIter close "Token" True
+      displayStatement textBuffer treeStore childTreeIter body
+      pure childTreeIter
+
+    displayParameters parentTreeIter Nothing = pure parentTreeIter
+
+    displayParameters parentTreeIter (Just ((t, name), rest)) = do
+      display textBuffer treeStore parentTreeIter t "Identifier" True
+      display textBuffer treeStore parentTreeIter name "Identifier" True
+
+      for_ rest $ \(separator, t, name) -> do
+        display textBuffer treeStore parentTreeIter separator "Token" True
+        display textBuffer treeStore parentTreeIter t "Identifier" True
+        display textBuffer treeStore parentTreeIter name "Identifier" True
+
+      pure parentTreeIter
+
+
 displayStatement ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement -> IO (Maybe Gtk.TreeIter)
@@ -395,22 +487,6 @@ displayStatement isTextBuffer isTreeStore = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
     treeStore = isTreeStore `asA` Gtk.TreeStore
-
-    go parentTreeIter s@(Syntax.DeclareStatement t variable terminator) = do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "DeclareStatement" False
-      display textBuffer treeStore childTreeIter t "Identifier" True
-      display textBuffer treeStore childTreeIter variable "Identifier" True
-      display textBuffer treeStore childTreeIter terminator "Token" True
-      pure childTreeIter
-
-    go parentTreeIter s@(Syntax.DeclareAndAssignStatement t variable equalSign value terminator) = do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "DeclareAndAssignStatement" False
-      display textBuffer treeStore childTreeIter t "Identifier" True
-      display textBuffer treeStore childTreeIter variable "Identifier" True
-      display textBuffer treeStore childTreeIter equalSign "Token" True
-      displayExpression textBuffer treeStore childTreeIter value
-      display textBuffer treeStore childTreeIter terminator "Token" True
-      pure childTreeIter
 
     go parentTreeIter s@(Syntax.ExpressionStatement value terminator) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter s "ExpressionStatement" False
@@ -457,12 +533,15 @@ displayStatement isTextBuffer isTreeStore = go
       display textBuffer treeStore childTreeIter terminator "Token" True
       pure childTreeIter
 
-    go parentTreeIter s@(Syntax.BlockStatement open statements close) = do
+    go parentTreeIter s@(Syntax.BlockStatement open elements close) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter s "BlockStatement" False
       display textBuffer treeStore childTreeIter open "Token" True
-      for_ statements (go childTreeIter)
+      for_ elements (displayElement childTreeIter)
       display textBuffer treeStore childTreeIter close "Token" True
       pure childTreeIter
+
+    displayElement parentTreeIter (Left declaration) = displayDeclaration textBuffer treeStore parentTreeIter declaration
+    displayElement parentTreeIter (Right statement) = go parentTreeIter statement
 
 
 displayExpression ::

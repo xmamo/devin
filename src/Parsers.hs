@@ -1,8 +1,8 @@
 module Parsers (
-  comment,
-  identifier,
-  declareStatement,
-  declareAndAssignStatement,
+  variableDeclaration,
+  variableAssignDeclaration,
+  functionDeclaration,
+  declaration,
   expressionStatement,
   ifStatement,
   ifElseStatement,
@@ -21,7 +21,9 @@ module Parsers (
   expression,
   unaryOperator,
   binaryOperator,
-  assignOperator
+  assignOperator,
+  identifier,
+  comment
 ) where
 
 import Data.Char
@@ -47,62 +49,62 @@ import qualified Helpers
 type Parser = ParserT (Writer [Syntax.Comment])
 
 
-comment :: Parser Syntax.Comment
-comment = do
-  start <- Parser.position
-  Parser.text "//"
-  many (Parser.satisfy (not . Helpers.isNewline))
-  end <- Parser.position
-
-  let comment = Syntax.Comment (Span start end)
-  lift (tell [comment])
-  pure (Syntax.Comment (Span start end))
-
-
--- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
-identifier :: Parser Syntax.Identifier
-identifier = Parser.label "identifier" . syntax $ do
-  start <- gc [lu, ll, lt, lm, lo, nl, pc]
-  continue <- Text.pack <$> many (gc [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
-  pure (Syntax.Identifier (Text.cons start continue))
-  where
-    gc list = Parser.satisfy (\c -> generalCategory c `elem` list)
-    lu = UppercaseLetter
-    ll = LowercaseLetter
-    lt = TitlecaseLetter
-    lm = ModifierLetter
-    lo = OtherLetter
-    mn = NonSpacingMark
-    mc = SpacingCombiningMark
-    nd = DecimalNumber
-    nl = LetterNumber
-    pc = ConnectorPunctuation
-
-
-declareStatement :: Parser Syntax.Statement
-declareStatement = do
+variableDeclaration :: Parser Syntax.Declaration
+variableDeclaration = do
   t <- identifier
   variable <- s *> identifier
-  terminator <- s *> token (Parser.char ';')
-  pure (Syntax.DeclareStatement t variable terminator)
+  terminator <- s *> charToken ';'
+  pure (Syntax.VariableDeclaration t variable terminator)
 
 
-declareAndAssignStatement :: Parser Syntax.Statement
-declareAndAssignStatement = do
+variableAssignDeclaration :: Parser Syntax.Declaration
+variableAssignDeclaration = do
   t <- identifier
   variable <- s *> identifier
-  equalSign <- s *> token (Parser.char '=')
+  equalSign <- s *> charToken '='
 
   Parser.commit $ do
     value <- s *> expression
-    terminator <- s *> token (Parser.char ';')
-    pure (Syntax.DeclareAndAssignStatement t variable equalSign value terminator)
+    terminator <- s *> charToken ';'
+    pure (Syntax.VariableAssignDeclaration t variable equalSign value terminator)
+
+
+functionDeclaration :: Parser Syntax.Declaration
+functionDeclaration = do
+  t <- identifier
+  name <- s *> identifier
+  open <- s *> charToken '('
+
+  Parser.commit $ do
+    first <- optional ((,) <$> (s *> identifier) <*> Parser.commit (s *> identifier))
+
+    parameters <- case first of
+      Just first -> do
+        rest <- many $ do
+          separator <- s *> charToken ','
+
+          Parser.commit $ do
+            t <- s *> identifier
+            name <- s *> identifier
+            pure (separator, t, name)
+
+        pure (Just (first, rest))
+
+      Nothing -> pure Nothing
+
+    close <- s *> charToken ')'
+    body <- s *> statement
+    pure (Syntax.FunctionDeclaration t name open parameters close body)
+
+
+declaration :: Parser Syntax.Declaration
+declaration = functionDeclaration <|> variableAssignDeclaration <|> variableDeclaration
 
 
 expressionStatement :: Parser Syntax.Statement
 expressionStatement = do
   value <- expression
-  terminator <- Parser.commit (s *> token (Parser.char ';'))
+  terminator <- Parser.commit (s *> charToken ';')
   pure (Syntax.ExpressionStatement value terminator)
 
 
@@ -140,7 +142,7 @@ doWhileStatement = do
   Parser.commit $ do
     whileKeyword <- s *> keyword "while"
     predicate <- s *> expression
-    terminator <- s *> token (Parser.char ';')
+    terminator <- s *> charToken ';'
     pure (Syntax.DoWhileStatement doKeyword body whileKeyword predicate terminator)
 
 
@@ -148,38 +150,23 @@ returnStatement :: Parser Syntax.Statement
 returnStatement = do
   returnKeyword <- keyword "return"
   value <- s*> expression
-  terminator <- Parser.commit (s *> token (Parser.char ';'))
+  terminator <- Parser.commit (s *> charToken ';')
   pure (Syntax.ReturnStatement returnKeyword value terminator)
 
 
 blockStatement :: Parser Syntax.Statement
 blockStatement = do
-  open <- token (Parser.char '{')
+  open <- charToken '{'
 
   Parser.commit $ do
-    statements <- s *> Parser.separatedBy statement s
-    close <- s *> token (Parser.char '}')
-    pure (Syntax.BlockStatement open statements close)
+    elements <- s *> Parser.separatedBy ((Left <$> declaration) <|> (Right <$> statement)) s
+    close <- s *> charToken '}'
+    pure (Syntax.BlockStatement open elements close)
 
 
 statement :: Parser Syntax.Statement
 statement = asum
   [
-    do
-      t <- identifier
-      variable <- s *> identifier <* s
-      equalSign <- optional (token (Parser.char '='))
-
-      case equalSign of
-        Just equalSign -> Parser.commit $ do
-          value <- s *> expression
-          terminator <- s *> token (Parser.char ';')
-          pure (Syntax.DeclareAndAssignStatement t variable equalSign value terminator)
-
-        Nothing -> do
-          terminator <- s *> token (Parser.char ';')
-          pure (Syntax.DeclareStatement t variable terminator),
-
     do
       ifKeyword <- keyword "if"
       predicate <- s *> expression
@@ -236,13 +223,12 @@ assignExpression :: Parser Syntax.Expression
 assignExpression = do
   target <- identifier
   operator <- s *> assignOperator
-  value <- Parser.commit (s *> expression)
+  value <- s *> expression
   pure (Syntax.AssignExpression target operator value)
 
 
 parenthesizedExpression :: Parser Syntax.Expression
-parenthesizedExpression =
-  Syntax.ParenthesizedExpression <$> token (Parser.char '(') <*> (s *> expression) <*> (s *> token (Parser.char ')'))
+parenthesizedExpression = Syntax.ParenthesizedExpression <$> charToken '(' <*> (s *> expression) <*> (s *> charToken ')')
 
 
 expression :: Parser Syntax.Expression
@@ -303,6 +289,38 @@ assignOperator = syntax $ asum
   ]
 
 
+-- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
+identifier :: Parser Syntax.Identifier
+identifier = Parser.label "identifier" . syntax $ do
+  start <- gc [lu, ll, lt, lm, lo, nl, pc]
+  continue <- Text.pack <$> many (gc [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
+  pure (Syntax.Identifier (Text.cons start continue))
+  where
+    gc list = Parser.satisfy (\c -> generalCategory c `elem` list)
+    lu = UppercaseLetter
+    ll = LowercaseLetter
+    lt = TitlecaseLetter
+    lm = ModifierLetter
+    lo = OtherLetter
+    mn = NonSpacingMark
+    mc = SpacingCombiningMark
+    nd = DecimalNumber
+    nl = LetterNumber
+    pc = ConnectorPunctuation
+
+
+comment :: Parser Syntax.Comment
+comment = do
+  start <- Parser.position
+  Parser.text "//"
+  many (Parser.satisfy (not . Helpers.isNewline))
+  end <- Parser.position
+
+  let comment = Syntax.Comment (Span start end)
+  lift (tell [comment])
+  pure (Syntax.Comment (Span start end))
+
+
 s :: Parser ()
 s = void (many (void (some (Parser.satisfy isSpace)) <|> void comment))
 
@@ -313,6 +331,10 @@ token parser = do
   parser
   end <- Parser.position
   pure (Syntax.Token (Span start end))
+
+
+charToken :: Char -> Parser Syntax.Token
+charToken = token . Parser.char
 
 
 syntax :: Parser (Span -> a) -> Parser a
