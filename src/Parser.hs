@@ -2,6 +2,7 @@ module Parser (
   Parser,
   ParserT (..),
   parse,
+  eoi,
   satisfy,
   char,
   text,
@@ -92,6 +93,14 @@ instance MonadTrans ParserT where
 
 parse :: Parser a -> Input -> Result a
 parse parser input = runIdentity (parseT parser input)
+
+
+eoi :: Applicative m => ParserT m ()
+eoi = ParserT $ \input@(Input position text) ->
+  if Text.null text then
+    pure (Result.Success () input)
+  else
+    pure (Result.Failure True position ["End of input"])
 
 
 satisfy :: Applicative m => (Char -> Bool) -> ParserT m Char

@@ -8,7 +8,6 @@ import Data.Maybe
 import System.Environment
 import System.Exit
 
-import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Writer
 
 import Data.Text (Text)
@@ -55,7 +54,7 @@ onActivate isApplication = do
           ("integer", "def:decimal"),
           ("operator", "def:operator"),
           ("error", "def:error"),
-          ("parenthesis", "bracket-match")
+          ("bracket", "bracket-match")
         ]
 
   -- Create defaultLanguage and codeTreeStore, which are needed later:
@@ -143,30 +142,34 @@ onActivate isApplication = do
   -- Register listeners:
 
   threadIdVar <- newMVar =<< forkIO (pure ())
-  declarationVar <- newMVar Nothing
+  declarationsVar <- newMVar []
 
   on codeTextBuffer #changed $ do
     text <- fromJust <$> get codeTextBuffer #text
 
     killThread =<< takeMVar threadIdVar
-    swapMVar declarationVar Nothing
+    swapMVar declarationsVar []
 
     threadId <- forkIO $ do
-      let (statement, comments) = runWriter (Parser.parseT Parsers.declaration (Input 0 text))
+      let (declarations, comments) = runWriter (Parser.parseT Parsers.declarations (Input 0 text))
 
-      case statement of
-        Result.Success declaration _ -> Gtk.postGUIASync $ do
-          swapMVar declarationVar (Just declaration)
+      case declarations of
+        Result.Success declarations _ -> Gtk.postGUIASync $ do
+          swapMVar declarationsVar declarations
 
           (startTextIter, endTextIter) <- #getBounds codeTextBuffer
           for_ styleIds $ \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
 
           for_ comments (highlight codeTextBuffer "comment")
-          highlightDeclaration codeTextBuffer declaration
-          highlightDeclarationParentheses codeTextBuffer declaration =<< Helpers.getInsertTextIter codeTextBuffer
+
+          insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
+
+          for_ declarations $ \declaration -> do
+            highlightDeclaration codeTextBuffer declaration
+            highlightDeclarationParentheses codeTextBuffer declaration insertTextIter
 
           #clear codeTreeStore
-          displayDeclaration codeTextBuffer codeTreeStore Nothing declaration
+          for_ declarations (displayDeclaration codeTextBuffer codeTreeStore Nothing)
 
           set logTextBuffer [#text := ""]
 
@@ -184,12 +187,13 @@ onActivate isApplication = do
 
     putMVar threadIdVar threadId
 
-  on codeTextBuffer (PropertyNotify #cursorPosition) . const . void . runMaybeT $ do
+  on codeTextBuffer (PropertyNotify #cursorPosition) . const . void $ do
     (startTextIter, endTextIter) <- #getBounds codeTextBuffer
-    #removeTagByName codeTextBuffer "parenthesis" startTextIter endTextIter
+    #removeTagByName codeTextBuffer "bracket" startTextIter endTextIter
 
-    declaration <- MaybeT (readMVar declarationVar)
-    highlightDeclarationParentheses codeTextBuffer declaration =<< Helpers.getInsertTextIter codeTextBuffer
+    declarations <- readMVar declarationsVar
+    insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
+    for_ declarations $ \declaration -> highlightDeclarationParentheses codeTextBuffer declaration insertTextIter
 
   -- Display the UI:
 
@@ -442,8 +446,8 @@ highlightParentheses isTextBuffer open close insertTextIter = do
     [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
 
   if applyParenthesisTag then do
-    #applyTagByName textBuffer "parenthesis" openStartTextIter openEndTextIter
-    #applyTagByName textBuffer "parenthesis" closeStartTextIter closeEndTextIter
+    #applyTagByName textBuffer "bracket" openStartTextIter openEndTextIter
+    #applyTagByName textBuffer "bracket" closeStartTextIter closeEndTextIter
     pure True
   else
     pure False

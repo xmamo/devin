@@ -1,4 +1,5 @@
 module Parsers (
+  declarations,
   variableDeclaration,
   variableAssignDeclaration,
   functionDeclaration,
@@ -48,6 +49,10 @@ import qualified Helpers
 
 
 type Parser = ParserT (Writer [Syntax.Comment])
+
+
+declarations :: Parser [Syntax.Declaration]
+declarations = s *> Parser.separatedBy declaration s <* s <* Parser.eoi
 
 
 variableDeclaration :: Parser Syntax.Declaration
