@@ -1,4 +1,4 @@
-resolver: lts-17.11
+resolver: lts-17.13
 
 extra-deps:
   - gi-gtksource-3.0.23
