@@ -6,7 +6,7 @@ module Syntax (
   UnaryOperator (..),
   BinaryOperator (..),
   AssignOperator (..),
-  Identifier(..),
+  Identifier (..),
   Token (..),
   Comment (..),
   comparePrecedence
@@ -49,7 +49,7 @@ data Statement where
   ExpressionStatement :: Expression -> Token -> Statement
   IfStatement :: Token -> Expression -> Statement -> Statement
   IfElseStatement :: Token -> Expression -> Statement -> Token -> Statement -> Statement
-  WhileStatement :: Token -> Expression -> Statement-> Statement
+  WhileStatement :: Token -> Expression -> Statement -> Statement
   DoWhileStatement :: Token -> Statement -> Token -> Expression -> Token -> Statement
   ReturnStatement :: Token -> Expression -> Token -> Statement
   BlockStatement :: Token -> [Either Declaration Statement] -> Token -> Statement
@@ -221,16 +221,16 @@ instance Syntax Comment where
 comparePrecedence :: BinaryOperator -> BinaryOperator -> Ordering
 comparePrecedence = comparing precedence
   where
-    precedence AddOperator{} = 4
-    precedence SubtractOperator{} = 4
-    precedence MultiplyOperator{} = 5
-    precedence DivideOperator{} = 5
-    precedence RemainderOperator{} = 5
-    precedence EqualOperator{} = 2
-    precedence NotEqualOperator{} = 2
-    precedence LessOperator{} = 3
-    precedence LessOrEqualOperator{} = 3
-    precedence GreaterOperator{} = 3
-    precedence GreaterOrEqualOperator{} = 3
-    precedence AndOperator{} = 1
-    precedence OrOperator{} = 1
+    precedence (AddOperator _) = 4
+    precedence (SubtractOperator _) = 4
+    precedence (MultiplyOperator _) = 5
+    precedence (DivideOperator _) = 5
+    precedence (RemainderOperator _) = 5
+    precedence (EqualOperator _) = 2
+    precedence (NotEqualOperator _) = 2
+    precedence (LessOperator _) = 3
+    precedence (LessOrEqualOperator _) = 3
+    precedence (GreaterOperator _) = 3
+    precedence (GreaterOrEqualOperator _) = 3
+    precedence (AndOperator _) = 1
+    precedence (OrOperator _) = 1

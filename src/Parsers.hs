@@ -27,10 +27,10 @@ module Parsers (
   comment
 ) where
 
+import Control.Applicative
 import Data.Char
 import Data.Foldable
 import Data.Functor
-import Control.Applicative
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
@@ -38,13 +38,11 @@ import Control.Monad.Trans.Writer
 import Data.Text (Text)
 import qualified Data.Text as Text
 
+import qualified Helpers
 import Parser (ParserT)
 import qualified Parser
-
 import Span (Span (Span))
 import qualified Syntax
-
-import qualified Helpers
 
 
 type Parser = ParserT (Writer [Syntax.Comment])
@@ -154,7 +152,7 @@ doWhileStatement = do
 returnStatement :: Parser Syntax.Statement
 returnStatement = do
   returnKeyword <- keyword "return"
-  value <- s*> expression
+  value <- s *> expression
   terminator <- Parser.commit (s *> charToken ';')
   pure (Syntax.ReturnStatement returnKeyword value terminator)
 
@@ -240,7 +238,7 @@ unaryExpression = do
   operator <- unaryOperator
 
   case operator of
-    Syntax.NotOperator{} -> do
+    Syntax.NotOperator _ -> do
       operand <- s *> operandExpression
       pure (Syntax.UnaryExpression operator operand)
 
@@ -266,7 +264,8 @@ assignExpression = do
 
 
 parenthesizedExpression :: Parser Syntax.Expression
-parenthesizedExpression = Syntax.ParenthesizedExpression <$> charToken '(' <*> (s *> expression) <*> (s *> charToken ')')
+parenthesizedExpression =
+  Syntax.ParenthesizedExpression <$> charToken '(' <*> (s *> expression) <*> (s *> charToken ')')
 
 
 expression :: Parser Syntax.Expression
@@ -364,23 +363,23 @@ s = token (many (void (some (Parser.satisfy isSpace)) <|> void comment))
 
 
 keyword :: Text -> Parser Syntax.Token
-keyword k = Parser.label ("keyword " <> k) $ do
+keyword k = do
   (Syntax.Identifier name span) <- identifier
 
   if name == k then
     pure (Syntax.Token span)
   else
-    empty
+    Parser.label ("keyword " <> k) empty
 
 
 symbol :: Text -> Parser Syntax.Token
-symbol s = Parser.label s . syntax $ do
+symbol s = syntax $ do
   s' <- Text.pack <$> some (Parser.satisfy (\c -> isSymbol c || generalCategory c == OtherPunctuation))
 
   if s' == s then
     pure Syntax.Token
   else
-    empty
+    Parser.label s empty
 
 
 token :: Parser a -> Parser Syntax.Token
@@ -405,7 +404,7 @@ syntax parser = do
 
 binary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syntax.Expression
 
-binary Syntax.BinaryExpression{} _ _ = undefined
+binary (Syntax.BinaryExpression _ _ _) _ _ = undefined
 
 binary left operator (Syntax.BinaryExpression rLeft rOperator rRight)
   | Syntax.comparePrecedence operator rOperator >= EQ =

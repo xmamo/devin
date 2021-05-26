@@ -1,3 +1,5 @@
+{-# LANGUAGE MonadComprehensions #-}
+
 module Helpers (
   isNewline,
   expectationsText,

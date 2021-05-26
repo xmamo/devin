@@ -1,4 +1,4 @@
-module Parser (
+module Parser(
   Parser,
   ParserT (..),
   parse,
@@ -13,10 +13,10 @@ module Parser (
   commit
 ) where
 
-import Data.Functor.Identity
-import Data.List
 import Control.Applicative
 import Control.Monad
+import Data.Functor.Identity
+import Data.List
 
 import Control.Monad.Trans.Class
 
@@ -25,7 +25,6 @@ import qualified Data.Text as Text
 
 import Input (Input (Input))
 import qualified Input
-
 import Result (Result)
 import qualified Result
 

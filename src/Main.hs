@@ -20,16 +20,13 @@ import qualified GI.Gtk as Gtk
 import qualified Data.GI.Gtk.Threading as Gtk
 import qualified GI.GtkSource as GtkSource
 
+import qualified Helpers
 import Input (Input (Input))
-
-import qualified Result
 import qualified Parser
 import qualified Parsers
-
+import qualified Result
 import Syntax (Syntax)
 import qualified Syntax
-
-import qualified Helpers
 
 
 main :: IO ()
@@ -47,12 +44,12 @@ onActivate isApplication = do
 
       styleIds =
         [
-          ("comment", "def:comment"),
           ("keyword", "def:keyword"),
           ("identifier", "def:identifier"),
           ("type", "def:type"),
           ("integer", "def:decimal"),
           ("operator", "def:operator"),
+          ("comment", "def:comment"),
           ("error", "def:error"),
           ("bracket", "bracket-match")
         ]
@@ -63,7 +60,7 @@ onActivate isApplication = do
   defaultLanguage <- fromJust <$> #getLanguage languageManager "def"
 
   codeTreeStore <- new Gtk.TreeStore []
-  #setColumnTypes codeTreeStore [gtypeString, gtypeString, gtypeString]
+  #setColumnTypes codeTreeStore (replicate 3 gtypeString)
 
   -- Build the UI:
 
@@ -116,8 +113,8 @@ onActivate isApplication = do
   #setHighlightMatchingBrackets codeTextBuffer False
   #setHighlightSyntax codeTextBuffer False
 
-  tagTable <- #getTagTable codeTextBuffer
   styleScheme <- fromJust <$> #getStyleScheme codeTextBuffer
+  tagTable <- #getTagTable codeTextBuffer
 
   for_ styleIds $ \(tagName, styleId) -> do
     tag <- new GtkSource.Tag [#name := tagName]
@@ -129,7 +126,7 @@ onActivate isApplication = do
 
   cellRenderer <- new Gtk.CellRendererText [#family := "monospace"]
 
-  for_ (zip [0..] [False, False, True]) $ \(column, expand) -> do
+  for_ (zip [0 ..] [False, False, True]) $ \(column, expand) -> do
     treeViewColumn <- new Gtk.TreeViewColumn []
     #packEnd treeViewColumn cellRenderer expand
     #addAttribute treeViewColumn cellRenderer "text" column
@@ -160,13 +157,13 @@ onActivate isApplication = do
           (startTextIter, endTextIter) <- #getBounds codeTextBuffer
           for_ styleIds $ \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
 
-          for_ comments (highlight codeTextBuffer "comment")
-
           insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
 
           for_ declarations $ \declaration -> do
             highlightDeclaration codeTextBuffer declaration
             highlightDeclarationParentheses codeTextBuffer declaration insertTextIter
+
+          for_ comments (highlight codeTextBuffer "comment")
 
           #clear codeTreeStore
           for_ declarations (displayDeclaration codeTextBuffer codeTreeStore Nothing)
@@ -241,23 +238,23 @@ highlightStatement isTextBuffer = go
     go (Syntax.IfStatement ifKeyword predicate trueBranch) = do
       highlight textBuffer "keyword" ifKeyword
       highlightExpression textBuffer predicate
-      highlightStatement textBuffer trueBranch
+      go trueBranch
 
     go (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch) = do
       highlight textBuffer "keyword" ifKeyword
       highlightExpression textBuffer predicate
-      highlightStatement textBuffer trueBranch
+      go trueBranch
       highlight textBuffer "keyword" elseKeyword
-      highlightStatement textBuffer falseBranch
+      go falseBranch
 
     go (Syntax.WhileStatement whileKeyword predicate body) = do
       highlight textBuffer "keyword" whileKeyword
       highlightExpression textBuffer predicate
-      highlightStatement textBuffer body
+      go body
 
     go (Syntax.DoWhileStatement doKeyword body whileKeyword predicate _) = do
       highlight textBuffer "keyword" doKeyword
-      highlightStatement textBuffer body
+      go body
       highlight textBuffer "keyword" whileKeyword
       highlightExpression textBuffer predicate
 
@@ -276,7 +273,7 @@ highlightExpression isTextBuffer = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-    go integer@Syntax.IntegerExpression{} = highlight textBuffer "integer" integer
+    go e@(Syntax.IntegerExpression _ _) = highlight textBuffer "integer" e
 
     go (Syntax.IdentifierExpression identifier) = highlight textBuffer "identifier" identifier
 
@@ -303,8 +300,8 @@ highlightExpression isTextBuffer = go
     highlightArguments Nothing = pure ()
 
     highlightArguments (Just (first, rest)) = do
-      highlightExpression textBuffer first
-      for_ rest (highlightExpression textBuffer . snd)
+      go first
+      for_ rest (go . snd)
 
 
 highlightDeclarationParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration -> Gtk.TextIter -> m Bool
@@ -312,10 +309,9 @@ highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go dec
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-    go Syntax.VariableDeclaration{} = pure False
+    go (Syntax.VariableDeclaration _ _ _) = pure False
 
-    go (Syntax.VariableAssignDeclaration _ _ _ value _) =
-      highlightExpressionParentheses textBuffer value insertTextIter
+    go (Syntax.VariableAssignDeclaration _ _ _ value _) = highlightExpressionParentheses textBuffer value insertTextIter
 
     go (Syntax.FunctionDeclaration _ _ open _ close body) = do
       done <- highlightParentheses textBuffer open close insertTextIter
@@ -380,7 +376,9 @@ highlightStatementParentheses isTextBuffer statement insertTextIter = go stateme
       else
         highlightParentheses textBuffer open close insertTextIter
 
-    highlightElementParentheses (Left declaration) = highlightDeclarationParentheses textBuffer declaration insertTextIter
+    highlightElementParentheses (Left declaration) =
+      highlightDeclarationParentheses textBuffer declaration insertTextIter
+
     highlightElementParentheses (Right statement) = go statement
 
 
@@ -394,7 +392,7 @@ highlightExpressionParentheses isTextBuffer expression insertTextIter = go expre
     go (Syntax.IdentifierExpression _) = pure False
 
     go (Syntax.CallExpression _ open arguments close) = do
-      done <- highlightArgumentsParentheses arguments
+      done <- highlightArgumentParentheses arguments
 
       if done then
         pure True
@@ -421,9 +419,9 @@ highlightExpressionParentheses isTextBuffer expression insertTextIter = go expre
       else
         highlightParentheses textBuffer open close insertTextIter
 
-    highlightArgumentsParentheses Nothing = pure False
+    highlightArgumentParentheses Nothing = pure False
 
-    highlightArgumentsParentheses (Just (first, rest)) = do
+    highlightArgumentParentheses (Just (first, rest)) = do
       done <- go first
 
       if done then
@@ -442,7 +440,7 @@ highlightParentheses isTextBuffer open close insertTextIter = do
   closeStartTextIter <- #getIterAtOffset textBuffer (Syntax.start close)
   closeEndTextIter <- #getIterAtOffset textBuffer (Syntax.end close)
 
-  applyParenthesisTag <- foldlM (\a i -> if a then pure True else #equal insertTextIter i) False
+  applyParenthesisTag <- foldlM (\a ti -> if a then pure True else #equal insertTextIter ti) False
     [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
 
   if applyParenthesisTag then do
@@ -497,7 +495,7 @@ displayDeclaration isTextBuffer isTreeStore = go
       displayStatement textBuffer treeStore childTreeIter body
       pure childTreeIter
 
-    displayParameters parentTreeIter Nothing = pure parentTreeIter
+    displayParameters _ Nothing = pure ()
 
     displayParameters parentTreeIter (Just ((t, name), rest)) = do
       display textBuffer treeStore parentTreeIter t "Identifier" True
@@ -507,8 +505,6 @@ displayDeclaration isTextBuffer isTreeStore = go
         display textBuffer treeStore parentTreeIter separator "Token" True
         display textBuffer treeStore parentTreeIter t "Identifier" True
         display textBuffer treeStore parentTreeIter name "Identifier" True
-
-      pure parentTreeIter
 
 
 displayStatement ::
@@ -534,7 +530,7 @@ displayStatement isTextBuffer isTreeStore = go
       pure childTreeIter
 
     go parentTreeIter s@(Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch) = do
-      childTreeIter <- display textBuffer treeStore parentTreeIter s "IfStatement" False
+      childTreeIter <- display textBuffer treeStore parentTreeIter s "IfElseStatement" False
       display textBuffer treeStore childTreeIter ifKeyword "Token" True
       displayExpression textBuffer treeStore childTreeIter predicate
       go childTreeIter trueBranch
@@ -572,7 +568,9 @@ displayStatement isTextBuffer isTreeStore = go
       display textBuffer treeStore childTreeIter close "Token" True
       pure childTreeIter
 
-    displayElement parentTreeIter (Left declaration) = displayDeclaration textBuffer treeStore parentTreeIter declaration
+    displayElement parentTreeIter (Left declaration) =
+      displayDeclaration textBuffer treeStore parentTreeIter declaration
+
     displayElement parentTreeIter (Right statement) = go parentTreeIter statement
 
 
@@ -585,7 +583,7 @@ displayExpression isTextBuffer isTreeStore = go
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
     treeStore = isTreeStore `asA` Gtk.TreeStore
 
-    go parentTreeIter e@Syntax.IntegerExpression{} =
+    go parentTreeIter e@(Syntax.IntegerExpression _ _) =
       display textBuffer treeStore parentTreeIter e "IntegerExpression" True
 
     go parentTreeIter e@(Syntax.IdentifierExpression identifier) = do
@@ -628,7 +626,7 @@ displayExpression isTextBuffer isTreeStore = go
       display textBuffer treeStore childTreeIter close "Token" True
       pure childTreeIter
 
-    displayArguments parentTreeIter Nothing = pure parentTreeIter
+    displayArguments _ Nothing = pure ()
 
     displayArguments parentTreeIter (Just (first, rest)) = do
       go parentTreeIter first
@@ -636,8 +634,6 @@ displayExpression isTextBuffer isTreeStore = go
       for_ rest $ \(separator, argument) -> do
         display textBuffer treeStore parentTreeIter separator "Token" True
         go parentTreeIter argument
-
-      pure parentTreeIter
 
 
 displayUnaryOperator ::
@@ -648,10 +644,9 @@ displayUnaryOperator isTextBuffer isTreeStore parentTreeIter operator =
   display isTextBuffer isTreeStore parentTreeIter operator label True
   where
     label = case operator of
-      Syntax.PlusOperator{} -> "PlusOperator"
-      Syntax.MinusOperator{} -> "MinusOperator"
-      Syntax.NotOperator{} -> "NotOperator"
-
+      Syntax.PlusOperator _ -> "PlusOperator"
+      Syntax.MinusOperator _ -> "MinusOperator"
+      Syntax.NotOperator _ -> "NotOperator"
 
 displayBinaryOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
@@ -661,20 +656,19 @@ displayBinaryOperator isTextBuffer isTreeStore parentTreeIter operator =
   display isTextBuffer isTreeStore parentTreeIter operator label True
   where
     label = case operator of
-      Syntax.AddOperator{} -> "AddOperator"
-      Syntax.SubtractOperator{} -> "SubtractOperator"
-      Syntax.MultiplyOperator{} -> "MultiplyOperator"
-      Syntax.DivideOperator{} -> "DivideOperator"
-      Syntax.RemainderOperator{} -> "RemainderOperator"
-      Syntax.EqualOperator{} -> "EqualOperator"
-      Syntax.NotEqualOperator{} -> "NotEqualOperator"
-      Syntax.LessOperator{} -> "LessOperator"
-      Syntax.LessOrEqualOperator{} -> "LessOrEqualOperator"
-      Syntax.GreaterOperator{} -> "GreaterOperator"
-      Syntax.GreaterOrEqualOperator{} -> "GreaterOrEqualOperator"
-      Syntax.AndOperator{} -> "AndOperator"
-      Syntax.OrOperator{} -> "OrOperator"
-
+      Syntax.AddOperator _ -> "AddOperator"
+      Syntax.SubtractOperator _ -> "SubtractOperator"
+      Syntax.MultiplyOperator _ -> "MultiplyOperator"
+      Syntax.DivideOperator _ -> "DivideOperator"
+      Syntax.RemainderOperator _ -> "RemainderOperator"
+      Syntax.EqualOperator _ -> "EqualOperator"
+      Syntax.NotEqualOperator _ -> "NotEqualOperator"
+      Syntax.LessOperator _ -> "LessOperator"
+      Syntax.LessOrEqualOperator _ -> "LessOrEqualOperator"
+      Syntax.GreaterOperator _ -> "GreaterOperator"
+      Syntax.GreaterOrEqualOperator _ -> "GreaterOrEqualOperator"
+      Syntax.AndOperator _ -> "AndOperator"
+      Syntax.OrOperator _ -> "OrOperator"
 
 displayAssignOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
@@ -684,13 +678,12 @@ displayAssignOperator isTextBuffer isTreeStore parentTreeIter operator =
   display isTextBuffer isTreeStore parentTreeIter operator label True
   where
     label = case operator of
-      Syntax.AssignOperator{} -> "AssignOperator"
-      Syntax.AddAssignOperator{} -> "AddAssignOperator"
-      Syntax.SubtractAssignOperator{} -> "SubtractAssignOperator"
-      Syntax.MultiplyAssignOperator{} -> "MultiplyAssignOperator"
-      Syntax.DivideAssignOperator{} -> "DivideAssignOperator"
-      Syntax.RemainderAssignOperator{} -> "RemainderAssignOperator"
-
+      Syntax.AssignOperator _ -> "AssignOperator"
+      Syntax.AddAssignOperator _ -> "AddAssignOperator"
+      Syntax.SubtractAssignOperator _ -> "SubtractAssignOperator"
+      Syntax.MultiplyAssignOperator _ -> "MultiplyAssignOperator"
+      Syntax.DivideAssignOperator _ -> "DivideAssignOperator"
+      Syntax.RemainderAssignOperator _ -> "RemainderAssignOperator"
 
 display ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax c) =>
