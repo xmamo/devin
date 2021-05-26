@@ -31,12 +31,15 @@ import Control.Applicative
 import Data.Char
 import Data.Foldable
 import Data.Functor
+import System.IO.Unsafe
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 
 import Data.Text (Text)
 import qualified Data.Text as Text
+
+import qualified GI.GLib as GLib
 
 import qualified Helpers
 import Parser (ParserT)
@@ -329,21 +332,20 @@ assignOperator = syntax $ asum
 -- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
 identifier :: Parser Syntax.Identifier
 identifier = Parser.label "identifier" . syntax $ do
-  start <- gc [lu, ll, lt, lm, lo, nl, pc]
-  continue <- Text.pack <$> many (gc [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
+  start <- category [lu, ll, lt, lm, lo, nl, pc]
+  continue <- Text.pack <$> many (category [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
   pure (Syntax.Identifier (Text.cons start continue))
   where
-    gc list = Parser.satisfy (\c -> generalCategory c `elem` list)
-    lu = UppercaseLetter
-    ll = LowercaseLetter
-    lt = TitlecaseLetter
-    lm = ModifierLetter
-    lo = OtherLetter
-    mn = NonSpacingMark
-    mc = SpacingCombiningMark
-    nd = DecimalNumber
-    nl = LetterNumber
-    pc = ConnectorPunctuation
+    lu = GLib.UnicodeTypeUppercaseLetter
+    ll = GLib.UnicodeTypeLowercaseLetter
+    lt = GLib.UnicodeTypeTitlecaseLetter
+    lm = GLib.UnicodeTypeModifierLetter
+    lo = GLib.UnicodeTypeOtherLetter
+    mn = GLib.UnicodeTypeNonSpacingMark
+    mc = GLib.UnicodeTypeSpacingMark
+    nd = GLib.UnicodeTypeDecimalNumber
+    nl = GLib.UnicodeTypeLetterNumber
+    pc = GLib.UnicodeTypeConnectPunctuation
 
 
 comment :: Parser Syntax.Comment
@@ -359,7 +361,7 @@ comment = do
 
 
 s :: Parser Syntax.Token
-s = token (many (void (some (Parser.satisfy isSpace)) <|> void comment))
+s = token (many (void (some (Parser.satisfy (unsafePerformIO . GLib.unicharIsspace))) <|> void comment))
 
 
 keyword :: Text -> Parser Syntax.Token
@@ -374,12 +376,20 @@ keyword k = do
 
 symbol :: Text -> Parser Syntax.Token
 symbol s = syntax $ do
-  s' <- Text.pack <$> some (Parser.satisfy (\c -> isSymbol c || generalCategory c == OtherPunctuation))
+  s' <- Text.pack <$> ((:) <$> category [pd, po, sm, sc, so] <*> many (category [pd, po, sm, sc, so, sk]))
 
   if s' == s then
     pure Syntax.Token
   else
     Parser.label s empty
+
+  where
+    pd = GLib.UnicodeTypeDashPunctuation
+    po = GLib.UnicodeTypeOtherPunctuation
+    sm = GLib.UnicodeTypeMathSymbol
+    sc = GLib.UnicodeTypeCurrencySymbol
+    sk = GLib.UnicodeTypeModifierSymbol
+    so = GLib.UnicodeTypeOtherSymbol
 
 
 token :: Parser a -> Parser Syntax.Token
@@ -392,6 +402,10 @@ token parser = do
 
 charToken :: Char -> Parser Syntax.Token
 charToken = token . Parser.char
+
+
+category :: (Foldable t, Applicative m) => t GLib.UnicodeType -> ParserT m Char
+category categories = Parser.satisfy (\c -> unsafePerformIO (GLib.unicharType c) `elem` categories)
 
 
 syntax :: Parser (Span -> a) -> Parser a
