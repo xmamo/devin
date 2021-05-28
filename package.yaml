@@ -13,15 +13,29 @@ ghc-options:
   - -foptimal-applicative-do
 
 default-extensions:
+  # Syntax
   - ApplicativeDo
   - LambdaCase
-  - NegativeLiterals
-  - OverloadedStrings
-  - OverloadedLabels
+
+  # Types
   - GADTs
+
+  # Records
+  - DisambiguateRecordFields
+  - DuplicateRecordFields
+  - NamedFieldPuns
+
+  # Deriving mechanism
   - DeriveFunctor
   - DeriveFoldable
   - DeriveTraversable
+
+  # Literals
+  - NegativeLiterals
+  - OverloadedStrings
+  - OverloadedLabels
+
+  # Bindings and generalisation
   - NoMonomorphismRestriction
 
 dependencies:

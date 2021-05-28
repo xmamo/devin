@@ -6,6 +6,7 @@ module Syntax (
   UnaryOperator (..),
   BinaryOperator (..),
   AssignOperator (..),
+  Integer (..),
   Identifier (..),
   Token (..),
   Comment (..),
@@ -13,16 +14,13 @@ module Syntax (
 ) where
 
 import Data.Ord
-import Prelude hiding (span)
+import Prelude hiding (Integer, span)
+import qualified Prelude
 
 import Data.Text (Text)
 
 import Span (Span (Span))
 import qualified Span
-
-
-type Parameters = Maybe ((Identifier, Token, Identifier), [(Token, Identifier, Token, Identifier)])
-type Arguments = Maybe (Expression, [(Token, Expression)])
 
 
 class Syntax a where
@@ -38,32 +36,150 @@ class Syntax a where
   {-# MINIMAL span | start, end #-}
 
 
-data Declaration where
-  VariableDeclaration :: Token -> Identifier -> Token -> Identifier -> Token -> Declaration
-  VariableAssignDeclaration :: Token -> Identifier -> Token -> Identifier -> Token -> Expression -> Token -> Declaration
-  FunctionDeclaration :: Token -> Identifier -> Token -> Parameters -> Token -> Token -> Identifier -> Statement -> Declaration
+data Declaration a where
+  VariableDeclaration :: {
+    varKeyword :: Token,
+    variable :: Identifier,
+    colon :: Token,
+    tName :: Identifier,
+    semicolon :: Token,
+    extra :: a
+  } -> Declaration a
+
+  VariableAssignDeclaration :: {
+    varKeyword :: Token,
+    variable :: Identifier,
+    colon :: Token,
+    tName :: Identifier,
+    equalSign :: Token,
+    value :: Expression a,
+    semicolon :: Token,
+    extra :: a
+  } -> Declaration a
+
+  FunctionDeclaration :: {
+    defKeyword :: Token,
+    name :: Identifier,
+    open :: Token,
+    parameters :: Maybe ((Identifier, Token, Identifier), [(Token, Identifier, Token, Identifier)]),
+    close :: Token,
+    arrow :: Token,
+    tName :: Identifier,
+    body :: Statement a,
+    extra :: a
+  } -> Declaration a
+
   deriving (Eq, Show, Read)
 
 
-data Statement where
-  ExpressionStatement :: Expression -> Token -> Statement
-  IfStatement :: Token -> Expression -> Statement -> Statement
-  IfElseStatement :: Token -> Expression -> Statement -> Token -> Statement -> Statement
-  WhileStatement :: Token -> Expression -> Statement -> Statement
-  DoWhileStatement :: Token -> Statement -> Token -> Expression -> Token -> Statement
-  ReturnStatement :: Token -> Maybe Expression -> Token -> Statement
-  BlockStatement :: Token -> [Either Declaration Statement] -> Token -> Statement
+data Statement a where
+  ExpressionStatement :: {
+    value :: Expression a,
+    semicolon :: Token,
+    extra :: a
+  } -> Statement a
+
+  IfStatement :: {
+    ifKeyword :: Token,
+    predicate :: Expression a,
+    trueBranch :: Statement a,
+    extra :: a
+  } -> Statement a
+
+  IfElseStatement :: {
+    ifKeyword :: Token,
+    predicate :: Expression a,
+    trueBranch :: Statement a,
+    elseKeyword :: Token,
+    falseBranch :: Statement a,
+    extra :: a
+  } -> Statement a
+
+  WhileStatement :: {
+    whileKeyword :: Token,
+    predicate :: Expression a,
+    body :: Statement a,
+    extra :: a
+  } -> Statement a
+
+  DoWhileStatement :: {
+    doKeyword :: Token,
+    body :: Statement a,
+    whileKeyword :: Token,
+    predicate :: Expression a,
+    semicolon :: Token,
+    extra :: a
+  } -> Statement a
+
+  ReturnStatement :: {
+    returnKeyword :: Token,
+    value :: Expression a,
+    semicolon :: Token,
+    extra :: a
+  } -> Statement a
+
+  EmptyReturnStatement :: {
+    returnKeyword :: Token,
+    semicolon :: Token,
+    extra :: a
+  } -> Statement a
+
+  BlockStatement :: {
+    open :: Token,
+    elements :: [Either (Declaration a) (Statement a)],
+    close :: Token,
+    extra :: a
+  } -> Statement a
+
   deriving (Eq, Show, Read)
 
 
-data Expression where
-  IntegerExpression :: Integer -> Span -> Expression
-  VariableExpression :: Identifier -> Expression
-  CallExpression :: Identifier -> Token -> Arguments -> Token -> Expression
-  UnaryExpression :: UnaryOperator -> Expression -> Expression
-  BinaryExpression :: Expression -> BinaryOperator -> Expression -> Expression
-  AssignExpression :: Identifier -> AssignOperator -> Expression -> Expression
-  ParenthesizedExpression :: Token -> Expression -> Token -> Expression
+data Expression a where
+  IntegerExpression :: {
+    integer :: Integer,
+    extra :: a
+  } -> Expression a
+
+  VariableExpression :: {
+    variable :: Identifier,
+    extra :: a
+  } -> Expression a
+
+  CallExpression :: {
+    target :: Identifier,
+    open :: Token,
+    arguments :: Maybe (Expression a, [(Token, Expression a)]),
+    close :: Token,
+    extra :: a
+  } -> Expression a
+
+  UnaryExpression :: {
+    unary :: UnaryOperator,
+    operand :: Expression a,
+    extra :: a
+  } -> Expression a
+
+  BinaryExpression :: {
+    left :: Expression a,
+    binary :: BinaryOperator,
+    right :: Expression a,
+    extra :: a
+  } -> Expression a
+
+  AssignExpression :: {
+    target :: Identifier,
+    assign :: AssignOperator,
+    value :: Expression a,
+    extra :: a
+  } -> Expression a
+
+  ParenthesizedExpression :: {
+    open :: Token,
+    inner :: Expression a,
+    close :: Token,
+    extra :: a
+  } -> Expression a
+
   deriving (Eq, Show, Read)
 
 
@@ -101,8 +217,13 @@ data AssignOperator where
   deriving (Eq, Show, Read)
 
 
+data Integer where
+  Integer :: Span -> Prelude.Integer -> Integer
+  deriving (Eq, Show, Read)
+
+
 data Identifier where
-  Identifier :: Text -> Span -> Identifier
+  Identifier :: Span -> Text -> Identifier
   deriving (Eq, Show, Read)
 
 
@@ -116,51 +237,53 @@ data Comment where
   deriving (Eq, Show, Read)
 
 
-instance Syntax Declaration where
-  start (VariableDeclaration varKeyword _ _ _ _) = start varKeyword
-  start (VariableAssignDeclaration varKeyword _ _ _ _ _ _) = start varKeyword
-  start (FunctionDeclaration defKeyword _ _ _ _ _ _ _) = start defKeyword
+instance Syntax (Declaration a) where
+  start VariableDeclaration {varKeyword} = start varKeyword
+  start VariableAssignDeclaration {varKeyword} = start varKeyword
+  start FunctionDeclaration {defKeyword} = start defKeyword
 
-  end (VariableDeclaration _ _ _ _ semicolon) = end semicolon
-  end (VariableAssignDeclaration _ _ _ _ _ _ semicolon) = end semicolon
-  end (FunctionDeclaration _ _ _ _ _ _ _ body) = end body
-
-
-instance Syntax Statement where
-  start (ExpressionStatement value _) = start value
-  start (IfStatement ifKeyword _ _) = start ifKeyword
-  start (IfElseStatement ifKeyword _ _ _ _) = start ifKeyword
-  start (WhileStatement whileKeyword _ _) = start whileKeyword
-  start (DoWhileStatement doKeyword _ _ _ _) = start doKeyword
-  start (ReturnStatement returnKeyword _ _) = start returnKeyword
-  start (BlockStatement open _ _) = start open
-
-  end (ExpressionStatement _ semicolon) = end semicolon
-  end (IfStatement _ _ trueBranch) = end trueBranch
-  end (IfElseStatement _ _ _ _ falseBranch) = end falseBranch
-  end (WhileStatement _ _ body) = end body
-  end (DoWhileStatement _ _ _ _ body) = end body
-  end (ReturnStatement _ _ semicolon) = end semicolon
-  end (BlockStatement _ _ close) = end close
+  end VariableDeclaration {semicolon} = end semicolon
+  end VariableAssignDeclaration {semicolon} = end semicolon
+  end FunctionDeclaration {body} = end body
 
 
-instance Syntax Expression where
-  span (IntegerExpression _ s) = s
-  span (VariableExpression variable) = span variable
+instance Syntax (Statement a) where
+  start ExpressionStatement {value} = start value
+  start IfStatement {ifKeyword} = start ifKeyword
+  start IfElseStatement {ifKeyword} = start ifKeyword
+  start WhileStatement {whileKeyword} = start whileKeyword
+  start DoWhileStatement {doKeyword} = start doKeyword
+  start ReturnStatement {returnKeyword} = start returnKeyword
+  start EmptyReturnStatement {returnKeyword} = start returnKeyword
+  start BlockStatement {open} = start open
+
+  end ExpressionStatement {semicolon} = end semicolon
+  end IfStatement {trueBranch} = end trueBranch
+  end IfElseStatement {falseBranch} = end falseBranch
+  end WhileStatement {body} = end body
+  end DoWhileStatement {body} = end body
+  end ReturnStatement {semicolon} = end semicolon
+  end EmptyReturnStatement {semicolon} = end semicolon
+  end BlockStatement {close} = end close
+
+
+instance Syntax (Expression a) where
+  span IntegerExpression {integer} = span integer
+  span VariableExpression {variable} = span variable
   span expression = Span (start expression) (end expression)
 
-  start (CallExpression target _ _ _) = start target
-  start (UnaryExpression operator _) = start operator
-  start (BinaryExpression left _ _) = start left
-  start (AssignExpression target _ _) = start target
-  start (ParenthesizedExpression open _ _) = start open
+  start CallExpression {target} = start target
+  start UnaryExpression {unary} = start unary
+  start BinaryExpression {left} = start left
+  start AssignExpression {target} = start target
+  start ParenthesizedExpression {open} = start open
   start expression = Span.start (span expression)
 
-  end (CallExpression _ _ _ close) = end close
-  end (UnaryExpression _ operand) = end operand
-  end (BinaryExpression _ _ right) = end right
-  end (AssignExpression _ _ value) = end value
-  end (ParenthesizedExpression _ _ close) = end close
+  end CallExpression {close} = end close
+  end UnaryExpression {operand} = end operand
+  end BinaryExpression {right} = end right
+  end AssignExpression {value} = end value
+  end ParenthesizedExpression {close} = end close
   end expression = Span.end (span expression)
 
 
@@ -195,8 +318,12 @@ instance Syntax BinaryOperator where
   span (OrOperator s) = s
 
 
+instance Syntax Integer where
+  span (Integer s _) = s
+
+
 instance Syntax Identifier where
-  span (Identifier _ s) = s
+  span (Identifier s _) = s
 
 
 instance Syntax Token where

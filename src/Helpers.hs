@@ -1,5 +1,3 @@
-{-# LANGUAGE MonadComprehensions #-}
-
 module Helpers (
   isNewline,
   collate,

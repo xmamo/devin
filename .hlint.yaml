@@ -4,9 +4,6 @@
 - ignore:
     name: Avoid lambda using `infix`
 
-- ignore:
-    name: Use record patterns
-
 - suggest:
     name: Use String
 

@@ -131,7 +131,7 @@ separatedBy1 parser comma = (:) <$> parser <*> many (comma *> parser)
 
 
 label :: Monad m => Text -> ParserT m a -> ParserT m a
-label l parser = ParserT $ \input@(Input position _) -> parseT parser input >>= \case
+label l parser = ParserT $ \input @ (Input position _) -> parseT parser input >>= \case
   Result.Success value rest -> pure (Result.Success value rest)
   Result.Failure recoverable _ _ -> pure (Result.Failure recoverable position [l])
 
@@ -143,7 +143,7 @@ commit parser = ParserT $ parseT parser >=> \case
 
 
 eoi :: Applicative m => ParserT m ()
-eoi = ParserT $ \input@(Input position text) ->
+eoi = ParserT $ \input @ (Input position text) ->
   if Text.null text then
     pure (Result.Success () input)
   else
