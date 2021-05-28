@@ -2,17 +2,22 @@
 
 module Helpers (
   isNewline,
+  collate,
   expectationsText,
   getInsertTextIter,
   getLineColumn,
   getStyle
 ) where
 
+import System.IO.Unsafe
+
 import Control.Monad.IO.Class
 
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 import Data.GI.Base
+import qualified GI.GLib as GLib
 import qualified GI.Gtk as Gtk
 import qualified GI.GtkSource as GtkSource
 
@@ -25,6 +30,10 @@ isNewline '\x85' = True
 isNewline '\x2028' = True
 isNewline '\x2029' = True
 isNewline _ = False
+
+
+collate :: Text -> Text
+collate text = unsafePerformIO (GLib.utf8CollateKey text (fromIntegral (Text.length text)))
 
 
 expectationsText :: [Text] -> Text

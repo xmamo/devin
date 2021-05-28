@@ -1,24 +1,7 @@
 module Parsers (
   declarations,
-  variableDeclaration,
-  variableAssignDeclaration,
-  functionDeclaration,
   declaration,
-  expressionStatement,
-  ifStatement,
-  ifElseStatement,
-  whileStatement,
-  doWhileStatement,
-  returnStatement,
-  blockStatement,
   statement,
-  integerExpression,
-  identifierExpression,
-  callExpression,
-  unaryExpression,
-  binaryExpression,
-  assignExpression,
-  parenthesizedExpression,
   expression,
   unaryOperator,
   binaryOperator,
@@ -57,107 +40,115 @@ declarations = s *> Parser.separatedBy declaration s <* s <* Parser.eoi
 
 variableDeclaration :: Parser Syntax.Declaration
 variableDeclaration = do
-  t <- identifier
-  variable <- s *> identifier
-  terminator <- s *> charToken ';'
-  pure (Syntax.VariableDeclaration t variable terminator)
-
-
-variableAssignDeclaration :: Parser Syntax.Declaration
-variableAssignDeclaration = do
-  t <- identifier
-  variable <- s *> identifier
-  equalSign <- s *> symbol "="
+  varKeyword <- keyword "var"
 
   Parser.commit $ do
-    value <- s *> expression
-    terminator <- s *> charToken ';'
-    pure (Syntax.VariableAssignDeclaration t variable equalSign value terminator)
+    variable <- s *> identifier
+    colon <- s *> charToken ':'
+    tName <- s *> identifier <* s
+
+    Parser.either (charToken ';') (charToken '=') >>= \case
+      Left semicolon -> pure (Syntax.VariableDeclaration varKeyword variable colon tName semicolon)
+
+      Right equalSign -> do
+        value <- s *> expression
+        semicolon <- s *> charToken ';'
+        pure (Syntax.VariableAssignDeclaration varKeyword variable colon tName equalSign value semicolon)
 
 
 functionDeclaration :: Parser Syntax.Declaration
 functionDeclaration = do
-  t <- identifier
-  name <- s *> identifier
-  open <- s *> charToken '('
+  defKeyword <- keyword "def"
 
   Parser.commit $ do
-    first <- optional ((,) <$> (s *> identifier) <*> Parser.commit (s *> identifier))
+    name <- s *> identifier
+    open <- s *> charToken '('
+
+    first <- optional $ do
+      name <- s *> identifier
+
+      Parser.commit $ do
+        colon <- s *> charToken ':'
+        tName <- s *> identifier
+        pure (name, colon, tName)
 
     parameters <- case first of
       Just first -> do
         rest <- many $ do
-          separator <- s *> charToken ','
+          comma <- s *> charToken ','
 
           Parser.commit $ do
-            t <- s *> identifier
             name <- s *> identifier
-            pure (separator, t, name)
+            colon <- s *> charToken ':'
+            tName <- s *> identifier
+            pure (comma, name, colon, tName)
 
         pure (Just (first, rest))
 
       Nothing -> pure Nothing
 
     close <- s *> charToken ')'
+    arrow <- s *> textToken "->"
+    tName <- s *> identifier
     body <- s *> statement
-    pure (Syntax.FunctionDeclaration t name open parameters close body)
+    pure (Syntax.FunctionDeclaration defKeyword name open parameters close arrow tName body)
 
 
 declaration :: Parser Syntax.Declaration
-declaration = functionDeclaration <|> variableAssignDeclaration <|> variableDeclaration
+declaration = variableDeclaration <|> functionDeclaration
 
 
 expressionStatement :: Parser Syntax.Statement
 expressionStatement = do
   value <- expression
-  terminator <- Parser.commit (s *> charToken ';')
-  pure (Syntax.ExpressionStatement value terminator)
+  semicolon <- Parser.commit (s *> charToken ';')
+  pure (Syntax.ExpressionStatement value semicolon)
 
 
 ifStatement :: Parser Syntax.Statement
 ifStatement = do
   ifKeyword <- keyword "if"
-  predicate <- s *> expression
-  trueBranch <- Parser.commit (s *> statement)
-  pure (Syntax.IfStatement ifKeyword predicate trueBranch)
 
+  Parser.commit $ do
+    predicate <- s *> expression
+    trueBranch <- s *> statement
 
-ifElseStatement :: Parser Syntax.Statement
-ifElseStatement = do
-  ifKeyword <- keyword "if"
-  predicate <- s *> expression
-  trueBranch <- Parser.commit (s *> statement)
-  elseKeyword <- s *> keyword "else"
-  falseBranch <- Parser.commit (s *> statement)
-  pure (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch)
+    optional (s *> keyword "else") >>= \case
+      Just elseKeyword -> do
+        falseBranch <- Parser.commit (s *> statement)
+        pure (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch)
+
+      Nothing -> pure (Syntax.IfStatement ifKeyword predicate trueBranch)
 
 
 whileStatement :: Parser Syntax.Statement
 whileStatement = do
   whileKeyword <- keyword "while"
-  predicate <- s *> expression
-  body <- Parser.commit (s *> statement)
-  pure (Syntax.WhileStatement whileKeyword predicate body)
+
+  Parser.commit $ do
+    predicate <- s *> expression
+    body <- s *> statement
+    pure (Syntax.WhileStatement whileKeyword predicate body)
 
 
 doWhileStatement :: Parser Syntax.Statement
 doWhileStatement = do
   doKeyword <- keyword "do"
-  body <- s *> statement
 
   Parser.commit $ do
+    body <- s *> statement
     whileKeyword <- s *> keyword "while"
     predicate <- s *> expression
-    terminator <- s *> charToken ';'
-    pure (Syntax.DoWhileStatement doKeyword body whileKeyword predicate terminator)
+    semicolon <- s *> charToken ';'
+    pure (Syntax.DoWhileStatement doKeyword body whileKeyword predicate semicolon)
 
 
 returnStatement :: Parser Syntax.Statement
 returnStatement = do
   returnKeyword <- keyword "return"
-  value <- s *> expression
-  terminator <- Parser.commit (s *> charToken ';')
-  pure (Syntax.ReturnStatement returnKeyword value terminator)
+  value <- optional (s *> expression)
+  semicolon <- Parser.commit (s *> charToken ';')
+  pure (Syntax.ReturnStatement returnKeyword value semicolon)
 
 
 blockStatement :: Parser Syntax.Statement
@@ -165,7 +156,7 @@ blockStatement = do
   open <- charToken '{'
 
   Parser.commit $ do
-    elements <- s *> Parser.separatedBy ((Left <$> declaration) <|> (Right <$> statement)) s
+    elements <- s *> Parser.separatedBy (Parser.either declaration statement) s
     close <- s *> charToken '}'
     pure (Syntax.BlockStatement open elements close)
 
@@ -173,23 +164,11 @@ blockStatement = do
 statement :: Parser Syntax.Statement
 statement = asum
   [
-    do
-      ifKeyword <- keyword "if"
-      predicate <- s *> expression
-      trueBranch <- Parser.commit (s *> statement)
-      elseKeyword <- optional (s *> keyword "else")
-
-      case elseKeyword of
-        Just elseKeyword -> do
-          falseBranch <- Parser.commit (s *> statement)
-          pure (Syntax.IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch)
-
-        Nothing -> pure (Syntax.IfStatement ifKeyword predicate trueBranch),
-
+    blockStatement,
+    ifStatement,
     whileStatement,
     doWhileStatement,
     returnStatement,
-    blockStatement,
     expressionStatement
   ]
 
@@ -202,8 +181,8 @@ integerExpression = Parser.label "integer" . syntax $ do
   pure (Syntax.IntegerExpression (sign * magnitude))
 
 
-identifierExpression :: Parser Syntax.Expression
-identifierExpression = Syntax.IdentifierExpression <$> identifier
+variableExpression :: Parser Syntax.Expression
+variableExpression = Syntax.VariableExpression <$> identifier
 
 
 callExpression :: Parser Syntax.Expression
@@ -212,9 +191,7 @@ callExpression = do
   open <- s *> charToken '('
 
   Parser.commit $ do
-    first <- optional (s *> expression)
-
-    arguments <- case first of
+    arguments <- optional (s *> expression) >>= \case
       Just first -> do
         rest <- many ((,) <$> (s *> charToken ',') <*> Parser.commit (s *> expression))
         pure (Just (first, rest))
@@ -225,37 +202,37 @@ callExpression = do
     pure (Syntax.CallExpression target open arguments close)
 
 
-operandExpression :: Parser Syntax.Expression
-operandExpression = asum
-  [
-    parenthesizedExpression,
-    integerExpression,
-    callExpression,
-    unaryExpression,
-    identifierExpression
-  ]
-
-
 unaryExpression :: Parser Syntax.Expression
-unaryExpression = do
-  operator <- unaryOperator
+unaryExpression = asum
+  [
+    integerExpression,
 
-  case operator of
-    Syntax.NotOperator _ -> do
-      operand <- s *> operandExpression
-      pure (Syntax.UnaryExpression operator operand)
+    do
+      operator <- optional unaryOperator
 
-    _ -> do
-      operand <- Parser.commit (s *> operandExpression)
-      pure (Syntax.UnaryExpression operator operand)
+      case operator of
+        Just operator@(Syntax.NotOperator span) -> optional (s *> unaryExpression) >>= \case
+          Just operand -> pure (Syntax.UnaryExpression operator operand)
+          Nothing -> pure (Syntax.VariableExpression (Syntax.Identifier "not" span))
+
+        Just operator -> do
+          operand <- Parser.commit (s *> unaryExpression)
+          pure (Syntax.UnaryExpression operator operand)
+
+        Nothing -> integerExpression <|> callExpression
+  ]
 
 
 binaryExpression :: Parser Syntax.Expression
 binaryExpression = do
-  left <- operandExpression
-  operator <- s *> binaryOperator
-  right <- Parser.commit (s *> expression)
-  pure (binary left operator right)
+  left <- unaryExpression
+
+  optional (s *> binaryOperator) >>= \case
+    Just operator -> do
+      right <- Parser.commit (s *> expression)
+      pure (binary left operator right)
+
+    Nothing -> pure left
 
 
 assignExpression :: Parser Syntax.Expression
@@ -267,25 +244,23 @@ assignExpression = do
 
 
 parenthesizedExpression :: Parser Syntax.Expression
-parenthesizedExpression =
-  Syntax.ParenthesizedExpression <$> charToken '(' <*> (s *> expression) <*> (s *> charToken ')')
+parenthesizedExpression = do
+  open <- charToken '('
+
+  Parser.commit $ do
+    inner <- s *> expression
+    close <- s *> charToken ')'
+    pure (Syntax.ParenthesizedExpression open inner close)
 
 
 expression :: Parser Syntax.Expression
 expression = asum
   [
+    parenthesizedExpression,
     assignExpression,
-
-    do
-      left <- operandExpression
-      operator <- optional (s *> binaryOperator)
-
-      case operator of
-        Just operator -> do
-          right <- Parser.commit (s *> expression)
-          pure (binary left operator right)
-
-        Nothing -> pure left
+    binaryExpression,
+    unaryExpression,
+    variableExpression
   ]
 
 
@@ -365,23 +340,23 @@ s = token (many (void (some (Parser.satisfy (unsafePerformIO . GLib.unicharIsspa
 
 
 keyword :: Text -> Parser Syntax.Token
-keyword k = do
+keyword k = Parser.label ("keyword " <> k) $ do
   (Syntax.Identifier name span) <- identifier
 
-  if name == k then
+  if Helpers.collate name == Helpers.collate k then
     pure (Syntax.Token span)
   else
-    Parser.label ("keyword " <> k) empty
+    empty
 
 
 symbol :: Text -> Parser Syntax.Token
-symbol s = syntax $ do
-  s' <- Text.pack <$> ((:) <$> category [pd, po, sm, sc, so] <*> many (category [pd, po, sm, sc, so, sk]))
+symbol s = Parser.label s . syntax $ do
+  text <- Text.pack <$> ((:) <$> category [pd, po, sm, sc, so] <*> many (category [pd, po, sm, sc, so, sk]))
 
-  if s' == s then
+  if Helpers.collate text == Helpers.collate s then
     pure Syntax.Token
   else
-    Parser.label s empty
+    empty
 
   where
     pd = GLib.UnicodeTypeDashPunctuation
@@ -404,8 +379,12 @@ charToken :: Char -> Parser Syntax.Token
 charToken = token . Parser.char
 
 
+textToken :: Text -> Parser Syntax.Token
+textToken = token . Parser.text
+
+
 category :: (Foldable t, Applicative m) => t GLib.UnicodeType -> ParserT m Char
-category categories = Parser.satisfy (\c -> unsafePerformIO (GLib.unicharType c) `elem` categories)
+category categories = Parser.satisfy $ \c -> unsafePerformIO (GLib.unicharType c) `elem` categories
 
 
 syntax :: Parser (Span -> a) -> Parser a

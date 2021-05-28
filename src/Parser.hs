@@ -2,21 +2,23 @@ module Parser(
   Parser,
   ParserT (..),
   parse,
-  eoi,
+  position,
   satisfy,
   char,
   text,
-  position,
+  either,
   separatedBy,
   separatedBy1,
   label,
-  commit
+  commit,
+  eoi
 ) where
 
 import Control.Applicative
 import Control.Monad
 import Data.Functor.Identity
 import Data.List
+import Prelude hiding (either)
 
 import Control.Monad.Trans.Class
 
@@ -79,8 +81,8 @@ instance Monad m => Alternative (ParserT m) where
       Result.Failure recoverable2 position2 expectations2 -> case compare position1 position2 of
         LT | null expectations2 && not (null expectations1) -> pure (Result.Failure recoverable2 position1 expectations1)
         LT -> pure (Result.Failure recoverable2 position2 expectations2)
-        EQ -> pure (Result.Failure recoverable2 position2 (expectations1 `union` expectations2))
-        GT | null expectations1 && not (null expectations1) -> pure (Result.Failure recoverable2 position2 expectations2)
+        EQ -> pure (Result.Failure recoverable2 position1 (expectations1 `union` expectations2))
+        GT | null expectations1 && not (null expectations2) -> pure (Result.Failure recoverable2 position2 expectations2)
         GT -> pure (Result.Failure recoverable2 position1 expectations1)
 
     Result.Failure False position expectations -> pure (Result.Failure False position expectations)
@@ -94,12 +96,8 @@ parse :: Parser a -> Input -> Result a
 parse parser input = runIdentity (parseT parser input)
 
 
-eoi :: Applicative m => ParserT m ()
-eoi = ParserT $ \input@(Input position text) ->
-  if Text.null text then
-    pure (Result.Success () input)
-  else
-    pure (Result.Failure True position ["End of input"])
+position :: Applicative m => Num a => ParserT m a
+position = ParserT $ \input -> pure (Result.Success (Input.position input) input)
 
 
 satisfy :: Applicative m => (Char -> Bool) -> ParserT m Char
@@ -120,16 +118,16 @@ text t = ParserT $ \(Input position text) -> case Text.stripPrefix t text of
   Nothing -> pure (Result.Failure True position [Text.pack (show t)])
 
 
-position :: Applicative m => Num a => ParserT m a
-position = ParserT $ \input -> pure (Result.Success (Input.position input) input)
+either :: Monad m => ParserT m a -> ParserT m b -> ParserT m (Either a b)
+either parser1 parser2 = (Left <$> parser1) <|> (Right <$> parser2)
 
 
 separatedBy :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
-separatedBy parser separator = separatedBy1 parser separator <|> pure []
+separatedBy parser comma = separatedBy1 parser comma <|> pure []
 
 
 separatedBy1 :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
-separatedBy1 parser separator = (:) <$> parser <*> many (separator *> parser)
+separatedBy1 parser comma = (:) <$> parser <*> many (comma *> parser)
 
 
 label :: Monad m => Text -> ParserT m a -> ParserT m a
@@ -142,3 +140,11 @@ commit :: Monad m => ParserT m a -> ParserT m a
 commit parser = ParserT $ parseT parser >=> \case
   Result.Success value rest -> pure (Result.Success value rest)
   Result.Failure _ position expectations -> pure (Result.Failure False position expectations)
+
+
+eoi :: Applicative m => ParserT m ()
+eoi = ParserT $ \input@(Input position text) ->
+  if Text.null text then
+    pure (Result.Success () input)
+  else
+    pure (Result.Failure True position ["end of input"])

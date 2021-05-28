@@ -202,30 +202,30 @@ highlightDeclaration isTextBuffer = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-    go (Syntax.VariableDeclaration t variable _) = do
-      highlight textBuffer "type" t
+    go (Syntax.VariableDeclaration varKeyword variable _ tName _) = do
+      highlight textBuffer "keyword" varKeyword
       highlight textBuffer "identifier" variable
+      highlight textBuffer "type" tName
 
-    go (Syntax.VariableAssignDeclaration t variable _ value _) = do
-      highlight textBuffer "type" t
+    go (Syntax.VariableAssignDeclaration varKeyword variable _ tName _ value _) = do
+      highlight textBuffer "keyword" varKeyword
       highlight textBuffer "identifier" variable
+      highlight textBuffer "type" tName
       highlightExpression textBuffer value
 
-    go (Syntax.FunctionDeclaration t name _ parameters _ body) = do
-      highlight textBuffer "type" t
+    go (Syntax.FunctionDeclaration defKeyword name _ parameters _ _ tName body) = do
+      highlight textBuffer "keyword" defKeyword
       highlight textBuffer "identifier" name
       highlightParameters parameters
+      highlight textBuffer "type" tName
       highlightStatement textBuffer body
 
     highlightParameters Nothing = pure ()
 
-    highlightParameters (Just ((t, name), rest)) = do
-      highlight textBuffer "type" t
-      highlight textBuffer "type" name
-
-      for_ rest $ \(_, t, name) -> do
-        highlight textBuffer "type" t
-        highlight textBuffer "type" name
+    highlightParameters (Just ((name, _, tName), rest)) =
+      for_ ((name, tName) : [(name, tName) | (_, name, _, tName) <- rest]) $ \(name, tName) -> do
+        highlight textBuffer "identifier" name
+        highlight textBuffer "type" tName
 
 
 highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m ()
@@ -258,9 +258,9 @@ highlightStatement isTextBuffer = go
       highlight textBuffer "keyword" whileKeyword
       highlightExpression textBuffer predicate
 
-    go (Syntax.ReturnStatement returnKeyword value _) = do
+    go (Syntax.ReturnStatement returnKeyword value _) = void $ do
       highlight textBuffer "keyword" returnKeyword
-      highlightExpression textBuffer value
+      traverse_ (highlightExpression textBuffer) value
 
     go (Syntax.BlockStatement _ elements _) = for_ elements highlightElement
 
@@ -275,7 +275,7 @@ highlightExpression isTextBuffer = go
 
     go e@(Syntax.IntegerExpression _ _) = highlight textBuffer "integer" e
 
-    go (Syntax.IdentifierExpression identifier) = highlight textBuffer "identifier" identifier
+    go (Syntax.VariableExpression variable) = highlight textBuffer "identifier" variable
 
     go (Syntax.CallExpression target _ arguments _) = do
       highlight textBuffer "identifier" target
@@ -295,13 +295,10 @@ highlightExpression isTextBuffer = go
       highlight textBuffer "operator" operator
       go value
 
-    go (Syntax.ParenthesizedExpression _ expression _) = go expression
+    go (Syntax.ParenthesizedExpression _ inner _) = go inner
 
     highlightArguments Nothing = pure ()
-
-    highlightArguments (Just (first, rest)) = do
-      go first
-      for_ rest (go . snd)
+    highlightArguments (Just (first, rest)) = for_ (first : map snd rest) go
 
 
 highlightDeclarationParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration -> Gtk.TextIter -> m Bool
@@ -309,11 +306,12 @@ highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go dec
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-    go (Syntax.VariableDeclaration _ _ _) = pure False
+    go (Syntax.VariableDeclaration _ _ _ _ _) = pure False
 
-    go (Syntax.VariableAssignDeclaration _ _ _ value _) = highlightExpressionParentheses textBuffer value insertTextIter
+    go (Syntax.VariableAssignDeclaration _ _ _ _ _ value _) =
+      highlightExpressionParentheses textBuffer value insertTextIter
 
-    go (Syntax.FunctionDeclaration _ _ open _ close body) = do
+    go (Syntax.FunctionDeclaration _ _ open _ close _ _ body) = do
       done <- highlightParentheses textBuffer open close insertTextIter
 
       if done then
@@ -366,7 +364,9 @@ highlightStatementParentheses isTextBuffer statement insertTextIter = go stateme
       else
         highlightExpressionParentheses textBuffer predicate insertTextIter
 
-    go (Syntax.ReturnStatement _ value _) = highlightExpressionParentheses textBuffer value insertTextIter
+    go (Syntax.ReturnStatement _ (Just value) _) = highlightExpressionParentheses textBuffer value insertTextIter
+
+    go (Syntax.ReturnStatement _ Nothing _) = pure False
 
     go (Syntax.BlockStatement open elements close) = do
       done <- foldlM (\a e -> if a then pure True else highlightElementParentheses e) False elements
@@ -389,7 +389,7 @@ highlightExpressionParentheses isTextBuffer expression insertTextIter = go expre
 
     go (Syntax.IntegerExpression _ _) = pure False
 
-    go (Syntax.IdentifierExpression _) = pure False
+    go (Syntax.VariableExpression _) = pure False
 
     go (Syntax.CallExpression _ open arguments close) = do
       done <- highlightArgumentParentheses arguments
@@ -411,8 +411,8 @@ highlightExpressionParentheses isTextBuffer expression insertTextIter = go expre
 
     go (Syntax.AssignExpression _ _ value) = go value
 
-    go (Syntax.ParenthesizedExpression open expression close) = do
-      done <- go expression
+    go (Syntax.ParenthesizedExpression open inner close) = do
+      done <- go inner
 
       if done then
         pure True
@@ -469,42 +469,50 @@ displayDeclaration isTextBuffer isTreeStore = go
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
     treeStore = isTreeStore `asA` Gtk.TreeStore
 
-    go parentTreeIter d@(Syntax.VariableDeclaration t variable terminator) = do
+    go parentTreeIter d@(Syntax.VariableDeclaration varKeyword variable colon tName semicolon) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter d "VariableDeclaration" False
-      display textBuffer treeStore childTreeIter t "Identifier" True
+      display textBuffer treeStore childTreeIter varKeyword "Token" True
       display textBuffer treeStore childTreeIter variable "Identifier" True
-      display textBuffer treeStore childTreeIter terminator "Token" True
+      display textBuffer treeStore childTreeIter colon "Token" True
+      display textBuffer treeStore childTreeIter tName "Identifier" True
+      display textBuffer treeStore childTreeIter semicolon "Token" True
       pure childTreeIter
 
-    go parentTreeIter d@(Syntax.VariableAssignDeclaration t variable equalSign value terminator) = do
+    go parentTreeIter d@(Syntax.VariableAssignDeclaration varKeyword variable colon tName equalSign value semicolon) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter d "VariableAssignDeclaration" False
-      display textBuffer treeStore childTreeIter t "Identifier" True
+      display textBuffer treeStore childTreeIter varKeyword "Token" True
       display textBuffer treeStore childTreeIter variable "Identifier" True
+      display textBuffer treeStore childTreeIter colon "Token" True
+      display textBuffer treeStore childTreeIter tName "Identifier" True
       display textBuffer treeStore childTreeIter equalSign "Token" True
       displayExpression textBuffer treeStore childTreeIter value
-      display textBuffer treeStore childTreeIter terminator "Token" True
+      display textBuffer treeStore childTreeIter semicolon "Token" True
       pure childTreeIter
 
-    go parentTreeIter d@(Syntax.FunctionDeclaration name t open parameters close body) = do
+    go parentTreeIter d@(Syntax.FunctionDeclaration defKeyword name open parameters close arrow tName body) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter d "FunctionDeclaration" False
+      display textBuffer treeStore childTreeIter defKeyword "Token" True
       display textBuffer treeStore childTreeIter name "Identifier" True
-      display textBuffer treeStore childTreeIter t "Identifier" True
       display textBuffer treeStore childTreeIter open "Token" True
       displayParameters childTreeIter parameters
       display textBuffer treeStore childTreeIter close "Token" True
+      display textBuffer treeStore childTreeIter arrow "Token" True
+      display textBuffer treeStore childTreeIter tName "Identifier" True
       displayStatement textBuffer treeStore childTreeIter body
       pure childTreeIter
 
     displayParameters _ Nothing = pure ()
 
-    displayParameters parentTreeIter (Just ((t, name), rest)) = do
-      display textBuffer treeStore parentTreeIter t "Identifier" True
+    displayParameters parentTreeIter (Just ((name, colon, tName), rest)) = do
       display textBuffer treeStore parentTreeIter name "Identifier" True
+      display textBuffer treeStore parentTreeIter colon "Token" True
+      display textBuffer treeStore parentTreeIter tName "Identifier" True
 
-      for_ rest $ \(separator, t, name) -> do
-        display textBuffer treeStore parentTreeIter separator "Token" True
-        display textBuffer treeStore parentTreeIter t "Identifier" True
+      for_ rest $ \(comma, name, colon, tName) -> do
+        display textBuffer treeStore parentTreeIter comma "Token" True
         display textBuffer treeStore parentTreeIter name "Identifier" True
+        display textBuffer treeStore parentTreeIter colon "Token" True
+        display textBuffer treeStore parentTreeIter tName "Identifier" True
 
 
 displayStatement ::
@@ -516,10 +524,10 @@ displayStatement isTextBuffer isTreeStore = go
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
     treeStore = isTreeStore `asA` Gtk.TreeStore
 
-    go parentTreeIter s@(Syntax.ExpressionStatement value terminator) = do
+    go parentTreeIter s@(Syntax.ExpressionStatement value semicolon) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter s "ExpressionStatement" False
       displayExpression textBuffer treeStore childTreeIter value
-      display textBuffer treeStore childTreeIter terminator "Token" True
+      display textBuffer treeStore childTreeIter semicolon "Token" True
       pure childTreeIter
 
     go parentTreeIter s@(Syntax.IfStatement ifKeyword predicate trueBranch) = do
@@ -545,20 +553,20 @@ displayStatement isTextBuffer isTreeStore = go
       go childTreeIter body
       pure childTreeIter
 
-    go parentTreeIter s@(Syntax.DoWhileStatement doKeyword body whileKeyword predicate terminator) = do
+    go parentTreeIter s@(Syntax.DoWhileStatement doKeyword body whileKeyword predicate semicolon) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter s "DoWhileStatement" False
       display textBuffer treeStore childTreeIter doKeyword "Token" True
       go childTreeIter body
       display textBuffer treeStore childTreeIter whileKeyword "Token" True
       displayExpression textBuffer treeStore childTreeIter predicate
-      display textBuffer treeStore childTreeIter terminator "Token" True
+      display textBuffer treeStore childTreeIter semicolon "Token" True
       pure childTreeIter
 
-    go parentTreeIter s@(Syntax.ReturnStatement returnKeyword value terminator) = do
+    go parentTreeIter s@(Syntax.ReturnStatement returnKeyword value semicolon) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter s "ReturnStatement" False
       display textBuffer treeStore childTreeIter returnKeyword "Token" True
-      displayExpression textBuffer treeStore childTreeIter value
-      display textBuffer treeStore childTreeIter terminator "Token" True
+      traverse_ (displayExpression textBuffer treeStore childTreeIter) value
+      display textBuffer treeStore childTreeIter semicolon "Token" True
       pure childTreeIter
 
     go parentTreeIter s@(Syntax.BlockStatement open elements close) = do
@@ -586,9 +594,9 @@ displayExpression isTextBuffer isTreeStore = go
     go parentTreeIter e@(Syntax.IntegerExpression _ _) =
       display textBuffer treeStore parentTreeIter e "IntegerExpression" True
 
-    go parentTreeIter e@(Syntax.IdentifierExpression identifier) = do
-      childTreeIter <- display textBuffer treeStore parentTreeIter e "IdentifierExpression" False
-      display textBuffer treeStore childTreeIter identifier "Identifier" True
+    go parentTreeIter e@(Syntax.VariableExpression variable) = do
+      childTreeIter <- display textBuffer treeStore parentTreeIter e "VariableExpression" False
+      display textBuffer treeStore childTreeIter variable "Identifier" True
       pure childTreeIter
 
     go parentTreeIter e@(Syntax.CallExpression target open arguments close) = do
@@ -619,10 +627,10 @@ displayExpression isTextBuffer isTreeStore = go
       go childTreeIter value
       pure childTreeIter
 
-    go parentTreeIter e@(Syntax.ParenthesizedExpression open expression close) = do
+    go parentTreeIter e@(Syntax.ParenthesizedExpression open inner close) = do
       childTreeIter <- display textBuffer treeStore parentTreeIter e "ParenthesizedExpression" False
       display textBuffer treeStore childTreeIter open "Token" True
-      go childTreeIter expression
+      go childTreeIter inner
       display textBuffer treeStore childTreeIter close "Token" True
       pure childTreeIter
 
@@ -631,8 +639,8 @@ displayExpression isTextBuffer isTreeStore = go
     displayArguments parentTreeIter (Just (first, rest)) = do
       go parentTreeIter first
 
-      for_ rest $ \(separator, argument) -> do
-        display textBuffer treeStore parentTreeIter separator "Token" True
+      for_ rest $ \(comma, argument) -> do
+        display textBuffer treeStore parentTreeIter comma "Token" True
         go parentTreeIter argument
 
 

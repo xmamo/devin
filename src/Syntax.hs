@@ -21,7 +21,7 @@ import Span (Span (Span))
 import qualified Span
 
 
-type Parameters = Maybe ((Identifier, Identifier), [(Token, Identifier, Identifier)])
+type Parameters = Maybe ((Identifier, Token, Identifier), [(Token, Identifier, Token, Identifier)])
 type Arguments = Maybe (Expression, [(Token, Expression)])
 
 
@@ -39,9 +39,9 @@ class Syntax a where
 
 
 data Declaration where
-  VariableDeclaration :: Identifier -> Identifier -> Token -> Declaration
-  VariableAssignDeclaration :: Identifier -> Identifier -> Token -> Expression -> Token -> Declaration
-  FunctionDeclaration :: Identifier -> Identifier -> Token -> Parameters -> Token -> Statement -> Declaration
+  VariableDeclaration :: Token -> Identifier -> Token -> Identifier -> Token -> Declaration
+  VariableAssignDeclaration :: Token -> Identifier -> Token -> Identifier -> Token -> Expression -> Token -> Declaration
+  FunctionDeclaration :: Token -> Identifier -> Token -> Parameters -> Token -> Token -> Identifier -> Statement -> Declaration
   deriving (Eq, Show, Read)
 
 
@@ -51,14 +51,14 @@ data Statement where
   IfElseStatement :: Token -> Expression -> Statement -> Token -> Statement -> Statement
   WhileStatement :: Token -> Expression -> Statement -> Statement
   DoWhileStatement :: Token -> Statement -> Token -> Expression -> Token -> Statement
-  ReturnStatement :: Token -> Expression -> Token -> Statement
+  ReturnStatement :: Token -> Maybe Expression -> Token -> Statement
   BlockStatement :: Token -> [Either Declaration Statement] -> Token -> Statement
   deriving (Eq, Show, Read)
 
 
 data Expression where
   IntegerExpression :: Integer -> Span -> Expression
-  IdentifierExpression :: Identifier -> Expression
+  VariableExpression :: Identifier -> Expression
   CallExpression :: Identifier -> Token -> Arguments -> Token -> Expression
   UnaryExpression :: UnaryOperator -> Expression -> Expression
   BinaryExpression :: Expression -> BinaryOperator -> Expression -> Expression
@@ -116,25 +116,14 @@ data Comment where
   deriving (Eq, Show, Read)
 
 
-instance (Syntax a, Syntax b) => Syntax (Either a b) where
-  span (Left a) = span a
-  span (Right a) = span a
-
-  start (Left a) = start a
-  start (Right a) = start a
-
-  end (Left a) = end a
-  end (Right a) = end a
-
-
 instance Syntax Declaration where
-  start (VariableDeclaration t _ _) = start t
-  start (VariableAssignDeclaration t _ _ _ _) = start t
-  start (FunctionDeclaration t _ _ _ _ _) = start t
+  start (VariableDeclaration varKeyword _ _ _ _) = start varKeyword
+  start (VariableAssignDeclaration varKeyword _ _ _ _ _ _) = start varKeyword
+  start (FunctionDeclaration defKeyword _ _ _ _ _ _ _) = start defKeyword
 
-  end (VariableDeclaration _ _ terminator) = end terminator
-  end (VariableAssignDeclaration _ _ _ _ terminator) = end terminator
-  end (FunctionDeclaration _ _ _ _ _ body) = end body
+  end (VariableDeclaration _ _ _ _ semicolon) = end semicolon
+  end (VariableAssignDeclaration _ _ _ _ _ _ semicolon) = end semicolon
+  end (FunctionDeclaration _ _ _ _ _ _ _ body) = end body
 
 
 instance Syntax Statement where
@@ -146,18 +135,18 @@ instance Syntax Statement where
   start (ReturnStatement returnKeyword _ _) = start returnKeyword
   start (BlockStatement open _ _) = start open
 
-  end (ExpressionStatement _ terminator) = end terminator
+  end (ExpressionStatement _ semicolon) = end semicolon
   end (IfStatement _ _ trueBranch) = end trueBranch
   end (IfElseStatement _ _ _ _ falseBranch) = end falseBranch
   end (WhileStatement _ _ body) = end body
   end (DoWhileStatement _ _ _ _ body) = end body
-  end (ReturnStatement _ _ terminator) = end terminator
+  end (ReturnStatement _ _ semicolon) = end semicolon
   end (BlockStatement _ _ close) = end close
 
 
 instance Syntax Expression where
   span (IntegerExpression _ s) = s
-  span (IdentifierExpression identifier) = span identifier
+  span (VariableExpression variable) = span variable
   span expression = Span (start expression) (end expression)
 
   start (CallExpression target _ _ _) = start target
