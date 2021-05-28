@@ -10,8 +10,6 @@ module Helpers (
 
 import Control.Monad.IO.Class
 
-import Control.Monad.Trans.Maybe
-
 import Data.Text (Text)
 
 import Data.GI.Base
@@ -72,19 +70,16 @@ getStyle ::
   (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b, MonadIO m) =>
   a -> b -> Text -> m (Maybe GtkSource.Style)
 
-getStyle isLanguage isStyleScheme styleId = runMaybeT (go styleId [])
+getStyle isLanguage isStyleScheme styleId = go styleId []
   where
     language = isLanguage `asA` GtkSource.Language
     styleScheme = isStyleScheme `asA` GtkSource.StyleScheme
 
-    go styleId seen = MaybeT $ do
-      style <- #getStyle styleScheme styleId
+    go styleId seen = #getStyle styleScheme styleId >>= \case
+      Just style -> pure (Just style)
 
-      case style of
-        Just style -> pure (Just style)
-
-        Nothing | styleId `notElem` seen -> runMaybeT $ do
-          fallbackStyleId <- MaybeT (#getStyleFallback language styleId)
-          go fallbackStyleId (styleId : seen)
-
+      Nothing | styleId `notElem` seen -> #getStyleFallback language styleId >>= \case
+        Just fallbackStyleId -> go fallbackStyleId (styleId : seen)
         Nothing -> pure Nothing
+
+      Nothing -> pure Nothing
