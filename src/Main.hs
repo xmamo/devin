@@ -202,12 +202,12 @@ highlightDeclaration isTextBuffer = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-    go Syntax.VariableDeclaration {varKeyword, variable, tName} = do
+    go Syntax.EmptyVariableDeclaration {varKeyword, variable, tName} = do
       highlight textBuffer "keyword" varKeyword
       highlight textBuffer "identifier" variable
       highlight textBuffer "type" tName
 
-    go Syntax.VariableAssignDeclaration {varKeyword, variable, tName, value} = do
+    go Syntax.VariableDeclaration {varKeyword, variable, tName, value} = do
       highlight textBuffer "keyword" varKeyword
       highlight textBuffer "identifier" variable
       highlight textBuffer "type" tName
@@ -258,11 +258,9 @@ highlightStatement isTextBuffer = go
       highlight textBuffer "keyword" whileKeyword
       highlightExpression textBuffer predicate
 
-    go Syntax.ReturnStatement {returnKeyword, value} = do
+    go Syntax.ReturnStatement {returnKeyword, result} = do
       highlight textBuffer "keyword" returnKeyword
-      highlightExpression textBuffer value
-
-    go Syntax.EmptyReturnStatement {returnKeyword} = highlight textBuffer "keyword" returnKeyword
+      for_ result (highlightExpression textBuffer)
 
     go Syntax.BlockStatement {elements} = for_ elements highlightElement
 
@@ -311,9 +309,9 @@ highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go dec
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-    go Syntax.VariableDeclaration {} = pure False
+    go Syntax.EmptyVariableDeclaration {} = pure False
 
-    go Syntax.VariableAssignDeclaration {value} =
+    go Syntax.VariableDeclaration {value} =
       highlightExpressionParentheses textBuffer value insertTextIter
 
     go Syntax.FunctionDeclaration {open, close, body} = do
@@ -369,9 +367,9 @@ highlightStatementParentheses isTextBuffer statement insertTextIter = go stateme
       else
         highlightExpressionParentheses textBuffer predicate insertTextIter
 
-    go Syntax.ReturnStatement {value} = highlightExpressionParentheses textBuffer value insertTextIter
+    go Syntax.ReturnStatement {result = Just result} = highlightExpressionParentheses textBuffer result insertTextIter
 
-    go Syntax.EmptyReturnStatement {} = pure False
+    go Syntax.ReturnStatement {result = Nothing} = pure False
 
     go Syntax.BlockStatement {open, elements, close} = do
       done <- foldlM (\a e -> if a then pure True else highlightElementParentheses e) False elements
@@ -474,7 +472,7 @@ displayDeclaration isTextBuffer isTreeStore = go
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
     treeStore = isTreeStore `asA` Gtk.TreeStore
 
-    go treeIter d @ Syntax.VariableDeclaration {varKeyword, variable, colon, tName, semicolon} = do
+    go treeIter d @ Syntax.EmptyVariableDeclaration {varKeyword, variable, colon, tName, semicolon} = do
       treeIter' <- display textBuffer treeStore treeIter d "VariableDeclaration" False
       display textBuffer treeStore treeIter' varKeyword "Token" True
       display textBuffer treeStore treeIter' variable "Identifier" True
@@ -483,7 +481,7 @@ displayDeclaration isTextBuffer isTreeStore = go
       display textBuffer treeStore treeIter' semicolon "Token" True
       pure treeIter'
 
-    go treeIter d @ Syntax.VariableAssignDeclaration {varKeyword, variable, colon, tName, equalSign, value, semicolon} = do
+    go treeIter d @ Syntax.VariableDeclaration {varKeyword, variable, colon, tName, equalSign, value, semicolon} = do
       treeIter' <- display textBuffer treeStore treeIter d "VariableAssignDeclaration" False
       display textBuffer treeStore treeIter' varKeyword "Token" True
       display textBuffer treeStore treeIter' variable "Identifier" True
@@ -567,16 +565,10 @@ displayStatement isTextBuffer isTreeStore = go
       display textBuffer treeStore treeIter' semicolon "Token" True
       pure treeIter'
 
-    go treeIter s @ Syntax.ReturnStatement {returnKeyword, value, semicolon} = do
+    go treeIter s @ Syntax.ReturnStatement {returnKeyword, result, semicolon} = do
       treeIter' <- display textBuffer treeStore treeIter s "ReturnStatement" False
       display textBuffer treeStore treeIter' returnKeyword "Token" True
-      displayExpression textBuffer treeStore treeIter' value
-      display textBuffer treeStore treeIter' semicolon "Token" True
-      pure treeIter'
-
-    go treeIter s @ Syntax.EmptyReturnStatement {returnKeyword, semicolon} = do
-      treeIter' <- display textBuffer treeStore treeIter s "ReturnStatement" False
-      display textBuffer treeStore treeIter' returnKeyword "Token" True
+      for_ result (displayExpression textBuffer treeStore treeIter')
       display textBuffer treeStore treeIter' semicolon "Token" True
       pure treeIter'
 

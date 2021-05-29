@@ -37,7 +37,7 @@ class Syntax a where
 
 
 data Declaration a where
-  VariableDeclaration :: {
+  EmptyVariableDeclaration :: {
     varKeyword :: Token,
     variable :: Identifier,
     colon :: Token,
@@ -46,7 +46,7 @@ data Declaration a where
     extra :: a
   } -> Declaration a
 
-  VariableAssignDeclaration :: {
+  VariableDeclaration :: {
     varKeyword :: Token,
     variable :: Identifier,
     colon :: Token,
@@ -113,13 +113,7 @@ data Statement a where
 
   ReturnStatement :: {
     returnKeyword :: Token,
-    value :: Expression a,
-    semicolon :: Token,
-    extra :: a
-  } -> Statement a
-
-  EmptyReturnStatement :: {
-    returnKeyword :: Token,
+    result :: Maybe (Expression a),
     semicolon :: Token,
     extra :: a
   } -> Statement a
@@ -238,12 +232,12 @@ data Comment where
 
 
 instance Syntax (Declaration a) where
+  start EmptyVariableDeclaration {varKeyword} = start varKeyword
   start VariableDeclaration {varKeyword} = start varKeyword
-  start VariableAssignDeclaration {varKeyword} = start varKeyword
   start FunctionDeclaration {defKeyword} = start defKeyword
 
+  end EmptyVariableDeclaration {semicolon} = end semicolon
   end VariableDeclaration {semicolon} = end semicolon
-  end VariableAssignDeclaration {semicolon} = end semicolon
   end FunctionDeclaration {body} = end body
 
 
@@ -254,7 +248,6 @@ instance Syntax (Statement a) where
   start WhileStatement {whileKeyword} = start whileKeyword
   start DoWhileStatement {doKeyword} = start doKeyword
   start ReturnStatement {returnKeyword} = start returnKeyword
-  start EmptyReturnStatement {returnKeyword} = start returnKeyword
   start BlockStatement {open} = start open
 
   end ExpressionStatement {semicolon} = end semicolon
@@ -263,7 +256,6 @@ instance Syntax (Statement a) where
   end WhileStatement {body} = end body
   end DoWhileStatement {body} = end body
   end ReturnStatement {semicolon} = end semicolon
-  end EmptyReturnStatement {semicolon} = end semicolon
   end BlockStatement {close} = end close
 
 

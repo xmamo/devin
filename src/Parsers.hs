@@ -49,12 +49,12 @@ variableDeclaration = do
     tName <- s *> identifier <* s
 
     Parser.either (charToken ';') (charToken '=') >>= \case
-      Left semicolon -> pure (Syntax.VariableDeclaration {varKeyword, variable, colon, tName, semicolon, extra = ()})
+      Left semicolon -> pure Syntax.EmptyVariableDeclaration {varKeyword, variable, colon, tName, semicolon, extra = ()}
 
       Right equalSign -> do
         value <- s *> expression
         semicolon <- s *> charToken ';'
-        pure Syntax.VariableAssignDeclaration {varKeyword, variable, colon, tName, equalSign, value, semicolon, extra = ()}
+        pure Syntax.VariableDeclaration {varKeyword, variable, colon, tName, equalSign, value, semicolon, extra = ()}
 
 
 functionDeclaration :: Parser (Syntax.Declaration ())
@@ -106,8 +106,8 @@ expressionStatement = do
   pure Syntax.ExpressionStatement {value, semicolon, extra = ()}
 
 
-ifStatement :: Parser (Syntax.Statement ())
-ifStatement = do
+ifElseStatementOrIfStatement :: Parser (Syntax.Statement ())
+ifElseStatementOrIfStatement = do
   ifKeyword <- keyword "if"
 
   Parser.commit $ do
@@ -147,12 +147,9 @@ doWhileStatement = do
 returnStatement :: Parser (Syntax.Statement ())
 returnStatement = do
   returnKeyword <- keyword "return"
-  value <- optional (s *> expression)
+  result <- optional (s *> expression)
   semicolon <- Parser.commit (s *> charToken ';')
-
-  case value of
-    Just value -> pure Syntax.ReturnStatement {returnKeyword, value, semicolon, extra = ()}
-    Nothing -> pure Syntax.EmptyReturnStatement {returnKeyword, semicolon, extra = ()}
+  pure Syntax.ReturnStatement {returnKeyword, result, semicolon, extra = ()}
 
 
 blockStatement :: Parser (Syntax.Statement ())
@@ -169,7 +166,7 @@ statement :: Parser (Syntax.Statement ())
 statement = asum
   [
     blockStatement,
-    ifStatement,
+    ifElseStatementOrIfStatement,
     whileStatement,
     doWhileStatement,
     returnStatement,
@@ -203,31 +200,28 @@ callExpression = do
 
 
 unaryExpression :: Parser (Syntax.Expression ())
-unaryExpression = asum
-  [
-    integerExpression,
+unaryExpression = do
+  unary <- unaryOperator
 
-    optional unaryOperator >>= \case
-      Just unary @ (Syntax.NotOperator span) -> optional (s *> unaryExpression) >>= \case
-        Just operand -> pure Syntax.UnaryExpression {unary, operand, extra = ()}
-        Nothing -> pure Syntax.VariableExpression {variable = Syntax.Identifier span "not", extra = ()}
+  operand <- case unary of
+    Syntax.NotOperator _ -> s *> operandExpression
+    _ -> Parser.commit (s *> operandExpression)
 
-      Just unary -> do
-        operand <- Parser.commit (s *> unaryExpression)
-        pure Syntax.UnaryExpression {unary, operand, extra = ()}
-
-      Nothing -> integerExpression <|> callExpression
-  ]
+  pure Syntax.UnaryExpression {unary, operand, extra = ()}
 
 
-binaryExpression :: Parser (Syntax.Expression ())
-binaryExpression = do
-  left <- unaryExpression
+operandExpression :: Parser (Syntax.Expression ())
+operandExpression = integerExpression <|> callExpression <|> unaryExpression <|> variableExpression
+
+
+binaryExpressionOrOperandExpression :: Parser (Syntax.Expression ())
+binaryExpressionOrOperandExpression = do
+  left <- operandExpression
 
   optional (s *> binaryOperator) >>= \case
-    Just operator -> do
+    Just binary -> do
       right <- Parser.commit (s *> expression)
-      pure (binary left operator right)
+      pure (newBinary left binary right)
 
     Nothing -> pure left
 
@@ -246,19 +240,12 @@ parenthesizedExpression = do
 
   Parser.commit $ do
     inner <- s *> expression
-    close <- s *> charToken ')'
+    close <- charToken ')'
     pure Syntax.ParenthesizedExpression {open, inner, close, extra = ()}
 
 
 expression :: Parser (Syntax.Expression ())
-expression = asum
-  [
-    parenthesizedExpression,
-    assignExpression,
-    binaryExpression,
-    unaryExpression,
-    variableExpression
-  ]
+expression = parenthesizedExpression <|> assignExpression <|> binaryExpressionOrOperandExpression
 
 
 unaryOperator :: Parser Syntax.UnaryOperator
@@ -273,17 +260,17 @@ unaryOperator = syntax $ asum
 binaryOperator :: Parser Syntax.BinaryOperator
 binaryOperator = syntax $ asum
   [
-    symbol "+" $> Syntax.AddOperator,
-    symbol "-" $> Syntax.SubtractOperator,
-    symbol "*" $> Syntax.MultiplyOperator,
-    symbol "/" $> Syntax.DivideOperator,
-    symbol "%" $> Syntax.DivideOperator,
-    symbol "==" $> Syntax.EqualOperator,
-    symbol "!=" $> Syntax.NotEqualOperator,
-    symbol "<" $> Syntax.LessOperator,
-    symbol "<=" $> Syntax.LessOrEqualOperator,
-    symbol ">" $> Syntax.GreaterOperator,
-    symbol ">=" $> Syntax.GreaterOrEqualOperator,
+    Parser.char '+' $> Syntax.AddOperator,
+    Parser.char '-' $> Syntax.SubtractOperator,
+    Parser.char '*' $> Syntax.MultiplyOperator,
+    Parser.char '/' $> Syntax.DivideOperator,
+    Parser.char '%' $> Syntax.DivideOperator,
+    Parser.text "==" $> Syntax.EqualOperator,
+    Parser.text "!=" $> Syntax.NotEqualOperator,
+    Parser.text "<=" $> Syntax.LessOrEqualOperator,
+    Parser.char '<' $> Syntax.LessOperator,
+    Parser.text ">=" $> Syntax.GreaterOrEqualOperator,
+    Parser.char '>' $> Syntax.GreaterOperator,
     keyword "and" $> Syntax.AndOperator,
     keyword "or" $> Syntax.OrOperator
   ]
@@ -292,12 +279,12 @@ binaryOperator = syntax $ asum
 assignOperator :: Parser Syntax.AssignOperator
 assignOperator = syntax $ asum
   [
-    symbol "=" $> Syntax.AssignOperator,
-    symbol "+=" $> Syntax.AddAssignOperator,
-    symbol "-=" $> Syntax.SubtractAssignOperator,
-    symbol "*=" $> Syntax.MultiplyAssignOperator,
-    symbol "/=" $> Syntax.DivideAssignOperator,
-    symbol "%=" $> Syntax.RemainderAssignOperator
+    Parser.char '=' $> Syntax.AssignOperator,
+    Parser.text "+=" $> Syntax.AddAssignOperator,
+    Parser.text "-=" $> Syntax.SubtractAssignOperator,
+    Parser.text "*=" $> Syntax.MultiplyAssignOperator,
+    Parser.text "/=" $> Syntax.DivideAssignOperator,
+    Parser.text "%=" $> Syntax.RemainderAssignOperator
   ]
 
 
@@ -316,6 +303,7 @@ identifier = Parser.label "identifier" . syntax $ do
   continue <- Text.pack <$> many (category [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
   pure $ \span -> Syntax.Identifier span (Text.cons start continue)
   where
+    category categories = Parser.satisfy $ \c -> unsafePerformIO (GLib.unicharType c) `elem` categories
     lu = GLib.UnicodeTypeUppercaseLetter
     ll = GLib.UnicodeTypeLowercaseLetter
     lt = GLib.UnicodeTypeTitlecaseLetter
@@ -354,24 +342,6 @@ keyword k = Parser.label ("keyword " <> k) $ do
     empty
 
 
-symbol :: Text -> Parser Syntax.Token
-symbol s = Parser.label s . syntax $ do
-  text <- Text.pack <$> ((:) <$> category [pd, po, sm, sc, so] <*> many (category [pd, po, sm, sc, so, sk]))
-
-  if Helpers.collate text == Helpers.collate s then
-    pure Syntax.Token
-  else
-    empty
-
-  where
-    pd = GLib.UnicodeTypeDashPunctuation
-    po = GLib.UnicodeTypeOtherPunctuation
-    sm = GLib.UnicodeTypeMathSymbol
-    sc = GLib.UnicodeTypeCurrencySymbol
-    sk = GLib.UnicodeTypeModifierSymbol
-    so = GLib.UnicodeTypeOtherSymbol
-
-
 token :: Parser a -> Parser Syntax.Token
 token parser = do
   start <- Parser.position
@@ -388,10 +358,6 @@ textToken :: Text -> Parser Syntax.Token
 textToken = token . Parser.text
 
 
-category :: (Foldable t, Applicative m) => t GLib.UnicodeType -> ParserT m Char
-category categories = Parser.satisfy $ \c -> unsafePerformIO (GLib.unicharType c) `elem` categories
-
-
 syntax :: Parser (Span -> a) -> Parser a
 syntax parser = do
   start <- Parser.position
@@ -400,12 +366,12 @@ syntax parser = do
   pure (f (Span start end))
 
 
-binary :: Syntax.Expression () -> Syntax.BinaryOperator -> Syntax.Expression () -> Syntax.Expression ()
+newBinary :: Syntax.Expression () -> Syntax.BinaryOperator -> Syntax.Expression () -> Syntax.Expression ()
 
-binary Syntax.BinaryExpression {} _ _ = undefined
+newBinary Syntax.BinaryExpression {} _ _ = undefined
 
-binary left operator (Syntax.BinaryExpression rLeft rOperator rRight _)
+newBinary left operator (Syntax.BinaryExpression rLeft rOperator rRight _)
   | Syntax.comparePrecedence operator rOperator >= EQ =
     Syntax.BinaryExpression (Syntax.BinaryExpression left operator rLeft ()) rOperator rRight ()
 
-binary left operator right = Syntax.BinaryExpression left operator right ()
+newBinary left operator right = Syntax.BinaryExpression left operator right ()
