@@ -24,9 +24,9 @@ import Control.Monad.Trans.Writer
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import qualified Helpers
 import Span (Span)
 import qualified Syntax
+import qualified Unicode
 
 
 data Environment where
@@ -159,9 +159,9 @@ defaultEnvironment = Environment ts []
   where
     ts =
       [
-        (Helpers.collate "unit", Unit, True),
-        (Helpers.collate "true", Bool, True),
-        (Helpers.collate "false", Bool, True)
+        (Unicode.collate "unit", Unit, True),
+        (Unicode.collate "true", Bool, True),
+        (Unicode.collate "false", Bool, True)
       ]
 
 
@@ -203,14 +203,14 @@ checkDeclarationW :: Environment -> Syntax.Declaration () -> Writer [Error] Envi
 checkDeclarationW (Environment ts functionTs) Syntax.EmptyVariableDeclaration {variable, tName} = do
   let (Syntax.Identifier _ variableName) = variable
   t <- getT tName
-  pure (Environment ((Helpers.collate variableName, t, False) : ts) functionTs)
+  pure (Environment ((Unicode.collate variableName, t, False) : ts) functionTs)
 
 checkDeclarationW environment Syntax.VariableDeclaration {variable, tName, value} = do
   let (Syntax.Identifier _ variableName) = variable
   t <- getT tName
   (valueT, Environment ts' functionTs') <- checkExpressionW environment value
   when (t /= Error && valueT /= Error && valueT /= t) (tell [InvalidTypeError value t valueT])
-  pure (Environment ((Helpers.collate variableName, t, True) : ts') functionTs')
+  pure (Environment ((Unicode.collate variableName, t, True) : ts') functionTs')
 
 checkDeclarationW (Environment ts functionTs) Syntax.FunctionDeclaration {name = n, parameters, tName, body} = do
   let (Syntax.Identifier _ name) = n
@@ -220,12 +220,12 @@ checkDeclarationW (Environment ts functionTs) Syntax.FunctionDeclaration {name =
       where
         f (parameterTs, ts) (Syntax.Identifier _ name, tName) = do
           t <- getT tName
-          pure (t : parameterTs, (Helpers.collate name, t, True) : ts)
+          pure (t : parameterTs, (Unicode.collate name, t, True) : ts)
 
     Nothing -> pure ([], ts)
 
   returnT <- getT tName
-  let functionTs' = (Helpers.collate name, parameterTs, returnT) : functionTs
+  let functionTs' = (Unicode.collate name, parameterTs, returnT) : functionTs
   (doesReturn, _) <- checkStatementW returnT (Environment ts' functionTs') body
   when (returnT /= Unit && not doesReturn) (tell [MissingReturnValue body returnT])
   pure (Environment ts functionTs')
@@ -389,18 +389,18 @@ checkExpressionW environment Syntax.ParenthesizedExpression {inner} = checkExpre
 lookupT :: Bool -> Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
 
 lookupT expectInitialized environment @ (Environment ts functionTs) identifier @ (Syntax.Identifier _ name) =
-  case lookup (Helpers.collate name) ts of
+  case lookup (Unicode.collate name) ts of
     Just (t, True) -> pure (t, environment)
 
     Just (t, False) | not expectInitialized -> pure (t, environment)
 
     Just (t, False) -> do
       tell [UnassignedVariableError identifier]
-      pure (t, Environment ((Helpers.collate name, t, expectInitialized) : ts) functionTs)
+      pure (t, Environment ((Unicode.collate name, t, expectInitialized) : ts) functionTs)
 
     Nothing -> do
       tell [UnknownIdentifierError identifier]
-      pure (Error, Environment ((Helpers.collate name, Error, expectInitialized) : ts) functionTs)
+      pure (Error, Environment ((Unicode.collate name, Error, expectInitialized) : ts) functionTs)
 
   where
     lookup _ [] = Nothing
@@ -411,12 +411,12 @@ lookupT expectInitialized environment @ (Environment ts functionTs) identifier @
 lookupFunctionT :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
 
 lookupFunctionT environment @ (Environment ts functionTs) identifier @ (Syntax.Identifier _ name) parameterTs =
-  case lookup (Helpers.collate name) parameterTs functionTs of
+  case lookup (Unicode.collate name) parameterTs functionTs of
     Just t -> pure (t, environment)
 
     Nothing -> do
       tell [UnknownFunctionError identifier parameterTs]
-      pure (Error, Environment ts ((Helpers.collate name, parameterTs, Error) : functionTs))
+      pure (Error, Environment ts ((Unicode.collate name, parameterTs, Error) : functionTs))
 
   where
     lookup _ _ [] = Nothing
@@ -425,11 +425,11 @@ lookupFunctionT environment @ (Environment ts functionTs) identifier @ (Syntax.I
 
 
 getT :: Syntax.Identifier -> Writer [Error] Type
-getT identifier @ (Syntax.Identifier _ tName) = case Helpers.collate tName of
-  tName | tName == Helpers.collate "Int" -> pure Int
-  tName | tName == Helpers.collate "Float" -> pure Float
-  tName | tName == Helpers.collate "Bool" -> pure Bool
-  tName | tName == Helpers.collate "Unit" -> pure Unit
+getT identifier @ (Syntax.Identifier _ tName) = case Unicode.collate tName of
+  tName | tName == Unicode.collate "Int" -> pure Int
+  tName | tName == Unicode.collate "Float" -> pure Float
+  tName | tName == Unicode.collate "Bool" -> pure Bool
+  tName | tName == Unicode.collate "Unit" -> pure Unit
 
   _ -> do
     tell [UnknownTypeError identifier]

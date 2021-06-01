@@ -15,7 +15,6 @@ import Control.Applicative
 import Data.Char
 import Data.Foldable
 import Data.Functor
-import System.IO.Unsafe
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
@@ -23,13 +22,11 @@ import Control.Monad.Trans.Writer
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import qualified GI.GLib as GLib
-
-import qualified Helpers
 import Parser (ParserT)
 import qualified Parser
 import Span (Span (Span))
 import qualified Syntax
+import qualified Unicode
 
 
 type Parser = ParserT (Writer [Syntax.Comment])
@@ -303,24 +300,24 @@ identifier = Parser.label "identifier" . syntax $ do
   continue <- Text.pack <$> many (category [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
   pure $ \span -> Syntax.Identifier span (Text.cons start continue)
   where
-    category categories = Parser.satisfy $ \c -> unsafePerformIO (GLib.unicharType c) `elem` categories
-    lu = GLib.UnicodeTypeUppercaseLetter
-    ll = GLib.UnicodeTypeLowercaseLetter
-    lt = GLib.UnicodeTypeTitlecaseLetter
-    lm = GLib.UnicodeTypeModifierLetter
-    lo = GLib.UnicodeTypeOtherLetter
-    mn = GLib.UnicodeTypeNonSpacingMark
-    mc = GLib.UnicodeTypeSpacingMark
-    nd = GLib.UnicodeTypeDecimalNumber
-    nl = GLib.UnicodeTypeLetterNumber
-    pc = GLib.UnicodeTypeConnectPunctuation
+    category categories = Parser.satisfy $ \c -> Unicode.category c `elem` categories
+    lu = Unicode.UppercaseLetter
+    ll = Unicode.LowercaseLetter
+    lt = Unicode.TitlecaseLetter
+    lm = Unicode.ModifierLetter
+    lo = Unicode.OtherLetter
+    mn = Unicode.NonspacingMark
+    mc = Unicode.SpacingMark
+    nd = Unicode.DecimalNumber
+    nl = Unicode.LetterNumber
+    pc = Unicode.ConnectorPunctuation
 
 
 comment :: Parser Syntax.Comment
 comment = do
   start <- Parser.position
   Parser.text "//"
-  many (Parser.satisfy (not . Helpers.isNewline))
+  many (Parser.satisfy (not . Unicode.isNewline))
   end <- Parser.position
 
   let comment = Syntax.Comment (Span start end)
@@ -329,14 +326,14 @@ comment = do
 
 
 s :: Parser Syntax.Token
-s = token (many (void (some (Parser.satisfy (unsafePerformIO . GLib.unicharIsspace))) <|> void comment))
+s = token (many (void (some (Parser.satisfy Unicode.isSpace)) <|> void comment))
 
 
 keyword :: Text -> Parser Syntax.Token
 keyword k = Parser.label ("keyword " <> k) $ do
   (Syntax.Identifier span name) <- identifier
 
-  if Helpers.collate name == Helpers.collate k then
+  if Unicode.collate name == Unicode.collate k then
     pure (Syntax.Token span)
   else
     empty
