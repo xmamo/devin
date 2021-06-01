@@ -12,7 +12,6 @@ import System.IO.Unsafe
 import Control.Monad.IO.Class
 
 import Data.Text (Text)
-import qualified Data.Text as Text
 
 import Data.GI.Base
 import qualified GI.GLib as GLib
@@ -31,7 +30,7 @@ isNewline _ = False
 
 
 collate :: Text -> Text
-collate text = unsafePerformIO (GLib.utf8CollateKey text (fromIntegral (Text.length text)))
+collate text = unsafePerformIO (GLib.utf8CollateKey text -1)
 
 
 expectationsText :: [Text] -> Text
