@@ -39,7 +39,7 @@ data Type where
   Int :: Type
   Float :: Type
   Bool :: Type
-  Void :: Type
+  Unit :: Type
   Function :: [Type] -> Type -> Type
   deriving (Eq, Show, Read)
 
@@ -54,7 +54,6 @@ data Error where
   InvalidAssignError :: Syntax.AssignOperator -> Type -> Type -> Error
   InvalidReturnTypeError :: Syntax.Statement () -> Type -> Type -> Error
   MissingReturnValue :: Syntax.Statement () -> Type -> Error
-  UnexpectedReturnValueError :: Syntax.Statement () -> Error
   InvalidTypeError :: Syntax.Expression () -> Type -> Type -> Error
   deriving (Eq, Show, Read)
 
@@ -112,8 +111,6 @@ description (InvalidReturnTypeError _ expectedT resultT) =
 
 description (MissingReturnValue _ expectedT) = "Missing return value: expected " <> Text.pack (show expectedT)
 
-description (UnexpectedReturnValueError _) = "Unexpected return value"
-
 description (InvalidTypeError _ expectedT actualT) =
   "Invalid type: expected " <> Text.pack (show expectedT) <> ", but got " <> Text.pack (show actualT)
 
@@ -128,7 +125,6 @@ span (InvalidBinaryError binary _ _) = Syntax.span binary
 span (InvalidAssignError assign _ _) = Syntax.span assign
 span (InvalidReturnTypeError statement _ _) = Syntax.span statement
 span (MissingReturnValue statement _) = Syntax.span statement
-span (UnexpectedReturnValueError statement) = Syntax.span statement
 span (InvalidTypeError expression _ _) = Syntax.span expression
 
 
@@ -142,7 +138,6 @@ start (InvalidBinaryError binary _ _) = Syntax.start binary
 start (InvalidAssignError assign _ _) = Syntax.start assign
 start (InvalidReturnTypeError statement _ _) = Syntax.start statement
 start (MissingReturnValue statement _) = Syntax.start statement
-start (UnexpectedReturnValueError statement) = Syntax.start statement
 start (InvalidTypeError expression _ _) = Syntax.start expression
 
 
@@ -156,12 +151,18 @@ end (InvalidBinaryError binary _ _) = Syntax.end binary
 end (InvalidAssignError assign _ _) = Syntax.end assign
 end (InvalidReturnTypeError statement _ _) = Syntax.end statement
 end (MissingReturnValue statement _) = Syntax.end statement
-end (UnexpectedReturnValueError statement) = Syntax.end statement
 end (InvalidTypeError expression _ _) = Syntax.end expression
 
 
 defaultEnvironment :: Environment
-defaultEnvironment = Environment [(Helpers.collate "true", Bool, True), (Helpers.collate "false", Bool, True)] []
+defaultEnvironment = Environment ts []
+  where
+    ts =
+      [
+        (Helpers.collate "unit", Unit, True),
+        (Helpers.collate "true", Bool, True),
+        (Helpers.collate "false", Bool, True)
+      ]
 
 
 checkDeclarations :: Environment -> [Syntax.Declaration ()] -> [Error]
@@ -226,7 +227,7 @@ checkDeclarationW (Environment ts functionTs) Syntax.FunctionDeclaration {name =
   returnT <- getT tName
   let functionTs' = (Helpers.collate name, parameterTs, returnT) : functionTs
   (doesReturn, _) <- checkStatementW returnT (Environment ts' functionTs') body
-  when (returnT /= Void && not doesReturn) (tell [MissingReturnValue body returnT])
+  when (returnT /= Unit && not doesReturn) (tell [MissingReturnValue body returnT])
   pure (Environment ts functionTs')
 
 
@@ -264,16 +265,12 @@ checkStatementW expectedT environment Syntax.DoWhileStatement {body, predicate} 
 checkStatementW expectedT environment s @ Syntax.ReturnStatement {result = Just result} = do
   (resultT, environment') <- checkExpressionW environment result
 
-  case (expectedT, resultT) of
-    (Error, _) -> pure ()
-    (_, Error) -> pure ()
-    (Void, _) -> tell [UnexpectedReturnValueError s]
-    _ | resultT == expectedT -> pure ()
-    _ -> tell [InvalidReturnTypeError s expectedT resultT]
+  when (expectedT /= Error && resultT /= Error && resultT /= expectedT) $
+    tell [InvalidReturnTypeError s expectedT resultT]
 
   pure (True, environment')
 
-checkStatementW Void environment Syntax.ReturnStatement {result = Nothing} = pure (True, environment)
+checkStatementW Unit environment Syntax.ReturnStatement {result = Nothing} = pure (True, environment)
 
 checkStatementW expectedT environment s @ Syntax.ReturnStatement {result = Nothing} = do
   tell [MissingReturnValue s expectedT]
@@ -432,7 +429,7 @@ getT identifier @ (Syntax.Identifier _ tName) = case Helpers.collate tName of
   tName | tName == Helpers.collate "Int" -> pure Int
   tName | tName == Helpers.collate "Float" -> pure Float
   tName | tName == Helpers.collate "Bool" -> pure Bool
-  tName | tName == Helpers.collate "Void" -> pure Void
+  tName | tName == Helpers.collate "Unit" -> pure Unit
 
   _ -> do
     tell [UnknownTypeError identifier]
