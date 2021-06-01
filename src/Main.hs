@@ -64,7 +64,7 @@ onActivate isApplication = do
   defaultLanguage <- fromJust <$> #getLanguage languageManager "def"
 
   codeTreeStore <- new Gtk.TreeStore []
-  #setColumnTypes codeTreeStore (replicate 3 gtypeString)
+  #setColumnTypes codeTreeStore [gtypeString, gtypeString ]
 
   -- Build the UI:
 
@@ -130,7 +130,7 @@ onActivate isApplication = do
 
   cellRenderer <- new Gtk.CellRendererText [#family := "monospace"]
 
-  for_ (zip [0 ..] [False, False, True]) $ \(column, expand) -> do
+  for_ [(0, False), (1, True)] $ \(column, expand) -> do
     treeViewColumn <- new Gtk.TreeViewColumn []
     #packEnd treeViewColumn cellRenderer expand
     #addAttribute treeViewColumn cellRenderer "text" column
@@ -189,7 +189,6 @@ onActivate isApplication = do
               pure (Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ") <> Type.description error)
 
             set logTextBuffer [#text := Text.intercalate "\n" log]
-
 
         Result.Failure _ position expectations -> Gtk.postGUIASync $ do
           (startTextIter, endTextIter) <- #getBounds codeTextBuffer
@@ -682,6 +681,7 @@ displayUnaryOperator isTextBuffer isTreeStore treeIter unary =
       Syntax.MinusOperator _ -> "MinusOperator"
       Syntax.NotOperator _ -> "NotOperator"
 
+
 displayBinaryOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator -> IO (Maybe Gtk.TreeIter)
@@ -704,6 +704,7 @@ displayBinaryOperator isTextBuffer isTreeStore treeIter binary =
       Syntax.AndOperator _ -> "AndOperator"
       Syntax.OrOperator _ -> "OrOperator"
 
+
 displayAssignOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator -> IO (Maybe Gtk.TreeIter)
@@ -719,6 +720,7 @@ displayAssignOperator isTextBuffer isTreeStore treeIter assign =
       Syntax.DivideAssignOperator _ -> "DivideAssignOperator"
       Syntax.RemainderAssignOperator _ -> "RemainderAssignOperator"
 
+
 display ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax c) =>
   a -> b -> Maybe Gtk.TreeIter -> c -> Text -> Bool -> IO (Maybe Gtk.TreeIter)
@@ -727,20 +729,14 @@ display isTextBuffer isTreeStore treeIter syntax label isLeaf = do
   let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
       treeStore = isTreeStore `asA` Gtk.TreeStore
 
-  startTextIter <- #getIterAtOffset textBuffer (Syntax.start syntax)
-  endTextIter <- #getIterAtOffset textBuffer (Syntax.end syntax)
-
-  (startLine, startColumn) <- Helpers.getLineColumn startTextIter
-  (endLine, endColumn) <- Helpers.getLineColumn endTextIter
-  let span = "[" ++ show startLine ++ ":" ++ show startColumn ++ "-" ++ show endLine ++ ":" ++ show endColumn ++ "]"
-
   treeIter' <- #append treeStore treeIter
 
-  #setValue treeStore treeIter' 0 =<< toGValue (Just span)
-  #setValue treeStore treeIter' 1 =<< toGValue (Just label)
-
-  when isLeaf $ do
+  if isLeaf then do
+    startTextIter <- #getIterAtOffset textBuffer (Syntax.start syntax)
+    endTextIter <- #getIterAtOffset textBuffer (Syntax.end syntax)
     slice <- #getSlice textBuffer startTextIter endTextIter True
-    #setValue treeStore treeIter' 2 =<< toGValue (Just slice)
+    #set treeStore treeIter' [0, 1] =<< traverse toGValue [Just label, Just slice]
+  else
+    #set treeStore treeIter' [0, 1] =<< traverse toGValue [Just label, Nothing]
 
   pure (Just treeIter')
