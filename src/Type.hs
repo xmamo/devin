@@ -15,9 +15,11 @@ module Type (
 ) where
 
 import Control.Monad
+import Data.Either
 import Data.Foldable
 import Data.Functor
 import Data.List hiding (span)
+import Data.Maybe
 import Prelude hiding (span)
 
 import Control.Monad.Trans.Writer
@@ -54,7 +56,7 @@ data Error where
   InvalidBinaryError :: Syntax.BinaryOperator -> Type -> Type -> Error
   InvalidAssignError :: Syntax.AssignOperator -> Type -> Type -> Error
   InvalidReturnTypeError :: Syntax.Statement () -> Type -> Type -> Error
-  MissingReturnValue :: Syntax.Statement () -> Type -> Error
+  MissingReturnValueError :: Syntax.Statement () -> Type -> Error
   InvalidTypeError :: Syntax.Expression () -> Type -> Type -> Error
   deriving (Eq, Show, Read)
 
@@ -113,7 +115,7 @@ description (InvalidAssignError assign targetT valueT) =
 description (InvalidReturnTypeError _ expectedT resultT) =
   "Invalid return type: expected " <> Text.pack (show expectedT) <> ", but got " <> Text.pack (show resultT)
 
-description (MissingReturnValue _ expectedT) =
+description (MissingReturnValueError _ expectedT) =
   "Missing return value: expected " <> Text.pack (show expectedT)
 
 description (InvalidTypeError _ expectedT actualT) =
@@ -129,7 +131,7 @@ span (InvalidUnaryError unary _) = Syntax.span unary
 span (InvalidBinaryError binary _ _) = Syntax.span binary
 span (InvalidAssignError assign _ _) = Syntax.span assign
 span (InvalidReturnTypeError statement _ _) = Syntax.span statement
-span (MissingReturnValue statement _) = Syntax.span statement
+span (MissingReturnValueError statement _) = Syntax.span statement
 span (InvalidTypeError expression _ _) = Syntax.span expression
 
 
@@ -142,7 +144,7 @@ start (InvalidUnaryError unary _) = Syntax.start unary
 start (InvalidBinaryError binary _ _) = Syntax.start binary
 start (InvalidAssignError assign _ _) = Syntax.start assign
 start (InvalidReturnTypeError statement _ _) = Syntax.start statement
-start (MissingReturnValue statement _) = Syntax.start statement
+start (MissingReturnValueError statement _) = Syntax.start statement
 start (InvalidTypeError expression _ _) = Syntax.start expression
 
 
@@ -155,7 +157,7 @@ end (InvalidUnaryError unary _) = Syntax.end unary
 end (InvalidBinaryError binary _ _) = Syntax.end binary
 end (InvalidAssignError assign _ _) = Syntax.end assign
 end (InvalidReturnTypeError statement _ _) = Syntax.end statement
-end (MissingReturnValue statement _) = Syntax.end statement
+end (MissingReturnValueError statement _) = Syntax.end statement
 end (InvalidTypeError expression _ _) = Syntax.end expression
 
 
@@ -170,7 +172,7 @@ defaultEnvironment = Environment ts []
       ]
 
 
-checkDeclarations :: Environment -> [Syntax.Declaration ()] -> [Error]
+checkDeclarations :: Foldable t => Environment -> t (Syntax.Declaration ()) -> [Error]
 checkDeclarations environment declarations = execWriter (checkDeclarationsW environment declarations)
 
 
@@ -196,11 +198,11 @@ checkIdentifier expectInitialized environment identifier =
    in (t, environment', errors)
 
 
-checkDeclarationsW :: Environment -> [Syntax.Declaration ()] -> Writer [Error] ()
-checkDeclarationsW _ [] = pure ()
-checkDeclarationsW environment (declaration : declarations) = do
-  environment' <- checkDeclarationW environment declaration
-  checkDeclarationsW environment' declarations
+checkDeclarationsW :: Foldable t => Environment -> t (Syntax.Declaration ()) -> Writer [Error] Environment
+checkDeclarationsW environment declarations = do
+  (Environment ts' functionTs') <- declareFunctions environment declarations
+  let f (Environment ts _) declaration = checkDeclarationW (Environment ts functionTs') declaration
+  foldlM f (Environment ts' functionTs') declarations
 
 
 checkDeclarationW :: Environment -> Syntax.Declaration () -> Writer [Error] Environment
@@ -232,7 +234,7 @@ checkDeclarationW (Environment ts functionTs) Syntax.FunctionDeclaration {name =
   returnT <- getT tName
   let functionTs' = (Unicode.collate name, parameterTs, returnT) : functionTs
   (doesReturn, _) <- checkStatementW returnT (Environment ts' functionTs') body
-  when (returnT `notElem` [Error, Unit] && not doesReturn) (tell [MissingReturnValue body returnT])
+  when (returnT `notElem` [Error, Unit] && not doesReturn) (tell [MissingReturnValueError body returnT])
   pure (Environment ts functionTs')
 
 
@@ -280,18 +282,21 @@ checkStatementW Error environment Syntax.ReturnStatement {result = Nothing} = pu
 checkStatementW Unit environment Syntax.ReturnStatement {result = Nothing} = pure (True, environment)
 
 checkStatementW expectedT environment s @ Syntax.ReturnStatement {result = Nothing} = do
-  tell [MissingReturnValue s expectedT]
+  tell [MissingReturnValueError s expectedT]
   pure (True, environment)
 
-checkStatementW expectedT environment Syntax.BlockStatement {elements} = foldlM f (False, environment) elements
-  where
-    f (doesReturn, environment) (Left declaration) = do
-      environment' <- checkDeclarationW environment declaration
-      pure (doesReturn, environment')
+checkStatementW expectedT environment Syntax.BlockStatement {elements} = do
+  (Environment ts' functionTs') <- declareFunctions environment (lefts elements)
 
-    f (doesReturn, environment) (Right statement) = do
-      (doesReturn', environment') <- checkStatementW expectedT environment statement
-      pure (doesReturn || doesReturn', environment')
+  let f (doesReturn, Environment ts _) (Left declaration) = do
+        (Environment ts' _) <- checkDeclarationW (Environment ts functionTs') declaration
+        pure (doesReturn, Environment ts' functionTs')
+
+      f (doesReturn, Environment ts _) (Right statement) = do
+        (doesReturn', Environment ts' _) <- checkStatementW expectedT (Environment ts functionTs') statement
+        pure (doesReturn || doesReturn', Environment ts' functionTs')
+
+  foldlM f (False, Environment ts' functionTs') elements
 
 
 checkExpressionW :: Environment -> Syntax.Expression () -> Writer [Error] (Type, Environment)
@@ -391,6 +396,24 @@ checkExpressionW environment Syntax.AssignExpression {target, assign, value} = d
       pure (Error, environment'')
 
 checkExpressionW environment Syntax.ParenthesizedExpression {inner} = checkExpressionW environment inner
+
+
+declareFunctions :: Foldable t => Environment -> t (Syntax.Declaration a) -> Writer [Error] Environment
+declareFunctions = foldlM f
+  where
+    f (Environment ts functionTs) Syntax.FunctionDeclaration {name = (Syntax.Identifier _ name), parameters, tName} = do
+      parameterTs <- case parameters of
+        Just ((_, _, tName), rest) -> foldlM g [] (tName : [tName | (_, _, _, tName) <- rest])
+        Nothing -> pure []
+
+      returnT <- getT tName
+      pure (Environment ts ((Unicode.collate name, parameterTs, returnT) : functionTs))
+
+    f (Environment ts functionTs) _ = pure (Environment ts functionTs)
+
+    g parameterTs tName = do
+      t <- getT tName
+      pure (t : parameterTs)
 
 
 lookupT :: Bool -> Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
