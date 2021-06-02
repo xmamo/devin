@@ -16,16 +16,19 @@ module Parser (
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Trans.Class
 import Data.Functor.Identity
 import Data.List
+import Prelude hiding (either)
+
+import Control.Monad.Trans.Class
+
 import Data.Text (Text)
 import qualified Data.Text as Text
+
 import Input (Input (Input))
 import qualified Input
 import Result (Result)
 import qualified Result
-import Prelude hiding (either)
 
 
 type Parser = ParserT Identity

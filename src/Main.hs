@@ -9,8 +9,6 @@ import Data.Traversable
 import System.Environment
 import System.Exit
 
-import Control.Monad.Trans.Writer
-
 import Data.Text (Text)
 import qualified Data.Text as Text
 
@@ -151,56 +149,53 @@ onActivate isApplication = do
     killThread =<< takeMVar threadIdVar
     swapMVar declarationsVar []
 
-    putMVar threadIdVar =<< forkIO do
-      let (declarations, comments) = runWriter (Parser.parseT Parsers.declarations (Input 0 text))
+    putMVar threadIdVar =<< forkIO case Parser.parse Parsers.declarations (Input 0 text) of
+      Result.Success (declarations, comments) _ -> do
+        Gtk.postGUIASync do
+          swapMVar declarationsVar declarations
 
-      case declarations of
-        Result.Success declarations _ -> do
-          Gtk.postGUIASync do
-            swapMVar declarationsVar declarations
+          (startTextIter, endTextIter) <- #getBounds codeTextBuffer
+          for_ styleIds \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
 
-            (startTextIter, endTextIter) <- #getBounds codeTextBuffer
-            for_ styleIds \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
+          insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
 
-            insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
+          for_ declarations \declaration -> do
+            highlightDeclaration codeTextBuffer declaration
+            highlightDeclarationParentheses codeTextBuffer declaration insertTextIter
 
-            for_ declarations \declaration -> do
-              highlightDeclaration codeTextBuffer declaration
-              highlightDeclarationParentheses codeTextBuffer declaration insertTextIter
+          for_ comments (highlight codeTextBuffer "comment" . Syntax.span)
 
-            for_ comments (highlight codeTextBuffer "comment" . Syntax.span)
+          #clear codeTreeStore
+          for_ declarations (displayDeclaration codeTextBuffer codeTreeStore Nothing)
 
-            #clear codeTreeStore
-            for_ declarations (displayDeclaration codeTextBuffer codeTreeStore Nothing)
+          set logTextBuffer [#text := ""]
 
-            set logTextBuffer [#text := ""]
+        let errors = Type.checkDeclarations Type.defaultEnvironment declarations
 
-          let errors = Type.checkDeclarations Type.defaultEnvironment declarations
-
-          Gtk.postGUIASync do
-            (startTextIter, endTextIter) <- #getBounds codeTextBuffer
-            #removeTagByName codeTextBuffer "error" startTextIter endTextIter
-
-            log <- for errors \error -> do
-              highlight codeTextBuffer "error" (Type.span error)
-
-              startTextIter <- #getIterAtOffset codeTextBuffer (Type.start error)
-              (line, column) <- Helpers.getLineColumn startTextIter
-              pure (Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ") <> Type.description error)
-
-            set logTextBuffer [#text := Text.intercalate "\n" log]
-
-        Result.Failure _ position expectations -> Gtk.postGUIASync do
+        Gtk.postGUIASync do
           (startTextIter, endTextIter) <- #getBounds codeTextBuffer
           #removeTagByName codeTextBuffer "error" startTextIter endTextIter
 
-          startTextIter <- #getIterAtOffset codeTextBuffer (fromIntegral position)
-          for_ styleIds \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
-          #applyTagByName codeTextBuffer "error" startTextIter endTextIter
+          log <- for errors \error -> do
+            highlight codeTextBuffer "error" (Type.span error)
 
-          (line, column) <- Helpers.getLineColumn startTextIter
-          let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
-          set logTextBuffer [#text := prefix <> Helpers.expectationsText expectations]
+            startTextIter <- #getIterAtOffset codeTextBuffer (Type.start error)
+            (line, column) <- Helpers.getLineColumn startTextIter
+            pure (Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ") <> Type.description error)
+
+          set logTextBuffer [#text := Text.intercalate "\n" log]
+
+      Result.Failure _ position expectations -> Gtk.postGUIASync do
+        (startTextIter, endTextIter) <- #getBounds codeTextBuffer
+        #removeTagByName codeTextBuffer "error" startTextIter endTextIter
+
+        startTextIter <- #getIterAtOffset codeTextBuffer (fromIntegral position)
+        for_ styleIds \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
+        #applyTagByName codeTextBuffer "error" startTextIter endTextIter
+
+        (line, column) <- Helpers.getLineColumn startTextIter
+        let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
+        set logTextBuffer [#text := prefix <> Helpers.expectationsText expectations]
 
   on codeTextBuffer (PropertyNotify #cursorPosition) . const $ void do
     (startTextIter, endTextIter) <- #getBounds codeTextBuffer

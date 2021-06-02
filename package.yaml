@@ -15,6 +15,7 @@ ghc-options:
 default-extensions:
   # Syntax
   - ApplicativeDo
+  - TupleSections
   - LambdaCase
   - BlockArguments
 
