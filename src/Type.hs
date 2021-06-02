@@ -51,7 +51,7 @@ data Error where
   UnknownTypeError :: Syntax.Identifier -> Error
   UnknownIdentifierError :: Syntax.Identifier -> Error
   UnknownFunctionError :: Syntax.Identifier -> [Type] -> Error
-  UnassignedVariableError :: Syntax.Identifier -> Error
+  UninitializedVariableError :: Syntax.Identifier -> Error
   InvalidUnaryError :: Syntax.UnaryOperator -> Type -> Error
   InvalidBinaryError :: Syntax.BinaryOperator -> Type -> Type -> Error
   InvalidAssignError :: Syntax.AssignOperator -> Type -> Type -> Error
@@ -72,8 +72,8 @@ description (UnknownIdentifierError (Syntax.Identifier _ name)) =
 description (UnknownFunctionError (Syntax.Identifier _ name) parameterTs) =
   "Unknown function " <> name <> "(" <> Text.pack (intercalate ", " (show <$> parameterTs)) <> ")"
 
-description (UnassignedVariableError (Syntax.Identifier _ name)) =
-  "Unassigned variable " <> name
+description (UninitializedVariableError (Syntax.Identifier _ name)) =
+  "Uninitialized variable " <> name
 
 description (InvalidUnaryError unary operandT) =
   "Cant' apply unary " <> operator <> " to " <> Text.pack (show operandT)
@@ -126,7 +126,7 @@ span :: Error -> Span
 span (UnknownTypeError tName) = Syntax.span tName
 span (UnknownIdentifierError name) = Syntax.span name
 span (UnknownFunctionError name _) = Syntax.span name
-span (UnassignedVariableError variable) = Syntax.span variable
+span (UninitializedVariableError variable) = Syntax.span variable
 span (InvalidUnaryError unary _) = Syntax.span unary
 span (InvalidBinaryError binary _ _) = Syntax.span binary
 span (InvalidAssignError assign _ _) = Syntax.span assign
@@ -139,7 +139,7 @@ start :: Integral a => Error -> a
 start (UnknownTypeError tName) = Syntax.start tName
 start (UnknownIdentifierError name) = Syntax.start name
 start (UnknownFunctionError name _) = Syntax.start name
-start (UnassignedVariableError variable) = Syntax.start variable
+start (UninitializedVariableError variable) = Syntax.start variable
 start (InvalidUnaryError unary _) = Syntax.start unary
 start (InvalidBinaryError binary _ _) = Syntax.start binary
 start (InvalidAssignError assign _ _) = Syntax.start assign
@@ -152,7 +152,7 @@ end :: Integral a => Error -> a
 end (UnknownTypeError tName) = Syntax.end tName
 end (UnknownIdentifierError name) = Syntax.end name
 end (UnknownFunctionError name _) = Syntax.end name
-end (UnassignedVariableError variable) = Syntax.end variable
+end (UninitializedVariableError variable) = Syntax.end variable
 end (InvalidUnaryError unary _) = Syntax.end unary
 end (InvalidBinaryError binary _ _) = Syntax.end binary
 end (InvalidAssignError assign _ _) = Syntax.end assign
@@ -371,8 +371,8 @@ checkExpressionW environment Syntax.BinaryExpression {left, binary, right} = do
       pure (Error, environment'')
 
 checkExpressionW environment Syntax.AssignExpression {target, assign, value} = do
-  (targetT, environment') <- lookupT True environment target
-  (valueT, environment'') <- checkExpressionW environment' value
+  (valueT, environment') <- checkExpressionW environment value
+  (targetT, environment'') <- lookupT False environment' target
 
   case (targetT, assign, valueT) of
     (Error, _, _) -> pure (Error, environment'')
@@ -418,38 +418,28 @@ declareFunctions = foldlM f
 
 lookupT :: Bool -> Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
 lookupT expectInitialized environment @ (Environment ts functionTs) identifier @ (Syntax.Identifier _ name) =
-  case lookup (Unicode.collate name) ts of
-    Just (t, True) -> pure (t, environment)
-
-    Just (t, False) | not expectInitialized -> pure (t, environment)
-
-    Just (t, False) -> do
-      tell [UnassignedVariableError identifier]
-      pure (t, Environment ((Unicode.collate name, t, expectInitialized) : ts) functionTs)
-
-    Nothing -> do
+  case break (\(name', _, _) -> name' == Unicode.collate name) ts of
+    (_, []) -> do
       tell [UnknownIdentifierError identifier]
       pure (Error, Environment ((Unicode.collate name, Error, expectInitialized) : ts) functionTs)
 
-  where
-    lookup _ [] = Nothing
-    lookup name ((name', t, isInitialized) : _) | name' == name = Just (t, isInitialized)
-    lookup name (_ : ts) = lookup name ts
+    (_, (_, t, True) : _) -> pure (t, environment)
+
+    (_, (_, t, False) : _) | expectInitialized -> do
+      tell [UninitializedVariableError identifier]
+      pure (t, Environment ((Unicode.collate name, t, True) : ts) functionTs)
+
+    (ts1, (name, t, False) : ts2) -> pure (t, Environment (ts1 ++ [(name, t, True)] ++ ts2) functionTs)
 
 
 lookupFunctionT :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
 lookupFunctionT environment @ (Environment ts functionTs) identifier @ (Syntax.Identifier _ name) parameterTs =
-  case lookup (Unicode.collate name) parameterTs functionTs of
-    Just t -> pure (t, environment)
-
-    Nothing -> do
+  case dropWhile (\(name', ts, _) -> name' /= Unicode.collate name || ts /= parameterTs) functionTs of
+    [] -> do
       tell [UnknownFunctionError identifier parameterTs]
       pure (Error, Environment ts ((Unicode.collate name, parameterTs, Error) : functionTs))
 
-  where
-    lookup _ _ [] = Nothing
-    lookup name parameters ((name', parameters', t) : _) | name' == name && parameters' == parameters = Just t
-    lookup name parameters (_ : parameterTs) = lookup name parameters parameterTs
+    (_, _, returnT) : _ -> pure (returnT, environment)
 
 
 getT :: Syntax.Identifier -> Writer [Error] Type
