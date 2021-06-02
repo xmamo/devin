@@ -36,7 +36,7 @@ import qualified Unicode
 data Pass where
   Pass1 :: Pass
   Pass2 :: Pass
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Enum, Bounded, Show, Read)
 
 
 data Environment where
