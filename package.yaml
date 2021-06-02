@@ -16,6 +16,7 @@ default-extensions:
   # Syntax
   - ApplicativeDo
   - LambdaCase
+  - BlockArguments
 
   # Types
   - GADTs

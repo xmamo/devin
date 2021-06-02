@@ -27,7 +27,6 @@ expectationsText expectations = "Expected " <> go expectations
 getInsertTextIter :: (Gtk.IsTextBuffer a, MonadIO m) => a -> m Gtk.TextIter
 getInsertTextIter isTextBuffer = do
   let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
   insertTextMark <- #getInsert textBuffer
   #getIterAtMark textBuffer insertTextMark
 
@@ -39,15 +38,14 @@ getLineColumn textIter = do
   textIter' <- #copy textIter
   #setLineOffset textIter' 0
 
-  let
-    go column = do
-      result <- #compare textIter' textIter
+  let go column = do
+        result <- #compare textIter' textIter
 
-      if result >= 0 then
-        pure column
-      else do
-        #forwardCursorPosition textIter'
-        go (column + 1)
+        if result >= 0 then
+          pure column
+        else do
+          #forwardCursorPosition textIter'
+          go (column + 1)
 
   column <- go 1
   pure (line, column)

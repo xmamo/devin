@@ -127,7 +127,6 @@ data Statement a where
 
   deriving (Eq, Show, Read)
 
-
 data Expression a where
   IntegerExpression :: {
     integer :: Integer,

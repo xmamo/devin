@@ -16,6 +16,7 @@ module Type (
 
 import Control.Monad
 import Data.Foldable
+import Data.Functor
 import Data.List hiding (span)
 import Prelude hiding (span)
 
@@ -60,14 +61,17 @@ data Error where
 
 description :: Error -> Text
 
-description (UnknownTypeError (Syntax.Identifier _ name)) = "Unknown type " <> name
+description (UnknownTypeError (Syntax.Identifier _ name)) =
+  "Unknown type " <> name
 
-description (UnknownIdentifierError (Syntax.Identifier _ name)) = "Unknown identifier " <> name
+description (UnknownIdentifierError (Syntax.Identifier _ name)) =
+  "Unknown identifier " <> name
 
 description (UnknownFunctionError (Syntax.Identifier _ name) parameterTs) =
   "Unknown function " <> name <> "(" <> Text.pack (intercalate ", " (show <$> parameterTs)) <> ")"
 
-description (UnassignedVariableError (Syntax.Identifier _ name)) = "Unassigned variable " <> name
+description (UnassignedVariableError (Syntax.Identifier _ name)) =
+  "Unassigned variable " <> name
 
 description (InvalidUnaryError unary operandT) =
   "Cant' apply unary " <> operator <> " to " <> Text.pack (show operandT)
@@ -109,7 +113,8 @@ description (InvalidAssignError assign targetT valueT) =
 description (InvalidReturnTypeError _ expectedT resultT) =
   "Invalid return type: expected " <> Text.pack (show expectedT) <> ", but got " <> Text.pack (show resultT)
 
-description (MissingReturnValue _ expectedT) = "Missing return value: expected " <> Text.pack (show expectedT)
+description (MissingReturnValue _ expectedT) =
+  "Missing return value: expected " <> Text.pack (show expectedT)
 
 description (InvalidTypeError _ expectedT actualT) =
   "Invalid type: expected " <> Text.pack (show expectedT) <> ", but got " <> Text.pack (show actualT)
@@ -387,7 +392,6 @@ checkExpressionW environment Syntax.ParenthesizedExpression {inner} = checkExpre
 
 
 lookupT :: Bool -> Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
-
 lookupT expectInitialized environment @ (Environment ts functionTs) identifier @ (Syntax.Identifier _ name) =
   case lookup (Unicode.collate name) ts of
     Just (t, True) -> pure (t, environment)
@@ -409,7 +413,6 @@ lookupT expectInitialized environment @ (Environment ts functionTs) identifier @
 
 
 lookupFunctionT :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
-
 lookupFunctionT environment @ (Environment ts functionTs) identifier @ (Syntax.Identifier _ name) parameterTs =
   case lookup (Unicode.collate name) parameterTs functionTs of
     Just t -> pure (t, environment)
@@ -425,12 +428,9 @@ lookupFunctionT environment @ (Environment ts functionTs) identifier @ (Syntax.I
 
 
 getT :: Syntax.Identifier -> Writer [Error] Type
-getT identifier @ (Syntax.Identifier _ tName) = case Unicode.collate tName of
-  tName | tName == Unicode.collate "Int" -> pure Int
-  tName | tName == Unicode.collate "Float" -> pure Float
-  tName | tName == Unicode.collate "Bool" -> pure Bool
-  tName | tName == Unicode.collate "Unit" -> pure Unit
-
-  _ -> do
-    tell [UnknownTypeError identifier]
-    pure Error
+getT identifier @ (Syntax.Identifier _ tName)
+  | Unicode.collate tName == Unicode.collate "Int" = pure Int
+  | Unicode.collate tName == Unicode.collate "Float" = pure Float
+  | Unicode.collate tName == Unicode.collate "Bool" = pure Bool
+  | Unicode.collate tName == Unicode.collate "Unit" = pure Unit
+  | otherwise = tell [UnknownTypeError identifier] $> Error

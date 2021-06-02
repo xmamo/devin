@@ -64,7 +64,7 @@ onActivate isApplication = do
   defaultLanguage <- fromJust <$> #getLanguage languageManager "def"
 
   codeTreeStore <- new Gtk.TreeStore []
-  #setColumnTypes codeTreeStore [gtypeString, gtypeString ]
+  #setColumnTypes codeTreeStore [gtypeString, gtypeString]
 
   -- Build the UI:
 
@@ -120,7 +120,7 @@ onActivate isApplication = do
   styleScheme <- fromJust <$> #getStyleScheme codeTextBuffer
   tagTable <- #getTagTable codeTextBuffer
 
-  for_ styleIds $ \(tagName, styleId) -> do
+  for_ styleIds \(tagName, styleId) -> do
     tag <- new GtkSource.Tag [#name := tagName]
     style <- fromJust <$> Helpers.getStyle defaultLanguage styleScheme styleId
     #apply style tag
@@ -130,7 +130,7 @@ onActivate isApplication = do
 
   cellRenderer <- new Gtk.CellRendererText [#family := "monospace"]
 
-  for_ [(0, False), (1, True)] $ \(column, expand) -> do
+  for_ [(0, False), (1, True)] \(column, expand) -> do
     treeViewColumn <- new Gtk.TreeViewColumn []
     #packEnd treeViewColumn cellRenderer expand
     #addAttribute treeViewColumn cellRenderer "text" column
@@ -145,26 +145,26 @@ onActivate isApplication = do
   threadIdVar <- newMVar =<< forkIO (pure ())
   declarationsVar <- newMVar []
 
-  on codeTextBuffer #changed $ do
+  on codeTextBuffer #changed do
     text <- fromJust <$> get codeTextBuffer #text
 
     killThread =<< takeMVar threadIdVar
     swapMVar declarationsVar []
 
-    threadId <- forkIO $ do
+    putMVar threadIdVar =<< forkIO do
       let (declarations, comments) = runWriter (Parser.parseT Parsers.declarations (Input 0 text))
 
       case declarations of
         Result.Success declarations _ -> do
-          Gtk.postGUIASync $ do
+          Gtk.postGUIASync do
             swapMVar declarationsVar declarations
 
             (startTextIter, endTextIter) <- #getBounds codeTextBuffer
-            for_ styleIds $ \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
+            for_ styleIds \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
 
             insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
 
-            for_ declarations $ \declaration -> do
+            for_ declarations \declaration -> do
               highlightDeclaration codeTextBuffer declaration
               highlightDeclarationParentheses codeTextBuffer declaration insertTextIter
 
@@ -177,11 +177,11 @@ onActivate isApplication = do
 
           let errors = Type.checkDeclarations Type.defaultEnvironment declarations
 
-          Gtk.postGUIASync $ do
+          Gtk.postGUIASync do
             (startTextIter, endTextIter) <- #getBounds codeTextBuffer
             #removeTagByName codeTextBuffer "error" startTextIter endTextIter
 
-            log <- for errors $ \error -> do
+            log <- for errors \error -> do
               highlight codeTextBuffer "error" (Type.span error)
 
               startTextIter <- #getIterAtOffset codeTextBuffer (Type.start error)
@@ -190,27 +190,25 @@ onActivate isApplication = do
 
             set logTextBuffer [#text := Text.intercalate "\n" log]
 
-        Result.Failure _ position expectations -> Gtk.postGUIASync $ do
+        Result.Failure _ position expectations -> Gtk.postGUIASync do
           (startTextIter, endTextIter) <- #getBounds codeTextBuffer
           #removeTagByName codeTextBuffer "error" startTextIter endTextIter
 
           startTextIter <- #getIterAtOffset codeTextBuffer (fromIntegral position)
-          for_ styleIds $ \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
+          for_ styleIds \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
           #applyTagByName codeTextBuffer "error" startTextIter endTextIter
 
           (line, column) <- Helpers.getLineColumn startTextIter
           let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
           set logTextBuffer [#text := prefix <> Helpers.expectationsText expectations]
 
-    putMVar threadIdVar threadId
-
-  on codeTextBuffer (PropertyNotify #cursorPosition) . const . void $ do
+  on codeTextBuffer (PropertyNotify #cursorPosition) . const $ void do
     (startTextIter, endTextIter) <- #getBounds codeTextBuffer
     #removeTagByName codeTextBuffer "bracket" startTextIter endTextIter
 
     declarations <- readMVar declarationsVar
     insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
-    for_ declarations $ \declaration -> highlightDeclarationParentheses codeTextBuffer declaration insertTextIter
+    for_ declarations \declaration -> highlightDeclarationParentheses codeTextBuffer declaration insertTextIter
 
   -- Display the UI:
 
@@ -243,7 +241,7 @@ highlightDeclaration isTextBuffer = go
     highlightParameters Nothing = pure ()
 
     highlightParameters (Just ((name, _, tName), rest)) =
-      for_ ((name, tName) : [(name, tName) | (_, name, _, tName) <- rest]) $ \(name, tName) -> do
+      for_ ((name, tName) : [(name, tName) | (_, name, _, tName) <- rest]) \(name, tName) -> do
         highlight textBuffer "identifier" (Syntax.span name)
         highlight textBuffer "type" (Syntax.span tName)
 
@@ -331,8 +329,7 @@ highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go dec
 
     go Syntax.EmptyVariableDeclaration {} = pure False
 
-    go Syntax.VariableDeclaration {value} =
-      highlightExpressionParentheses textBuffer value insertTextIter
+    go Syntax.VariableDeclaration {value} = highlightExpressionParentheses textBuffer value insertTextIter
 
     go Syntax.FunctionDeclaration {open, close, body} = do
       done <- highlightParentheses textBuffer open close insertTextIter
@@ -344,6 +341,7 @@ highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go dec
 
 
 highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement b -> Gtk.TextIter -> m Bool
+
 highlightStatementParentheses isTextBuffer statement insertTextIter = go statement
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
@@ -477,7 +475,6 @@ highlightParentheses isTextBuffer open close insertTextIter = do
 highlight :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Text -> Span -> m ()
 highlight isTextBuffer tagName span = do
   let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
   startTextIter <- #getIterAtOffset textBuffer (Span.start span)
   endTextIter <- #getIterAtOffset textBuffer (Span.end span)
   #applyTagByName textBuffer tagName startTextIter endTextIter
@@ -531,7 +528,7 @@ displayDeclaration isTextBuffer isTreeStore = go
       display textBuffer treeStore treeIter colon "Token" True
       display textBuffer treeStore treeIter tName "Identifier" True
 
-      for_ rest $ \(comma, name, colon, tName) -> do
+      for_ rest \(comma, name, colon, tName) -> do
         display textBuffer treeStore treeIter comma "Token" True
         display textBuffer treeStore treeIter name "Identifier" True
         display textBuffer treeStore treeIter colon "Token" True
@@ -599,9 +596,7 @@ displayStatement isTextBuffer isTreeStore = go
       display textBuffer treeStore treeIter' close "Token" True
       pure treeIter'
 
-    displayElement treeIter (Left declaration) =
-      displayDeclaration textBuffer treeStore treeIter declaration
-
+    displayElement treeIter (Left declaration) = displayDeclaration textBuffer treeStore treeIter declaration
     displayElement treeIter (Right statement) = go treeIter statement
 
 
@@ -664,7 +659,7 @@ displayExpression isTextBuffer isTreeStore = go
     displayArguments treeIter (Just (first, rest)) = do
       go treeIter first
 
-      for_ rest $ \(comma, argument) -> do
+      for_ rest \(comma, argument) -> do
         display textBuffer treeStore treeIter comma "Token" True
         go treeIter argument
 

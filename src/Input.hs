@@ -1,7 +1,7 @@
 module Input (
   Input (..),
   position,
-  text
+  rest
 ) where
 
 import Data.Text (Text)
@@ -16,5 +16,5 @@ position :: Num a => Input -> a
 position (Input p _) = fromIntegral p
 
 
-text :: Input -> Text
-text (Input _ t) = t
+rest :: Input -> Text
+rest (Input _ t) = t
