@@ -232,7 +232,7 @@ checkDeclarationW (Environment ts functionTs) Syntax.FunctionDeclaration {name =
   returnT <- getT tName
   let functionTs' = (Unicode.collate name, parameterTs, returnT) : functionTs
   (doesReturn, _) <- checkStatementW returnT (Environment ts' functionTs') body
-  when (returnT /= Unit && not doesReturn) (tell [MissingReturnValue body returnT])
+  when (returnT `notElem` [Error, Unit] && not doesReturn) (tell [MissingReturnValue body returnT])
   pure (Environment ts functionTs')
 
 
@@ -274,6 +274,8 @@ checkStatementW expectedT environment s @ Syntax.ReturnStatement {result = Just 
     tell [InvalidReturnTypeError s expectedT resultT]
 
   pure (True, environment')
+
+checkStatementW Error environment Syntax.ReturnStatement {result = Nothing} = pure (True, environment)
 
 checkStatementW Unit environment Syntax.ReturnStatement {result = Nothing} = pure (True, environment)
 
