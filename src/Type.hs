@@ -133,7 +133,7 @@ span (MissingReturnValue statement _) = Syntax.span statement
 span (InvalidTypeError expression _ _) = Syntax.span expression
 
 
-start :: Num a => Error -> a
+start :: Integral a => Error -> a
 start (UnknownTypeError tName) = Syntax.start tName
 start (UnknownIdentifierError name) = Syntax.start name
 start (UnknownFunctionError name _) = Syntax.start name
@@ -146,7 +146,7 @@ start (MissingReturnValue statement _) = Syntax.start statement
 start (InvalidTypeError expression _ _) = Syntax.start expression
 
 
-end :: Num a => Error -> a
+end :: Integral a => Error -> a
 end (UnknownTypeError tName) = Syntax.end tName
 end (UnknownIdentifierError name) = Syntax.end name
 end (UnknownFunctionError name _) = Syntax.end name

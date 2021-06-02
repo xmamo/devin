@@ -93,7 +93,7 @@ parse :: Parser a -> Input -> Result a
 parse parser input = runIdentity (parseT parser input)
 
 
-position :: Applicative m => Num a => ParserT m a
+position :: Applicative m => Integral a => ParserT m a
 position = ParserT \input -> pure (Result.Success (Input.position input) input)
 
 

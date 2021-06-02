@@ -27,10 +27,10 @@ class Syntax a where
   span :: a -> Span
   span syntax = Span (start syntax) (end syntax)
 
-  start :: Num b => a -> b
+  start :: Integral b => a -> b
   start = Span.start . span
 
-  end :: Num b => a -> b
+  end :: Integral b => a -> b
   end = Span.end . span
 
   {-# MINIMAL span | start, end #-}

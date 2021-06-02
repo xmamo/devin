@@ -31,7 +31,7 @@ getInsertTextIter isTextBuffer = do
   #getIterAtMark textBuffer insertTextMark
 
 
-getLineColumn :: (Num a, MonadIO m) => Gtk.TextIter -> m (a, a)
+getLineColumn :: (Integral a, MonadIO m) => Gtk.TextIter -> m (a, a)
 getLineColumn textIter = do
   line <- (1 +) . fromIntegral <$> #getLine textIter
 

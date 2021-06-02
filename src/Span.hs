@@ -10,9 +10,9 @@ data Span where
   deriving (Eq, Show, Read)
 
 
-start :: Num a => Span -> a
+start :: Integral a => Span -> a
 start (Span s _) = fromIntegral s
 
 
-end :: Num a => Span -> a
+end :: Integral a => Span -> a
 end (Span _ e) = fromIntegral e
