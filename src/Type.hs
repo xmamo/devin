@@ -38,7 +38,7 @@ data Pass where
 
 
 data Environment where
-  Environment :: [(Text, Type)] -> [(Text, Type, Bool)] -> [(Text, [Type], Type)] -> Environment
+  Environment :: [(Text, Type)] -> [(Text, Type, Bool)] -> [[(Text, [Type], Type)]] -> Environment
   deriving (Eq, Show, Read)
 
 
@@ -174,7 +174,7 @@ end (InvalidTypeError expression _ _) = Syntax.end expression
 
 
 defaultEnvironment :: Environment
-defaultEnvironment = Environment ts variableTs []
+defaultEnvironment = Environment ts variableTs [[]]
   where
     ts =
       [
@@ -258,8 +258,8 @@ checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, paramet
     Pass1 -> do
       let key = Unicode.collate name
 
-      if all (\(key', parameterTs', _) -> key' /= key || parameterTs' /= parameterTs) functionTs'' then
-        pure (Environment ts'' variableTs ((key, parameterTs, returnT) : functionTs''))
+      if all (\(key', parameterTs', _) -> key' /= key || parameterTs' /= parameterTs) (head functionTs'') then
+        pure (Environment ts'' variableTs (((key, parameterTs, returnT) : head functionTs'') : tail functionTs''))
       else do
         tell [DuplicateFunctionDefinition n parameterTs]
         pure (Environment ts'' variableTs functionTs'')
@@ -313,8 +313,10 @@ checkStatementW expectedT environment s @ Syntax.ReturnStatement {result = Nothi
   pure (True, environment)
 
 checkStatementW expectedT environment Syntax.BlockStatement {elements} = do
-  environment' <- foldlM (checkDeclarationW Pass1) environment (lefts elements)
-  foldlM f (False, environment') elements
+  let Environment ts variableTs functionTs = environment
+  environment' <- foldlM (checkDeclarationW Pass1) (Environment ts variableTs ([] : functionTs)) (lefts elements)
+  (doesReturn, Environment ts'' variableTs'' functionTs'') <- foldlM f (False, environment') elements
+  pure (doesReturn, Environment ts'' variableTs'' (tail functionTs''))
     where
       f (doesReturn, environment) (Left declaration) = do
         environment' <- checkDeclarationW Pass2 environment declaration
@@ -448,16 +450,18 @@ lookupVariableTW expectInitialized environment (Syntax.Identifier span name) = d
 
 
 lookupFunctionTW :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
-lookupFunctionTW environment (Syntax.Identifier span name) parameterTs = do
-  let Environment ts variableTs functionTs = environment
-      key = Unicode.collate name
+lookupFunctionTW environment (Syntax.Identifier span name) parameterTs = go functionTs
+  where
+    Environment ts variableTs functionTs = environment
+    key = Unicode.collate name
 
-  case find (\(key', variableTs, _) -> key' == key && variableTs == parameterTs) functionTs of
-    Just (_, _, returnT) -> pure (returnT, environment)
-
-    Nothing -> do
+    go [] = do
       tell [UnknownFunctionError (Syntax.Identifier span name) parameterTs]
-      pure (Error, Environment ts variableTs ((key, parameterTs, Error) : functionTs))
+      pure (Error, Environment ts variableTs (((key, parameterTs, Error) : head functionTs) : tail functionTs))
+
+    go functionTs = case find (\(key', variableTs, _) -> key' == key && variableTs == parameterTs) (head functionTs) of
+      Just (_, _, returnT) -> pure (returnT, environment)
+      Nothing -> go (tail functionTs)
 
 
 getTW :: Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)

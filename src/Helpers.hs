@@ -19,7 +19,7 @@ expectationsText expectations = "Expected " <> go expectations
     go [] = undefined
     go [expectation] = expectation
     go [expectation1, expectation2] = expectation1 <> " or " <> expectation2
-    go (head : tail) = head <> ", " <> go tail
+    go (expectation : expectations) = expectation <> ", " <> go expectations
 
 
 getInsertTextIter :: Gtk.IsTextBuffer a => a -> IO Gtk.TextIter
