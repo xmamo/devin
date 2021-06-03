@@ -6,7 +6,6 @@ module Parser (
   satisfy,
   char,
   text,
-  regex,
   either,
   separatedBy,
   separatedBy1,
@@ -20,11 +19,9 @@ import Control.Applicative
 import Control.Monad
 import Data.Functor.Identity
 import Data.List
-import Data.Maybe
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.ICU as ICU
 
 import Control.Monad.Trans.Class
 
@@ -119,15 +116,6 @@ text :: Applicative m => Text -> ParserT m Text
 text t = ParserT \(Input position text) -> case Text.stripPrefix t text of
   Just suffix -> pure (Result.Success t (Input (position + Text.length t) suffix))
   Nothing -> pure (Result.Failure True position [Text.pack (show t)])
-
-
-regex :: Applicative m => ICU.Regex -> ParserT m ICU.Match
-regex r = ParserT \(Input position text) -> case ICU.find r text of
-  Just match | Text.null (fromJust (ICU.prefix 0 match)) -> do
-    let rest = Input (position + Text.length (fromJust (ICU.group 0 match))) (fromJust (ICU.suffix 0 match))
-    pure (Result.Success match rest)
-
-  _ -> pure (Result.Failure True position [Text.pack (show r)])
 
 
 either :: Monad m => ParserT m a -> ParserT m b -> ParserT m (Either a b)

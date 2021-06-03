@@ -23,12 +23,12 @@ import Data.List hiding (span)
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.ICU as ICU
 
 import Control.Monad.Trans.Writer
 
 import Span (Span)
 import qualified Syntax
+import qualified Unicode
 
 
 data Pass where
@@ -167,11 +167,22 @@ end (InvalidTypeError expression _ _) = Syntax.end expression
 
 
 defaultEnvironment :: Environment
-defaultEnvironment = Environment ts variableTs functionTs
+defaultEnvironment = Environment ts variableTs []
   where
-    ts = [("Int", Int), ("Float", Float), ("Bool", Bool), ("Unit", Unit)]
-    variableTs = [("true", Bool, True), ("false", Bool, True), ("unit", Unit, True)]
-    functionTs = []
+    ts =
+      [
+        (Unicode.collate "Int", Int),
+        (Unicode.collate "Float", Float),
+        (Unicode.collate "Bool", Bool),
+        (Unicode.collate "Unit", Unit)
+      ]
+
+    variableTs =
+      [
+        (Unicode.collate "true", Bool, True),
+        (Unicode.collate "false", Bool, True),
+        (Unicode.collate "unit", Unit, True)
+      ]
 
 
 checkDeclarations :: Foldable t => Environment -> t (Syntax.Declaration ()) -> [Error]
@@ -211,14 +222,14 @@ checkDeclarationW :: Pass -> Environment -> Syntax.Declaration () -> Writer [Err
 checkDeclarationW Pass2 environment Syntax.EmptyVariableDeclaration {variable, tName} = do
   let Syntax.Identifier _ variableName = variable
   (t, Environment ts' variableTs' functionTs') <- getTW environment tName
-  pure (Environment ts' ((variableName, t, False) : variableTs') functionTs')
+  pure (Environment ts' ((Unicode.collate variableName, t, False) : variableTs') functionTs')
 
 checkDeclarationW Pass2 environment Syntax.VariableDeclaration {variable, tName, value} = do
   let Syntax.Identifier _ variableName = variable
   (t, environment') <- getTW environment tName
   (valueT, Environment ts'' variableTs'' functionTs'') <- checkExpressionW environment' value
   when (t /= Error && valueT /= Error && valueT /= t) (tell [InvalidTypeError value t valueT])
-  pure (Environment ts'' ((variableName, t, True) : variableTs'') functionTs'')
+  pure (Environment ts'' ((Unicode.collate variableName, t, True) : variableTs'') functionTs'')
 
 checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, parameters, tName, body} = do
   let Environment ts variableTs functionTs = environment
@@ -230,14 +241,14 @@ checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, paramet
       where
         f (parameterTs, environment) (Syntax.Identifier _ name, tName) = do
           (t, Environment ts' variableTs' functionTs') <- getTW environment tName
-          pure (parameterTs ++ [t], Environment ts' ((name, t, True) : variableTs') functionTs')
+          pure (parameterTs ++ [t], Environment ts' ((Unicode.collate name, t, True) : variableTs') functionTs')
 
     Nothing -> pure ([], environment)
 
   (returnT, Environment ts'' variableTs'' functionTs'') <- getTW (Environment ts variableTs' functionTs') tName
 
   case pass of
-    Pass1 -> pure (Environment ts'' variableTs ((name, parameterTs, returnT) : functionTs''))
+    Pass1 -> pure (Environment ts'' variableTs ((Unicode.collate name, parameterTs, returnT) : functionTs''))
 
     Pass2 -> do
       (doesReturn, _) <- checkStatementW returnT (Environment ts'' variableTs'' functionTs) body
@@ -405,17 +416,18 @@ checkExpressionW environment Syntax.ParenthesizedExpression {inner} = checkExpre
 lookupVariableTW :: Bool -> Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
 lookupVariableTW expectInitialized environment (Syntax.Identifier span name) = do
   let Environment ts variableTs functionTs = environment
+      key = Unicode.collate name
 
-  case break (\(name', _, _) -> ICU.compare [] name' name == EQ) variableTs of
+  case break (\(key', _, _) -> key' == key) variableTs of
     (_, []) -> do
       tell [UnknownIdentifierError (Syntax.Identifier span name)]
-      pure (Error, Environment ts ((name, Error, expectInitialized) : variableTs) functionTs)
+      pure (Error, Environment ts ((key, Error, expectInitialized) : variableTs) functionTs)
 
     (_, (_, t, True) : _) -> pure (t, environment)
 
     (_, (_, t, False) : _) | expectInitialized -> do
       tell [UninitializedVariableError (Syntax.Identifier span name)]
-      pure (t, Environment ts ((name, t, True) : variableTs) functionTs)
+      pure (t, Environment ts ((key, t, True) : variableTs) functionTs)
 
     (variableTs1, (name, t, False) : variableTs2) ->
       pure (t, Environment ts (variableTs1 ++ [(name, t, True)] ++ variableTs2) functionTs)
@@ -424,22 +436,24 @@ lookupVariableTW expectInitialized environment (Syntax.Identifier span name) = d
 lookupFunctionTW :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
 lookupFunctionTW environment (Syntax.Identifier span name) parameterTs = do
   let Environment ts variableTs functionTs = environment
+      key = Unicode.collate name
 
-  case find (\(name', variableTs, _) -> ICU.compare [] name' name == EQ && variableTs == parameterTs) functionTs of
+  case find (\(key', variableTs, _) -> key' == key && variableTs == parameterTs) functionTs of
     Just (_, _, returnT) -> pure (returnT, environment)
 
     Nothing -> do
       tell [UnknownFunctionError (Syntax.Identifier span name) parameterTs]
-      pure (Error, Environment ts variableTs ((name, parameterTs, Error) : functionTs))
+      pure (Error, Environment ts variableTs ((key, parameterTs, Error) : functionTs))
 
 
 getTW :: Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
 getTW environment (Syntax.Identifier span tName) = do
   let Environment ts variableTs functionTs = environment
+      key = Unicode.collate tName
 
-  case find (\(tName', _) -> ICU.compare [] tName' tName == EQ) ts of
-    Just (_, t) -> pure (t, environment)
+  case lookup key ts of
+    Just t -> pure (t, environment)
 
     Nothing -> do
       tell [UnknownTypeError (Syntax.Identifier span tName)]
-      pure (Error, Environment ((tName, Error) : ts) variableTs functionTs)
+      pure (Error, Environment ((key, Error) : ts) variableTs functionTs)

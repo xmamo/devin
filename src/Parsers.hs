@@ -15,11 +15,9 @@ import Control.Applicative
 import Data.Char
 import Data.Foldable
 import Data.Functor
-import Data.Maybe
 
 import Data.Text (Text)
-import qualified Data.Text.ICU as ICU
-import qualified Data.Text.ICU.Char as ICU
+import qualified Data.Text as Text
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
@@ -29,6 +27,7 @@ import qualified Parser
 import Span (Span (Span))
 import Syntax (Syntax)
 import qualified Syntax
+import qualified Unicode
 
 
 type ParserW = ParserT (Writer [Syntax.Comment])
@@ -341,17 +340,31 @@ integerW = Parser.label "integer" $ syntaxW do
   pure \span -> Syntax.Integer span (sign * magnitude)
 
 
-identifierW :: ParserT (Writer [Syntax.Comment]) Syntax.Identifier
+-- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
+identifierW ::ParserW Syntax.Identifier
 identifierW = Parser.label "identifier" $ syntaxW do
-  match <- Parser.regex "\\A[\\p{L}\\p{Nl}\\p{Pc}][\\p{L}\\p{Nl}\\p{Pc}\\p{Mn}\\p{Mc}\\p{Nd}]*"
-  pure \span -> Syntax.Identifier span (fromJust (ICU.group 0 match))
+  start <- category [lu, ll, lt, lm, lo, nl, pc]
+  continue <- Text.pack <$> many (category [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
+  pure \span -> Syntax.Identifier span (Text.cons start continue)
+  where
+    category categories = Parser.satisfy \c -> Unicode.category c `elem` categories
+    lu = Unicode.UppercaseLetter
+    ll = Unicode.LowercaseLetter
+    lt = Unicode.TitlecaseLetter
+    lm = Unicode.ModifierLetter
+    lo = Unicode.OtherLetter
+    mn = Unicode.NonspacingMark
+    mc = Unicode.SpacingMark
+    nd = Unicode.DecimalNumber
+    nl = Unicode.LetterNumber
+    pc = Unicode.ConnectorPunctuation
 
 
 commentW :: ParserW Syntax.Comment
 commentW = do
   start <- Parser.position
   Parser.text "//"
-  many (Parser.satisfy (`notElem` ['\n', '\v', '\r', '\x85', '\x2028', '\x2029']))
+  many (Parser.satisfy (not . Unicode.isNewline))
   end <- Parser.position
 
   let comment = Syntax.Comment (Span start end)
@@ -360,16 +373,17 @@ commentW = do
 
 
 sW :: ParserW Syntax.Token
-sW = tokenW (many (void (some (Parser.satisfy (ICU.property ICU.WhiteSpace))) <|> void commentW))
+sW = tokenW (many (void (some (Parser.satisfy Unicode.isSpace)) <|> void commentW))
 
 
 keywordW :: Text -> ParserW Syntax.Token
 keywordW k = Parser.label ("keyword " <> k) do
   Syntax.Identifier span name <- identifierW
 
-  case ICU.compare [] name k of
-    EQ -> pure (Syntax.Token span)
-    _ -> empty
+  if Unicode.collate name == Unicode.collate k then
+    pure (Syntax.Token span)
+  else
+    empty
 
 
 tokenW :: ParserW a -> ParserW Syntax.Token
