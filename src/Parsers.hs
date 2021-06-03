@@ -35,47 +35,47 @@ type ParserW = ParserT (Writer [Syntax.Comment])
 
 
 declarations :: Applicative m => ParserT m ([Syntax.Declaration ()], [Syntax.Comment])
-declarations = runW declarationsW
+declarations = run declarationsW
 
 
 declaration :: Applicative m => ParserT m (Syntax.Declaration (), [Syntax.Comment])
-declaration = runW declarationW
+declaration = run declarationW
 
 
 statement :: Applicative m => ParserT m (Syntax.Statement (), [Syntax.Comment])
-statement = runW statementW
+statement = run statementW
 
 
 expression :: Applicative m => ParserT m (Syntax.Expression (), [Syntax.Comment])
-expression = runW expressionW
+expression = run expressionW
 
 
 unaryOperator :: Applicative m => ParserT m (Syntax.UnaryOperator, [Syntax.Comment])
-unaryOperator = runW unaryOperatorW
+unaryOperator = run unaryOperatorW
 
 
 binaryOperator :: Applicative m => ParserT m (Syntax.BinaryOperator, [Syntax.Comment])
-binaryOperator = runW binaryOperatorW
+binaryOperator = run binaryOperatorW
 
 
 assignOperator :: Applicative m => ParserT m (Syntax.AssignOperator, [Syntax.Comment])
-assignOperator = runW assignOperatorW
+assignOperator = run assignOperatorW
 
 
 integer :: Applicative m => ParserT m (Syntax.Integer, [Syntax.Comment])
-integer = runW integerW
+integer = run integerW
 
 
 identifier :: Applicative m => ParserT m (Syntax.Identifier, [Syntax.Comment])
-identifier = runW identifierW
+identifier = run identifierW
 
 
 comment :: Applicative m => ParserT m (Syntax.Comment, [Syntax.Comment])
-comment = runW commentW
+comment = run commentW
 
 
-runW :: Applicative m => ParserW a -> ParserT m (a, [Syntax.Comment])
-runW parser = ParserT \input ->
+run :: Applicative m => ParserW a -> ParserT m (a, [Syntax.Comment])
+run parser = ParserT \input ->
   let (result, comments) = runWriter (Parser.parseT parser input)
    in pure ((, comments) <$> result)
 
