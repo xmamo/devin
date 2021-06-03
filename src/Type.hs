@@ -16,10 +16,10 @@ module Type (
 ) where
 
 import Prelude hiding (span)
+import Data.Functor.Classes
 import Control.Monad
 import Data.Either
 import Data.Foldable
-import Data.List hiding (span)
 
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -43,12 +43,13 @@ data Environment where
 
 
 data Type where
-  Error :: Type
+  Unit :: Type
+  Bool :: Type
   Int :: Type
   Float :: Type
-  Bool :: Type
-  Unit :: Type
   Function :: [Type] -> Type -> Type
+  Error :: Type
+  Unknown :: Text -> Type
   deriving (Eq, Show, Read)
 
 
@@ -68,6 +69,22 @@ data Error where
   deriving (Eq, Show, Read)
 
 
+text :: Type -> Text
+text Unit = "Unit"
+text Bool = "Bool"
+text Int = "Int"
+text Float = "Float"
+text (Function parameterTs returnT) = "(" <> Text.intercalate ", " (text <$> parameterTs) <> ") -> " <> text returnT
+text Error = "⊥"
+text (Unknown name) = name
+
+
+isCompatible :: Type -> Type -> Bool
+isCompatible Error _ = True
+isCompatible _ Error = True
+isCompatible t1 t2 = t1 == t2
+
+
 description :: Error -> Text
 
 description (UnknownTypeError (Syntax.Identifier _ name)) =
@@ -77,16 +94,16 @@ description (UnknownIdentifierError (Syntax.Identifier _ name)) =
   "Unknown identifier " <> name
 
 description (UnknownFunctionError (Syntax.Identifier _ name) parameterTs) =
-  "Unknown function " <> name <> "(" <> Text.pack (intercalate ", " (show <$> parameterTs)) <> ")"
+  "Unknown function " <> name <> "(" <> Text.intercalate ", " (text <$> parameterTs) <> ")"
 
 description (DuplicateFunctionDefinition (Syntax.Identifier _ name) parameterTs) =
-  "Function " <> name <> "(" <> Text.pack (intercalate ", " (show <$> parameterTs)) <> ") already defined"
+  "Function " <> name <> "(" <> Text.intercalate ", " (text <$> parameterTs) <> ") already defined"
 
 description (UninitializedVariableError (Syntax.Identifier _ name)) =
   "Uninitialized variable " <> name
 
 description (InvalidUnaryError unary operandT) =
-  "Cant' apply unary " <> operator <> " to " <> Text.pack (show operandT)
+  "Can’t apply unary " <> operator <> " to " <> text operandT
   where
     operator = case unary of
       Syntax.PlusOperator _ -> "+"
@@ -94,7 +111,7 @@ description (InvalidUnaryError unary operandT) =
       Syntax.NotOperator _ -> "not"
 
 description (InvalidBinaryError binary leftT rightT) =
-  "Can't apply binary " <> operator <> " to " <> Text.pack (show leftT) <> " and " <> Text.pack (show rightT)
+  "Can’t apply binary " <> operator <> " between " <> text leftT <> " and " <> text rightT
   where
     operator = case binary of
       Syntax.AddOperator _ -> "+"
@@ -112,7 +129,7 @@ description (InvalidBinaryError binary leftT rightT) =
       Syntax.OrOperator _ -> "or"
 
 description (InvalidAssignError assign targetT valueT) =
-  "Can't apply assign " <> operator <> " to " <> Text.pack (show targetT) <> " and " <> Text.pack (show valueT)
+  "Can’t apply assign " <> operator <> " to " <> text targetT <> " and " <> text valueT
   where
     operator = case assign of
       Syntax.AssignOperator _ -> "="
@@ -123,16 +140,16 @@ description (InvalidAssignError assign targetT valueT) =
       Syntax.RemainderAssignOperator _ -> "%="
 
 description (InvalidTypeError _ expectedT actualT) =
-  "Invalid type: expected " <> Text.pack (show expectedT) <> ", but got " <> Text.pack (show actualT)
+  "Invalid type: expected " <> text expectedT <> ", but got " <> text actualT
 
 description (InvalidReturnTypeError _ expectedT resultT) =
-  "Invalid return type: expected " <> Text.pack (show expectedT) <> ", but got " <> Text.pack (show resultT)
+  "Invalid return type: expected " <> text expectedT <> ", but got " <> text resultT
 
 description (MissingReturnValueError _ expectedT) =
-  "Missing return value: expected " <> Text.pack (show expectedT)
+  "Missing return value: expected " <> text expectedT
 
 description (MissingReturnPathError (Syntax.Identifier _ name) parameterTs) =
-  name <> "(" <> Text.pack (intercalate ", " (show <$> parameterTs)) <> "): not all code paths return a value"
+  name <> "(" <> Text.intercalate ", " (text <$> parameterTs) <> "): not all code paths return a value"
 
 
 span :: Error -> Span
@@ -185,17 +202,17 @@ defaultEnvironment = Environment ts variableTs [[]]
   where
     ts =
       [
-        (Unicode.collate "Int", Int),
-        (Unicode.collate "Float", Float),
+        (Unicode.collate "Unit", Unit),
         (Unicode.collate "Bool", Bool),
-        (Unicode.collate "Unit", Unit)
+        (Unicode.collate "Int", Int),
+        (Unicode.collate "Float", Float)
       ]
 
     variableTs =
       [
+        (Unicode.collate "unit", Unit, True),
         (Unicode.collate "true", Bool, True),
-        (Unicode.collate "false", Bool, True),
-        (Unicode.collate "unit", Unit, True)
+        (Unicode.collate "false", Bool, True)
       ]
 
 
@@ -242,7 +259,7 @@ checkDeclarationW Pass2 environment Syntax.VariableDeclaration {variable, tName,
   let Syntax.Identifier _ variableName = variable
   (t, environment') <- getTW environment tName
   (valueT, Environment ts'' variableTs'' functionTs'') <- checkExpressionW environment' value
-  when (t /= Error && valueT /= Error && valueT /= t) (tell [InvalidTypeError value t valueT])
+  unless (isCompatible valueT t) (tell [InvalidTypeError value t valueT])
   pure (Environment ts'' ((Unicode.collate variableName, t, True) : variableTs'') functionTs'')
 
 checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, parameters, tName, body} = do
@@ -251,7 +268,7 @@ checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, paramet
 
   (parameterTs, Environment _ variableTs' functionTs') <- case parameters of
     Just ((name, _, tName), rest) ->
-      foldlM f ([], environment) ((name, tName) : [(name, tName) | (_, name, _, tName) <- rest])
+      foldlM f ([], environment) ((name, tName) : [(n, tn) | (_, n, _, tn) <- rest])
       where
         f (parameterTs, environment) (Syntax.Identifier _ name, tName) = do
           (t, Environment ts' variableTs' functionTs') <- getTW environment tName
@@ -265,15 +282,15 @@ checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, paramet
     Pass1 -> do
       let key = Unicode.collate name
 
-      if all (\(key', parameterTs', _) -> key' /= key || parameterTs' /= parameterTs) (head functionTs'') then
-        pure (Environment ts'' variableTs (((key, parameterTs, returnT) : head functionTs'') : tail functionTs''))
-      else do
+      if any (\(k, ts, _) -> k == key && liftEq isCompatible ts parameterTs) (head functionTs'') then do
         tell [DuplicateFunctionDefinition n parameterTs]
         pure (Environment ts'' variableTs functionTs'')
+      else
+        pure (Environment ts'' variableTs (((key, parameterTs, returnT) : head functionTs'') : tail functionTs''))
 
     Pass2 -> do
       (doesReturn, _) <- checkStatementW returnT (Environment ts'' variableTs'' functionTs) body
-      when (returnT `notElem` [Error, Unit] && not doesReturn) (tell [MissingReturnPathError n parameterTs])
+      unless (isCompatible returnT Unit || doesReturn) (tell [MissingReturnPathError n parameterTs])
       pure (Environment ts'' variableTs functionTs)
 
 checkDeclarationW Pass1 environment _ = pure environment
@@ -287,36 +304,36 @@ checkStatementW _ environment Syntax.ExpressionStatement {value} = do
 
 checkStatementW expectedT environment Syntax.IfStatement {predicate, trueBranch} = do
   (predicateT, environment') <- checkExpressionW environment predicate
-  when (predicateT /= Bool) (tell [InvalidTypeError predicate Bool predicateT])
+  unless (isCompatible predicateT Bool) (tell [InvalidTypeError predicate Bool predicateT])
   (_, environment'') <- checkStatementW expectedT environment' trueBranch
   pure (False, environment'')
 
 checkStatementW expectedT environment Syntax.IfElseStatement {predicate, trueBranch, falseBranch} = do
   (predicateT, environment') <- checkExpressionW environment predicate
-  when (predicateT /= Bool) (tell [InvalidTypeError predicate Bool predicateT])
+  unless (isCompatible predicateT Bool) (tell [InvalidTypeError predicate Bool predicateT])
   (doesTrueBranchReturn, environment'') <- checkStatementW expectedT environment' trueBranch
   (doesFalseBrachReturn, environment''') <- checkStatementW expectedT environment'' falseBranch
   pure (doesTrueBranchReturn && doesFalseBrachReturn, environment''')
 
 checkStatementW expectedT environment Syntax.WhileStatement {predicate, body} = do
   (predicateT, environment') <- checkExpressionW environment predicate
-  when (predicateT /= Bool) (tell [InvalidTypeError predicate Bool predicateT])
+  unless (isCompatible predicateT Bool) (tell [InvalidTypeError predicate Bool predicateT])
   (_, environment'') <- checkStatementW expectedT environment' body
   pure (False, environment'')
 
 checkStatementW expectedT environment Syntax.DoWhileStatement {body, predicate} = do
   (doesReturn, environment') <- checkStatementW expectedT environment body
   (predicateT, environment'') <- checkExpressionW environment' predicate
-  when (predicateT /= Bool) (tell [InvalidTypeError predicate Bool predicateT])
+  unless (isCompatible predicateT Bool) (tell [InvalidTypeError predicate Bool predicateT])
   pure (doesReturn, environment'')
 
 checkStatementW expectedT environment s @ Syntax.ReturnStatement {result = Just result} = do
   (resultT, environment') <- checkExpressionW environment result
-  when (expectedT /= Error && resultT `notElem` [expectedT, Error]) (tell [InvalidReturnTypeError s expectedT resultT])
+  unless (isCompatible resultT expectedT) (tell [InvalidReturnTypeError s expectedT resultT])
   pure (True, environment')
 
 checkStatementW expectedT environment s @ Syntax.ReturnStatement {result = Nothing} = do
-  when (expectedT `notElem` [Error, Unit]) (tell [MissingReturnValueError s expectedT])
+  unless (isCompatible expectedT Unit) (tell [MissingReturnValueError s expectedT])
   pure (True, environment)
 
 checkStatementW expectedT environment Syntax.BlockStatement {elements} = do
@@ -324,14 +341,14 @@ checkStatementW expectedT environment Syntax.BlockStatement {elements} = do
   environment' <- foldlM (checkDeclarationW Pass1) (Environment ts variableTs ([] : functionTs)) (lefts elements)
   (doesReturn, Environment ts'' variableTs'' functionTs'') <- foldlM f (False, environment') elements
   pure (doesReturn, Environment ts'' variableTs'' (tail functionTs''))
-    where
-      f (doesReturn, environment) (Left declaration) = do
-        environment' <- checkDeclarationW Pass2 environment declaration
-        pure (doesReturn, environment')
+  where
+    f (doesReturn, environment) (Left declaration) = do
+      environment' <- checkDeclarationW Pass2 environment declaration
+      pure (doesReturn, environment')
 
-      f (doesReturn, environment) (Right statement) = do
-        (doesReturn', environment') <- checkStatementW expectedT environment statement
-        pure (doesReturn || doesReturn', environment')
+    f (doesReturn, environment) (Right statement) = do
+      (doesReturn', environment') <- checkStatementW expectedT environment statement
+      pure (doesReturn || doesReturn', environment')
 
 
 checkExpressionW :: Environment -> Syntax.Expression () -> Writer [Error] (Type, Environment)
@@ -350,10 +367,7 @@ checkExpressionW environment Syntax.CallExpression {target, arguments} = do
 
     Nothing -> pure ([], environment)
 
-  if Error `notElem` argumentTs then
-    lookupFunctionTW environment' target argumentTs
-  else
-    pure (Error, environment')
+  lookupFunctionTW environment' target argumentTs
 
 checkExpressionW environment Syntax.UnaryExpression {unary, operand} = do
   (operandT, environment') <- checkExpressionW environment operand
@@ -441,7 +455,7 @@ lookupVariableTW expectInitialized environment (Syntax.Identifier span name) = d
   let Environment ts variableTs functionTs = environment
       key = Unicode.collate name
 
-  case break (\(key', _, _) -> key' == key) variableTs of
+  case break (\(k, _, _) -> k == key) variableTs of
     (_, []) -> do
       tell [UnknownIdentifierError (Syntax.Identifier span name)]
       pure (Error, Environment ts ((key, Error, expectInitialized) : variableTs) functionTs)
@@ -452,8 +466,7 @@ lookupVariableTW expectInitialized environment (Syntax.Identifier span name) = d
       tell [UninitializedVariableError (Syntax.Identifier span name)]
       pure (t, Environment ts ((key, t, True) : variableTs) functionTs)
 
-    (variableTs1, (name, t, False) : variableTs2) ->
-      pure (t, Environment ts (variableTs1 ++ [(name, t, True)] ++ variableTs2) functionTs)
+    (ts1, (name, t, False) : ts2) -> pure (t, Environment ts (ts1 ++ [(name, t, True)] ++ ts2) functionTs)
 
 
 lookupFunctionTW :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
@@ -466,8 +479,9 @@ lookupFunctionTW environment (Syntax.Identifier span name) parameterTs = go func
       tell [UnknownFunctionError (Syntax.Identifier span name) parameterTs]
       pure (Error, Environment ts variableTs (((key, parameterTs, Error) : head functionTs) : tail functionTs))
 
-    go functionTs = case find (\(key', variableTs, _) -> key' == key && variableTs == parameterTs) (head functionTs) of
-      Just (_, _, returnT) -> pure (returnT, environment)
+    go functionTs = case find (\(k, ts, _) -> k == key && liftEq isCompatible ts parameterTs) (head functionTs) of
+      Just (_, _, returnT) | Error `notElem` parameterTs -> pure (returnT, environment)
+      Just _ -> pure (Error, environment)
       Nothing -> go (tail functionTs)
 
 
@@ -481,4 +495,4 @@ getTW environment (Syntax.Identifier span tName) = do
 
     Nothing -> do
       tell [UnknownTypeError (Syntax.Identifier span tName)]
-      pure (Error, Environment ((key, Error) : ts) variableTs functionTs)
+      pure (Unknown tName, Environment ((key, Error) : ts) variableTs functionTs)
