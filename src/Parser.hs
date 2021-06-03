@@ -55,37 +55,37 @@ instance Monad m => Applicative (ParserT m) where
 
   parser1 <*> parser2 = ParserT $ parseT parser1 >=> \case
     Result.Success f rest -> fmap f <$> parseT parser2 rest
-    Result.Failure recoverable position expectations -> pure (Result.Failure recoverable position expectations)
+    Result.Failure isFatal position expectations -> pure (Result.Failure isFatal position expectations)
 
 
 instance Monad m => Monad (ParserT m) where
   parser >>= f = ParserT $ parseT parser >=> \case
     Result.Success value rest -> parseT (f value) rest
-    Result.Failure recoverable position expectations -> pure (Result.Failure recoverable position expectations)
+    Result.Failure isFatal position expectations -> pure (Result.Failure isFatal position expectations)
 
 
 instance Monad m => MonadFail (ParserT m) where
-  fail label = ParserT \(Input position _) -> pure (Result.Failure True position [Text.pack label])
+  fail label = ParserT \(Input position _) -> pure (Result.Failure False position [Text.pack label])
 
 
 instance Monad m => Alternative (ParserT m) where
-  empty = ParserT \(Input position _) -> pure (Result.Failure True position [])
+  empty = ParserT \(Input position _) -> pure (Result.Failure False position [])
 
   -- TODO: This is probably not associative
   parser1 <|> parser2 = ParserT \input -> parseT parser1 input >>= \case
     Result.Success value rest -> pure (Result.Success value rest)
 
-    Result.Failure True position1 expectations1 -> parseT parser2 input >>= \case
+    Result.Failure True position expectations -> pure (Result.Failure True position expectations)
+
+    Result.Failure False position1 expectations1 -> parseT parser2 input >>= \case
       Result.Success value rest -> pure (Result.Success value rest)
 
-      Result.Failure recoverable2 position2 expectations2 -> case compare position1 position2 of
-        LT | null expectations2 && not (null expectations1) -> pure (Result.Failure recoverable2 position1 expectations1)
-        LT -> pure (Result.Failure recoverable2 position2 expectations2)
-        EQ -> pure (Result.Failure recoverable2 position1 (expectations1 `union` expectations2))
-        GT | null expectations1 && not (null expectations2) -> pure (Result.Failure recoverable2 position2 expectations2)
-        GT -> pure (Result.Failure recoverable2 position1 expectations1)
-
-    Result.Failure False position expectations -> pure (Result.Failure False position expectations)
+      Result.Failure isFatal position2 expectations2 -> case compare position1 position2 of
+        LT | null expectations2 && not (null expectations1) -> pure (Result.Failure isFatal position1 expectations1)
+        LT -> pure (Result.Failure isFatal position2 expectations2)
+        EQ -> pure (Result.Failure isFatal position1 (expectations1 `union` expectations2))
+        GT | null expectations1 && not (null expectations2) -> pure (Result.Failure isFatal position2 expectations2)
+        GT -> pure (Result.Failure isFatal position1 expectations1)
 
 
 instance MonadTrans ParserT where
@@ -103,19 +103,19 @@ position = ParserT \input -> pure (Result.Success (Input.position input) input)
 satisfy :: Applicative m => (Char -> Bool) -> ParserT m Char
 satisfy f = ParserT \(Input position text) -> case Text.uncons text of
   Just (head, tail) | f head -> pure (Result.Success head (Input (position + 1) tail))
-  _ -> pure (Result.Failure True position [])
+  _ -> pure (Result.Failure False position [])
 
 
 char :: Applicative m => Char -> ParserT m Char
 char c = ParserT \(Input position text) -> case Text.stripPrefix (Text.singleton c) text of
   Just suffix -> pure (Result.Success c (Input (position + 1) suffix))
-  Nothing -> pure (Result.Failure True position [Text.pack (show c)])
+  Nothing -> pure (Result.Failure False position [Text.pack (show c)])
 
 
 text :: Applicative m => Text -> ParserT m Text
 text t = ParserT \(Input position text) -> case Text.stripPrefix t text of
   Just suffix -> pure (Result.Success t (Input (position + Text.length t) suffix))
-  Nothing -> pure (Result.Failure True position [Text.pack (show t)])
+  Nothing -> pure (Result.Failure False position [Text.pack (show t)])
 
 
 either :: Monad m => ParserT m a -> ParserT m b -> ParserT m (Either a b)
@@ -139,7 +139,7 @@ label l parser = ParserT \input @ (Input position _) -> parseT parser input >>= 
 commit :: Monad m => ParserT m a -> ParserT m a
 commit parser = ParserT $ parseT parser >=> \case
   Result.Success value rest -> pure (Result.Success value rest)
-  Result.Failure _ position expectations -> pure (Result.Failure False position expectations)
+  Result.Failure _ position expectations -> pure (Result.Failure True position expectations)
 
 
 eoi :: Applicative m => ParserT m ()
@@ -147,4 +147,4 @@ eoi = ParserT \input @ (Input position text) ->
   if Text.null text then
     pure (Result.Success () input)
   else
-    pure (Result.Failure True position ["end of input"])
+    pure (Result.Failure False position ["end of input"])
