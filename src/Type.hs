@@ -61,9 +61,10 @@ data Error where
   InvalidUnaryError :: Syntax.UnaryOperator -> Type -> Error
   InvalidBinaryError :: Syntax.BinaryOperator -> Type -> Type -> Error
   InvalidAssignError :: Syntax.AssignOperator -> Type -> Type -> Error
+  InvalidTypeError :: Syntax.Expression () -> Type -> Type -> Error
   InvalidReturnTypeError :: Syntax.Statement () -> Type -> Type -> Error
   MissingReturnValueError :: Syntax.Statement () -> Type -> Error
-  InvalidTypeError :: Syntax.Expression () -> Type -> Type -> Error
+  MissingReturnPathError :: Syntax.Identifier -> [Type] -> Error
   deriving (Eq, Show, Read)
 
 
@@ -121,14 +122,17 @@ description (InvalidAssignError assign targetT valueT) =
       Syntax.DivideAssignOperator _ -> "/="
       Syntax.RemainderAssignOperator _ -> "%="
 
+description (InvalidTypeError _ expectedT actualT) =
+  "Invalid type: expected " <> Text.pack (show expectedT) <> ", but got " <> Text.pack (show actualT)
+
 description (InvalidReturnTypeError _ expectedT resultT) =
   "Invalid return type: expected " <> Text.pack (show expectedT) <> ", but got " <> Text.pack (show resultT)
 
 description (MissingReturnValueError _ expectedT) =
   "Missing return value: expected " <> Text.pack (show expectedT)
 
-description (InvalidTypeError _ expectedT actualT) =
-  "Invalid type: expected " <> Text.pack (show expectedT) <> ", but got " <> Text.pack (show actualT)
+description (MissingReturnPathError (Syntax.Identifier _ name) parameterTs) =
+  name <> "(" <> Text.pack (intercalate ", " (show <$> parameterTs)) <> "): not all code paths return a value"
 
 
 span :: Error -> Span
@@ -140,9 +144,10 @@ span (UninitializedVariableError variable) = Syntax.span variable
 span (InvalidUnaryError unary _) = Syntax.span unary
 span (InvalidBinaryError binary _ _) = Syntax.span binary
 span (InvalidAssignError assign _ _) = Syntax.span assign
+span (InvalidTypeError expression _ _) = Syntax.span expression
 span (InvalidReturnTypeError statement _ _) = Syntax.span statement
 span (MissingReturnValueError statement _) = Syntax.span statement
-span (InvalidTypeError expression _ _) = Syntax.span expression
+span (MissingReturnPathError name _) = Syntax.span name
 
 
 start :: Integral a => Error -> a
@@ -154,9 +159,10 @@ start (UninitializedVariableError variable) = Syntax.start variable
 start (InvalidUnaryError unary _) = Syntax.start unary
 start (InvalidBinaryError binary _ _) = Syntax.start binary
 start (InvalidAssignError assign _ _) = Syntax.start assign
+start (InvalidTypeError expression _ _) = Syntax.start expression
 start (InvalidReturnTypeError statement _ _) = Syntax.start statement
 start (MissingReturnValueError statement _) = Syntax.start statement
-start (InvalidTypeError expression _ _) = Syntax.start expression
+start (MissingReturnPathError name _) = Syntax.start name
 
 
 end :: Integral a => Error -> a
@@ -168,9 +174,10 @@ end (UninitializedVariableError variable) = Syntax.end variable
 end (InvalidUnaryError unary _) = Syntax.end unary
 end (InvalidBinaryError binary _ _) = Syntax.end binary
 end (InvalidAssignError assign _ _) = Syntax.end assign
+end (InvalidTypeError expression _ _) = Syntax.end expression
 end (InvalidReturnTypeError statement _ _) = Syntax.end statement
 end (MissingReturnValueError statement _) = Syntax.end statement
-end (InvalidTypeError expression _ _) = Syntax.end expression
+end (MissingReturnPathError name _) = Syntax.end name
 
 
 defaultEnvironment :: Environment
@@ -266,7 +273,7 @@ checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, paramet
 
     Pass2 -> do
       (doesReturn, _) <- checkStatementW returnT (Environment ts'' variableTs'' functionTs) body
-      when (returnT `notElem` [Error, Unit] && not doesReturn) (tell [MissingReturnValueError body returnT])
+      when (returnT `notElem` [Error, Unit] && not doesReturn) (tell [MissingReturnPathError n parameterTs])
       pure (Environment ts'' variableTs functionTs)
 
 checkDeclarationW Pass1 environment _ = pure environment
