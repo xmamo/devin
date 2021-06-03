@@ -7,8 +7,6 @@ module Helpers (
 
 import Data.Text (Text)
 
-import Control.Monad.IO.Class
-
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
 import qualified GI.GtkSource as GtkSource
@@ -24,14 +22,14 @@ expectationsText expectations = "Expected " <> go expectations
     go (head : tail) = head <> ", " <> go tail
 
 
-getInsertTextIter :: (Gtk.IsTextBuffer a, MonadIO m) => a -> m Gtk.TextIter
+getInsertTextIter :: Gtk.IsTextBuffer a => a -> IO Gtk.TextIter
 getInsertTextIter isTextBuffer = do
   let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
   insertTextMark <- #getInsert textBuffer
   #getIterAtMark textBuffer insertTextMark
 
 
-getLineColumn :: (Integral a, MonadIO m) => Gtk.TextIter -> m (a, a)
+getLineColumn :: Integral a => Gtk.TextIter -> IO (a, a)
 getLineColumn textIter = do
   line <- (1 +) . fromIntegral <$> #getLine textIter
 
@@ -51,10 +49,7 @@ getLineColumn textIter = do
   pure (line, column)
 
 
-getStyle ::
-  (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b, MonadIO m) =>
-  a -> b -> Text -> m (Maybe GtkSource.Style)
-
+getStyle :: (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b) => a -> b -> Text -> IO (Maybe GtkSource.Style)
 getStyle isLanguage isStyleScheme styleId = go styleId []
   where
     language = isLanguage `asA` GtkSource.Language

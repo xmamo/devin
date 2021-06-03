@@ -2,7 +2,6 @@ module Main (main) where
 
 import Control.Concurrent
 import Control.Monad
-import Control.Monad.IO.Class
 import Data.Foldable
 import Data.Maybe
 import Data.Traversable
@@ -210,7 +209,7 @@ onActivate isApplication = do
   #showAll window
 
 
-highlightDeclaration :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration b -> m ()
+highlightDeclaration :: Gtk.IsTextBuffer a => a -> Syntax.Declaration b -> IO ()
 highlightDeclaration isTextBuffer = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
@@ -241,7 +240,7 @@ highlightDeclaration isTextBuffer = go
         highlight textBuffer "type" (Syntax.span tName)
 
 
-highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement b -> m ()
+highlightStatement :: Gtk.IsTextBuffer a => a -> Syntax.Statement b -> IO ()
 highlightStatement isTextBuffer = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
@@ -281,7 +280,7 @@ highlightStatement isTextBuffer = go
     highlightElement (Right statement) = go statement
 
 
-highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression b -> m ()
+highlightExpression :: Gtk.IsTextBuffer a => a -> Syntax.Expression b -> IO ()
 highlightExpression isTextBuffer = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
@@ -314,10 +313,7 @@ highlightExpression isTextBuffer = go
     highlightArguments (Just (first, rest)) = for_ (first : map snd rest) go
 
 
-highlightDeclarationParentheses ::
-  (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Syntax.Declaration b -> Gtk.TextIter -> m Bool
-
+highlightDeclarationParentheses :: Gtk.IsTextBuffer a => a -> Syntax.Declaration b -> Gtk.TextIter -> IO Bool
 highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go declaration
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
@@ -335,8 +331,7 @@ highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go dec
         highlightStatementParentheses textBuffer body insertTextIter
 
 
-highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement b -> Gtk.TextIter -> m Bool
-
+highlightStatementParentheses :: Gtk.IsTextBuffer a => a -> Syntax.Statement b -> Gtk.TextIter -> IO Bool
 highlightStatementParentheses isTextBuffer statement insertTextIter = go statement
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
@@ -398,7 +393,7 @@ highlightStatementParentheses isTextBuffer statement insertTextIter = go stateme
     highlightElementParentheses (Right statement) = go statement
 
 
-highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression b -> Gtk.TextIter -> m Bool
+highlightExpressionParentheses :: Gtk.IsTextBuffer a => a -> Syntax.Expression b -> Gtk.TextIter -> IO Bool
 highlightExpressionParentheses isTextBuffer expression insertTextIter = go expression
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
@@ -446,7 +441,7 @@ highlightExpressionParentheses isTextBuffer expression insertTextIter = go expre
         foldlM (\a (_, e) -> if a then pure True else go e) False rest
 
 
-highlightParentheses :: (Gtk.IsTextBuffer a, Syntax b, Syntax c, MonadIO m) => a -> b -> c -> Gtk.TextIter -> m Bool
+highlightParentheses :: (Gtk.IsTextBuffer a, Syntax b, Syntax c) => a -> b -> c -> Gtk.TextIter -> IO Bool
 highlightParentheses isTextBuffer open close insertTextIter = do
   let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
@@ -467,7 +462,7 @@ highlightParentheses isTextBuffer open close insertTextIter = do
     pure False
 
 
-highlight :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Text -> Span -> m ()
+highlight :: Gtk.IsTextBuffer a => a -> Text -> Span -> IO ()
 highlight isTextBuffer tagName span = do
   let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
   startTextIter <- #getIterAtOffset textBuffer (Span.start span)
