@@ -56,6 +56,7 @@ data Error where
   UnknownTypeError :: Syntax.Identifier -> Error
   UnknownIdentifierError :: Syntax.Identifier -> Error
   UnknownFunctionError :: Syntax.Identifier -> [Type] -> Error
+  DuplicateFunctionDefinition :: Syntax.Identifier -> [Type] -> Error
   UninitializedVariableError :: Syntax.Identifier -> Error
   InvalidUnaryError :: Syntax.UnaryOperator -> Type -> Error
   InvalidBinaryError :: Syntax.BinaryOperator -> Type -> Type -> Error
@@ -76,6 +77,9 @@ description (UnknownIdentifierError (Syntax.Identifier _ name)) =
 
 description (UnknownFunctionError (Syntax.Identifier _ name) parameterTs) =
   "Unknown function " <> name <> "(" <> Text.pack (intercalate ", " (show <$> parameterTs)) <> ")"
+
+description (DuplicateFunctionDefinition (Syntax.Identifier _ name) parameterTs) =
+  "Function " <> name <> "(" <> Text.pack (intercalate ", " (show <$> parameterTs)) <> ") already defined"
 
 description (UninitializedVariableError (Syntax.Identifier _ name)) =
   "Uninitialized variable " <> name
@@ -131,6 +135,7 @@ span :: Error -> Span
 span (UnknownTypeError tName) = Syntax.span tName
 span (UnknownIdentifierError name) = Syntax.span name
 span (UnknownFunctionError name _) = Syntax.span name
+span (DuplicateFunctionDefinition name _) = Syntax.span name
 span (UninitializedVariableError variable) = Syntax.span variable
 span (InvalidUnaryError unary _) = Syntax.span unary
 span (InvalidBinaryError binary _ _) = Syntax.span binary
@@ -144,6 +149,7 @@ start :: Integral a => Error -> a
 start (UnknownTypeError tName) = Syntax.start tName
 start (UnknownIdentifierError name) = Syntax.start name
 start (UnknownFunctionError name _) = Syntax.start name
+start (DuplicateFunctionDefinition name _) = Syntax.start name
 start (UninitializedVariableError variable) = Syntax.start variable
 start (InvalidUnaryError unary _) = Syntax.start unary
 start (InvalidBinaryError binary _ _) = Syntax.start binary
@@ -157,6 +163,7 @@ end :: Integral a => Error -> a
 end (UnknownTypeError tName) = Syntax.end tName
 end (UnknownIdentifierError name) = Syntax.end name
 end (UnknownFunctionError name _) = Syntax.end name
+end (DuplicateFunctionDefinition name _) = Syntax.end name
 end (UninitializedVariableError variable) = Syntax.end variable
 end (InvalidUnaryError unary _) = Syntax.end unary
 end (InvalidBinaryError binary _ _) = Syntax.end binary
@@ -248,7 +255,14 @@ checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, paramet
   (returnT, Environment ts'' variableTs'' functionTs'') <- getTW (Environment ts variableTs' functionTs') tName
 
   case pass of
-    Pass1 -> pure (Environment ts'' variableTs ((Unicode.collate name, parameterTs, returnT) : functionTs''))
+    Pass1 -> do
+      let key = Unicode.collate name
+
+      if all (\(key', parameterTs', _) -> key' /= key || parameterTs' /= parameterTs) functionTs'' then
+        pure (Environment ts'' variableTs ((key, parameterTs, returnT) : functionTs''))
+      else do
+        tell [DuplicateFunctionDefinition n parameterTs]
+        pure (Environment ts'' variableTs functionTs'')
 
     Pass2 -> do
       (doesReturn, _) <- checkStatementW returnT (Environment ts'' variableTs'' functionTs) body
