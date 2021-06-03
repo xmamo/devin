@@ -6,6 +6,7 @@ module Parser (
   satisfy,
   char,
   text,
+  regex,
   either,
   separatedBy,
   separatedBy1,
@@ -14,16 +15,18 @@ module Parser (
   eoi
 ) where
 
+import Prelude hiding (either)
 import Control.Applicative
 import Control.Monad
 import Data.Functor.Identity
 import Data.List
-import Prelude hiding (either)
-
-import Control.Monad.Trans.Class
+import Data.Maybe
 
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.ICU as ICU
+
+import Control.Monad.Trans.Class
 
 import Input (Input (Input))
 import qualified Input
@@ -101,21 +104,30 @@ position = ParserT \input -> pure (Result.Success (Input.position input) input)
 
 
 satisfy :: Applicative m => (Char -> Bool) -> ParserT m Char
-satisfy f = ParserT \(Input position rest) -> case Text.uncons rest of
+satisfy f = ParserT \(Input position text) -> case Text.uncons text of
   Just (head, tail) | f head -> pure (Result.Success head (Input (position + 1) tail))
   _ -> pure (Result.Failure True position [])
 
 
 char :: Applicative m => Char -> ParserT m Char
-char c = ParserT \(Input position rest) -> case Text.stripPrefix (Text.singleton c) rest of
-  Just rest -> pure (Result.Success c (Input (position + 1) rest))
+char c = ParserT \(Input position text) -> case Text.stripPrefix (Text.singleton c) text of
+  Just suffix -> pure (Result.Success c (Input (position + 1) suffix))
   Nothing -> pure (Result.Failure True position [Text.pack (show c)])
 
 
 text :: Applicative m => Text -> ParserT m Text
-text t = ParserT \(Input position rest) -> case Text.stripPrefix t rest of
-  Just rest -> pure (Result.Success t (Input (position + Text.length t) rest))
+text t = ParserT \(Input position text) -> case Text.stripPrefix t text of
+  Just suffix -> pure (Result.Success t (Input (position + Text.length t) suffix))
   Nothing -> pure (Result.Failure True position [Text.pack (show t)])
+
+
+regex :: Applicative m => ICU.Regex -> ParserT m ICU.Match
+regex r = ParserT \(Input position text) -> case ICU.find r text of
+  Just match | Text.null (fromJust (ICU.prefix 0 match)) -> do
+    let rest = Input (position + Text.length (fromJust (ICU.group 0 match))) (fromJust (ICU.suffix 0 match))
+    pure (Result.Success match rest)
+
+  _ -> pure (Result.Failure True position [Text.pack (show r)])
 
 
 either :: Monad m => ParserT m a -> ParserT m b -> ParserT m (Either a b)
@@ -143,8 +155,8 @@ commit parser = ParserT $ parseT parser >=> \case
 
 
 eoi :: Applicative m => ParserT m ()
-eoi = ParserT \input @ (Input position rest) ->
-  if Text.null rest then
+eoi = ParserT \input @ (Input position text) ->
+  if Text.null text then
     pure (Result.Success () input)
   else
     pure (Result.Failure True position ["end of input"])

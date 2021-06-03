@@ -144,7 +144,7 @@ onActivate isApplication = do
   declarationsVar <- newMVar []
 
   on codeTextBuffer #changed do
-    text <- fromJust <$> get codeTextBuffer #text
+    text <- fromMaybe "" <$> get codeTextBuffer #text
 
     killThread =<< takeMVar threadIdVar
     swapMVar declarationsVar []

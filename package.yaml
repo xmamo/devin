@@ -42,8 +42,9 @@ default-extensions:
 
 dependencies:
   - base
-  - transformers
   - text
+  - text-icu
+  - transformers
   - haskell-gi-base
   - gi-glib
   - gi-gio

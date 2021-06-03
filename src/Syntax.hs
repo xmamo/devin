@@ -13,9 +13,9 @@ module Syntax (
   comparePrecedence
 ) where
 
-import Data.Ord
 import Prelude hiding (Integer, span)
 import qualified Prelude
+import Data.Ord
 
 import Data.Text (Text)
 

@@ -5,9 +5,9 @@ module Helpers (
   getStyle
 ) where
 
-import Control.Monad.IO.Class
-
 import Data.Text (Text)
+
+import Control.Monad.IO.Class
 
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
