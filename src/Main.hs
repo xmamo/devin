@@ -235,7 +235,7 @@ highlightDeclaration isTextBuffer = go
     highlightParameters Nothing = pure ()
 
     highlightParameters (Just ((name, _, tName), rest)) =
-      for_ ((name, tName) : [(name, tName) | (_, name, _, tName) <- rest]) \(name, tName) -> do
+      for_ ((name, tName) : [(n, tn) | (_, n, _, tn) <- rest]) \(name, tName) -> do
         highlight textBuffer "identifier" (Syntax.span name)
         highlight textBuffer "type" (Syntax.span tName)
 

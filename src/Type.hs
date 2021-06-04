@@ -1,7 +1,7 @@
 module Type (
+  Type (..),
   Pass (..),
   Environment (..),
-  Type (..),
   Error (..),
   description,
   span,
@@ -31,6 +31,17 @@ import qualified Syntax
 import qualified Unicode
 
 
+data Type where
+  Unit :: Type
+  Bool :: Type
+  Int :: Type
+  Float :: Type
+  Function :: [Type] -> Type -> Type
+  Unknown :: Text -> Type
+  Error :: Type
+  deriving (Eq, Show, Read)
+
+
 data Pass where
   Pass1 :: Pass
   Pass2 :: Pass
@@ -39,17 +50,6 @@ data Pass where
 
 data Environment where
   Environment :: [(Text, Type)] -> [(Text, Type, Bool)] -> [[(Text, [Type], Type)]] -> Environment
-  deriving (Eq, Show, Read)
-
-
-data Type where
-  Unit :: Type
-  Bool :: Type
-  Int :: Type
-  Float :: Type
-  Function :: [Type] -> Type -> Type
-  Error :: Type
-  Unknown :: Text -> Type
   deriving (Eq, Show, Read)
 
 
@@ -75,8 +75,8 @@ text Bool = "Bool"
 text Int = "Int"
 text Float = "Float"
 text (Function parameterTs returnT) = "(" <> Text.intercalate ", " (text <$> parameterTs) <> ") -> " <> text returnT
-text Error = "⊥"
 text (Unknown name) = name
+text Error = "⊥"
 
 
 isCompatible :: Type -> Type -> Bool
@@ -87,11 +87,9 @@ isCompatible t1 t2 = t1 == t2
 
 description :: Error -> Text
 
-description (UnknownTypeError (Syntax.Identifier _ name)) =
-  "Unknown type " <> name
+description (UnknownTypeError (Syntax.Identifier _ name)) = "Unknown type " <> name
 
-description (UnknownIdentifierError (Syntax.Identifier _ name)) =
-  "Unknown identifier " <> name
+description (UnknownIdentifierError (Syntax.Identifier _ name)) = "Unknown identifier " <> name
 
 description (UnknownFunctionError (Syntax.Identifier _ name) parameterTs) =
   "Unknown function " <> name <> "(" <> Text.intercalate ", " (text <$> parameterTs) <> ")"
@@ -99,11 +97,9 @@ description (UnknownFunctionError (Syntax.Identifier _ name) parameterTs) =
 description (DuplicateFunctionDefinition (Syntax.Identifier _ name) parameterTs) =
   "Function " <> name <> "(" <> Text.intercalate ", " (text <$> parameterTs) <> ") already defined"
 
-description (UninitializedVariableError (Syntax.Identifier _ name)) =
-  "Uninitialized variable " <> name
+description (UninitializedVariableError (Syntax.Identifier _ name)) = "Uninitialized variable " <> name
 
-description (InvalidUnaryError unary operandT) =
-  "Can’t apply unary " <> operator <> " to " <> text operandT
+description (InvalidUnaryError unary operandT) = "Can’t apply unary " <> operator <> " to " <> text operandT
   where
     operator = case unary of
       Syntax.PlusOperator _ -> "+"
@@ -145,8 +141,7 @@ description (InvalidTypeError _ expectedT actualT) =
 description (InvalidReturnTypeError _ expectedT resultT) =
   "Invalid return type: expected " <> text expectedT <> ", but got " <> text resultT
 
-description (MissingReturnValueError _ expectedT) =
-  "Missing return value: expected " <> text expectedT
+description (MissingReturnValueError _ expectedT) = "Missing return value: expected " <> text expectedT
 
 description (MissingReturnPathError (Syntax.Identifier _ name) parameterTs) =
   name <> "(" <> Text.intercalate ", " (text <$> parameterTs) <> "): not all code paths return a value"
@@ -282,7 +277,7 @@ checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, paramet
     Pass1 -> do
       let key = Unicode.collate name
 
-      if any (\(k, ts, _) -> k == key && liftEq isCompatible ts parameterTs) (head functionTs'') then do
+      if any (\(k, pts, _) -> k == key && liftEq isCompatible pts parameterTs) (head functionTs'') then do
         tell [DuplicateFunctionDefinition n parameterTs]
         pure (Environment ts'' variableTs functionTs'')
       else
@@ -479,7 +474,7 @@ lookupFunctionTW environment (Syntax.Identifier span name) parameterTs = go func
       tell [UnknownFunctionError (Syntax.Identifier span name) parameterTs]
       pure (Error, Environment ts variableTs (((key, parameterTs, Error) : head functionTs) : tail functionTs))
 
-    go functionTs = case find (\(k, ts, _) -> k == key && liftEq isCompatible ts parameterTs) (head functionTs) of
+    go functionTs = case find (\(k, pts, _) -> k == key && liftEq isCompatible pts parameterTs) (head functionTs) of
       Just (_, _, returnT) | Error `notElem` parameterTs -> pure (returnT, environment)
       Just _ -> pure (Error, environment)
       Nothing -> go (tail functionTs)
