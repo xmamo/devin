@@ -193,7 +193,7 @@ end (MissingReturnPathError name _) = Syntax.end name
 
 
 defaultEnvironment :: Environment
-defaultEnvironment = Environment ts variableTs [[]]
+defaultEnvironment = Environment ts variableTs functionTs
   where
     ts =
       [
@@ -208,6 +208,18 @@ defaultEnvironment = Environment ts variableTs [[]]
         (Unicode.collate "unit", Unit, True),
         (Unicode.collate "true", Bool, True),
         (Unicode.collate "false", Bool, True)
+      ]
+
+    functionTs =
+      [
+        [],
+
+        [
+          (Unicode.collate "int", [Int], Int),
+          (Unicode.collate "int", [Float], Int),
+          (Unicode.collate "float", [Int], Float),
+          (Unicode.collate "float", [Float], Float)
+        ]
       ]
 
 
