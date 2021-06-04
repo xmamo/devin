@@ -270,10 +270,10 @@ checkDeclarationW Pass2 environment Syntax.VariableDeclaration {variable, tName,
   pure (Environment ts'' ((Unicode.collate variableName, t, True) : variableTs'') functionTs'')
 
 checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, parameters, tName, body} = do
-  let Environment ts variableTs functionTs = environment
+  let Environment _ variableTs functionTs = environment
       Syntax.Identifier _ name = n
 
-  (parameterTs, Environment _ variableTs' functionTs') <- case parameters of
+  (parameterTs, environment') <- case parameters of
     Just ((name, _, tName), rest) ->
       foldlM f ([], environment) ((name, tName) : [(n, tn) | (_, n, _, tn) <- rest])
       where
@@ -283,7 +283,7 @@ checkDeclarationW pass environment Syntax.FunctionDeclaration {name = n, paramet
 
     Nothing -> pure ([], environment)
 
-  (returnT, Environment ts'' variableTs'' functionTs'') <- getTW (Environment ts variableTs' functionTs') tName
+  (returnT, Environment ts'' variableTs'' functionTs'') <- getTW environment' tName
 
   case pass of
     Pass1 -> do
@@ -346,8 +346,8 @@ checkStatementW expectedT environment s @ Syntax.ReturnStatement {result = Nothi
 checkStatementW expectedT environment Syntax.BlockStatement {elements} = do
   let Environment ts variableTs functionTs = environment
   environment' <- foldlM (checkDeclarationW Pass1) (Environment ts variableTs ([] : functionTs)) (lefts elements)
-  (doesReturn, Environment ts'' variableTs'' functionTs'') <- foldlM f (False, environment') elements
-  pure (doesReturn, Environment ts'' variableTs'' (tail functionTs''))
+  (doesReturn, _) <- foldlM f (False, environment') elements
+  pure (doesReturn, environment)
   where
     f (doesReturn, environment) (Left declaration) = do
       environment' <- checkDeclarationW Pass2 environment declaration
@@ -468,18 +468,18 @@ lookupVariableTW expectInitialized environment (Syntax.Identifier span name) = d
   let Environment ts variableTs functionTs = environment
       key = Unicode.collate name
 
-  case break (\(k, _, _) -> k == key) variableTs of
-    (_, []) -> do
-      tell [UnknownIdentifierError (Syntax.Identifier span name)]
-      pure (Error, Environment ts ((key, Error, expectInitialized) : variableTs) functionTs)
+  case find (\(k, _, _) -> k == key) variableTs of
+    Just (_, t, True) -> pure (t, environment)
 
-    (_, (_, t, True) : _) -> pure (t, environment)
-
-    (_, (_, t, False) : _) | expectInitialized -> do
+    Just (_, t, False) | expectInitialized -> do
       tell [UninitializedVariableError (Syntax.Identifier span name)]
       pure (t, Environment ts ((key, t, True) : variableTs) functionTs)
 
-    (ts1, (name, t, False) : ts2) -> pure (t, Environment ts (ts1 ++ [(name, t, True)] ++ ts2) functionTs)
+    Just (_, t, False) -> pure (t, Environment ts ((name, t, True) : variableTs) functionTs)
+
+    Nothing -> do
+      tell [UnknownIdentifierError (Syntax.Identifier span name)]
+      pure (Error, Environment ts ((key, Error, expectInitialized) : variableTs) functionTs)
 
 
 lookupFunctionTW :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
