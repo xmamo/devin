@@ -1,11 +1,54 @@
-- ignore:
-    name: Use <$>
+- arguments:
+  - -XHaskell2010
 
-- ignore:
-    name: Avoid lambda using `infix`
+  # Syntax
+  - -XApplicativeDo
+  - -XTupleSections
+  - -XLambdaCase
+  - -XBlockArguments
 
-- suggest:
-    name: Use String
+  # Types
+  - -XGADTs
 
-- suggest:
-    name: Redundant do
+  # Records
+  - -XDisambiguateRecordFields
+  - -XDuplicateRecordFields
+  - -XNamedFieldPuns
+
+  # Deriving mechanism
+  - -XDeriveFunctor
+  - -XDeriveFoldable
+  - -XDeriveTraversable
+
+  # Literals
+  - -XNegativeLiterals
+  - -XOverloadedStrings
+  - -XOverloadedLabels
+
+  # Bindings and generalisation
+  - -XNoMonomorphismRestriction
+
+# Overrides
+- ignore: {name: Use <$>}
+- ignore: {name: Avoid lambda using `infix`}
+- suggest: {name: Redundant do}
+- suggest: {name: Use explicit module export list}
+- suggest: {name: Use module export list}
+- warn: {name: Use String}
+- warn: {name: Use &&&}
+- warn: {name: Use Just}
+
+# Custom hints
+- warn: {lhs: (>>), rhs: (*>)}
+- warn: {lhs: return, rhs: pure}
+- warn: {lhs: mapM, rhs: traverse}
+- warn: {lhs: mapM_, rhs: traverse_}
+- warn: {lhs: forM, rhs: for}
+- warn: {lhs: forM_, rhs: for_}
+- warn: {lhs: sequence, rhs: sequenceA}
+- warn: {lhs: sequence_, rhs: sequenceA_}
+- warn: {lhs: foldM, rhs: foldlM}
+- warn: {lhs: liftM, rhs: liftA}
+- warn: {lhs: liftM2, rhs: liftA2}
+- warn: {lhs: liftM3, rhs: liftA3}
+- warn: {lhs: ap, rhs: (<*>)}
