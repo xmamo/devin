@@ -68,6 +68,9 @@ instance Monad m => MonadFail (ParserT m) where
   fail label = ParserT \(Input position _) -> pure (Result.Failure False position [Text.pack label])
 
 
+instance Monad m => MonadPlus (ParserT m)
+
+
 instance Monad m => Alternative (ParserT m) where
   empty = ParserT \(Input position _) -> pure (Result.Failure False position [])
 
