@@ -39,18 +39,18 @@ class Syntax a where
 data Declaration a where
   EmptyVariableDeclaration :: {
     varKeyword :: Token,
-    variable :: Identifier,
+    variableId :: Identifier,
     colon :: Token,
-    tName :: Identifier,
+    typeId :: Identifier,
     semicolon :: Token,
     extra :: a
   } -> Declaration a
 
   VariableDeclaration :: {
     varKeyword :: Token,
-    variable :: Identifier,
+    variableId :: Identifier,
     colon :: Token,
-    tName :: Identifier,
+    typeId :: Identifier,
     equalSign :: Token,
     value :: Expression a,
     semicolon :: Token,
@@ -59,12 +59,12 @@ data Declaration a where
 
   FunctionDeclaration :: {
     defKeyword :: Token,
-    name :: Identifier,
+    functionId :: Identifier,
     open :: Token,
     parameters :: Maybe ((Identifier, Token, Identifier), [(Token, Identifier, Token, Identifier)]),
     close :: Token,
     arrow :: Token,
-    tName :: Identifier,
+    typeId :: Identifier,
     body :: Statement a,
     extra :: a
   } -> Declaration a
@@ -134,12 +134,12 @@ data Expression a where
   } -> Expression a
 
   VariableExpression :: {
-    variable :: Identifier,
+    variableId :: Identifier,
     extra :: a
   } -> Expression a
 
   CallExpression :: {
-    target :: Identifier,
+    targetId :: Identifier,
     open :: Token,
     arguments :: Maybe (Expression a, [(Token, Expression a)]),
     close :: Token,
@@ -160,7 +160,7 @@ data Expression a where
   } -> Expression a
 
   AssignExpression :: {
-    target :: Identifier,
+    targetId :: Identifier,
     assign :: AssignOperator,
     value :: Expression a,
     extra :: a
@@ -260,13 +260,13 @@ instance Syntax (Statement a) where
 
 instance Syntax (Expression a) where
   span IntegerExpression {integer} = span integer
-  span VariableExpression {variable} = span variable
+  span VariableExpression {variableId} = span variableId
   span expression = Span (start expression) (end expression)
 
-  start CallExpression {target} = start target
+  start CallExpression {targetId} = start targetId
   start UnaryExpression {unary} = start unary
   start BinaryExpression {left} = start left
-  start AssignExpression {target} = start target
+  start AssignExpression {targetId} = start targetId
   start ParenthesizedExpression {open} = start open
   start expression = Span.start (span expression)
 

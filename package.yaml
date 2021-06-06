@@ -54,6 +54,16 @@ dependencies:
 library:
   source-dirs: src
 
+  exposed-modules:
+    - Input
+    - Main
+    - Parser
+    - Parsers
+    - Result
+    - Span
+    - Syntax
+    - Type
+
 executables:
   devin:
     main: Main.hs
