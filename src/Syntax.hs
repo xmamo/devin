@@ -63,8 +63,7 @@ data Declaration a where
     open :: Token,
     parameters :: Maybe ((Identifier, Token, Identifier), [(Token, Identifier, Token, Identifier)]),
     close :: Token,
-    arrow :: Token,
-    typeId :: Identifier,
+    result :: Maybe (Token, Identifier),
     body :: Statement a,
     extra :: a
   } -> Declaration a

@@ -67,32 +67,22 @@ functionDeclaration = do
 
     first <- optional do
       id <- s *> identifier
-
-      Parser.commit do
-        colon <- s *> charToken ':'
-        typeId <- s *> identifier
-        pure (id, colon, typeId)
+      Parser.commit ((id,,) <$> (s *> charToken ':') <*> (s *> identifier))
 
     parameters <- case first of
       Just first -> do
         rest <- many do
           comma <- s *> charToken ','
-
-          Parser.commit do
-            id <- s *> identifier
-            colon <- s *> charToken ':'
-            typeId <- s *> identifier
-            pure (comma, id, colon, typeId)
+          Parser.commit ((comma,,,) <$> (s *> identifier) <*> (s *> charToken ':') <*> (s *> identifier))
 
         pure (Just (first, rest))
 
       Nothing -> pure Nothing
 
-    close <- s *> charToken ')'
-    arrow <- s *> textToken "->"
-    typeId <- s *> identifier
+    close <- s *> charToken ')' <* s
+    result <- optional ((,) <$> (s *> textToken "->") <*> Parser.commit (s *> identifier))
     body <- s *> statement
-    pure Syntax.FunctionDeclaration {defKeyword, functionId, open, parameters, close, arrow, typeId, body, extra = ()}
+    pure Syntax.FunctionDeclaration {defKeyword, functionId, open, parameters, close, result, body, extra = ()}
 
 
 declaration :: Parser (Syntax.Declaration ())

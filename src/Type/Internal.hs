@@ -26,7 +26,7 @@ checkDeclarations environment declarations = do
 
 checkDeclaration :: Pass -> Environment -> Syntax.Declaration () -> Writer [Error] Environment
 checkDeclaration pass environment declaration = case (pass, declaration) of
-  (_, Syntax.FunctionDeclaration {functionId, parameters, typeId, body}) -> do
+  (_, Syntax.FunctionDeclaration {functionId, parameters, result, body}) -> do
     let Environment _ variables functions = environment
         Syntax.Identifier _ functionName = functionId
 
@@ -40,7 +40,9 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
 
       Nothing -> pure ([], environment)
 
-    (returnType, Environment types'' variables'' functions'') <- lookupType environment' typeId
+    (returnType, Environment types'' variables'' functions'') <- case result of
+      Just (_, returnTypeId) -> lookupType environment' returnTypeId
+      _ -> pure (Unit, environment')
 
     case pass of
       Pass1 -> do

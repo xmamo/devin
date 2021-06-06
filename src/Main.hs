@@ -226,11 +226,11 @@ highlightDeclaration isTextBuffer = go
       highlight textBuffer "type" (Syntax.span typeId)
       highlightExpression textBuffer value
 
-    go Syntax.FunctionDeclaration {defKeyword, functionId, parameters, typeId, body} = do
+    go Syntax.FunctionDeclaration {defKeyword, functionId, parameters, result, body} = do
       highlight textBuffer "keyword" (Syntax.span defKeyword)
       highlight textBuffer "identifier" (Syntax.span functionId)
       highlightParameters parameters
-      highlight textBuffer "type" (Syntax.span typeId)
+      highlightResult result
       highlightStatement textBuffer body
 
     highlightParameters Nothing = pure ()
@@ -239,6 +239,9 @@ highlightDeclaration isTextBuffer = go
       for_ ((id, typeId) : [(id, typeId) | (_, id, _, typeId) <- rest]) \(id, typeId) -> do
         highlight textBuffer "identifier" (Syntax.span id)
         highlight textBuffer "type" (Syntax.span typeId)
+
+    highlightResult Nothing = pure ()
+    highlightResult (Just (_, returnTypeId)) = highlight textBuffer "type" (Syntax.span returnTypeId)
 
 
 highlightStatement :: Gtk.IsTextBuffer a => a -> Syntax.Statement b -> IO ()
@@ -499,15 +502,14 @@ displayDeclaration isTextBuffer isTreeStore = go
       display textBuffer treeStore treeIter' semicolon "Token" True
       pure treeIter'
 
-    go treeIter d @ Syntax.FunctionDeclaration {defKeyword, functionId, open, parameters, close, arrow, typeId, body} = do
+    go treeIter d @ Syntax.FunctionDeclaration {defKeyword, functionId, open, parameters, close, result, body} = do
       treeIter' <- display textBuffer treeStore treeIter d "FunctionDeclaration" False
       display textBuffer treeStore treeIter' defKeyword "Token" True
       display textBuffer treeStore treeIter' functionId "Identifier" True
       display textBuffer treeStore treeIter' open "Token" True
       displayParameters treeIter' parameters
       display textBuffer treeStore treeIter' close "Token" True
-      display textBuffer treeStore treeIter' arrow "Token" True
-      display textBuffer treeStore treeIter' typeId "Identifier" True
+      displayResult treeIter' result
       displayStatement textBuffer treeStore treeIter' body
       pure treeIter'
 
@@ -523,6 +525,12 @@ displayDeclaration isTextBuffer isTreeStore = go
         display textBuffer treeStore treeIter id "Identifier" True
         display textBuffer treeStore treeIter colon "Token" True
         display textBuffer treeStore treeIter typeId "Identifier" True
+
+    displayResult _ Nothing = pure ()
+
+    displayResult treeIter (Just (arrow, returnTypeId)) = void do
+      display textBuffer treeStore treeIter arrow "Token" True
+      display textBuffer treeStore treeIter returnTypeId "Identifier" True
 
 
 displayStatement ::
