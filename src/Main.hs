@@ -90,6 +90,7 @@ onActivate isApplication = do
 
   codeSourceScrolledWindow <- new Gtk.ScrolledWindow [#child := codeSourceView]
   codeTreeScrolledWindow <- new Gtk.ScrolledWindow [#child := codeTreeView]
+  logScrolledWindow <- new Gtk.ScrolledWindow [#child := logTextView]
 
   innerPaned <- new Gtk.Paned [#orientation := Gtk.OrientationHorizontal]
   #pack1 innerPaned codeSourceScrolledWindow True False
@@ -97,7 +98,7 @@ onActivate isApplication = do
 
   outerPaned <- new Gtk.Paned [#orientation := Gtk.OrientationVertical]
   #pack1 outerPaned innerPaned True False
-  #pack2 outerPaned logTextView False False
+  #pack2 outerPaned logScrolledWindow False False
 
   window <- new Gtk.ApplicationWindow
     [
