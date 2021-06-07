@@ -74,7 +74,6 @@ instance Monad m => MonadPlus (ParserT m)
 instance Monad m => Alternative (ParserT m) where
   empty = ParserT \(Input position _) -> pure (Result.Failure False position [])
 
-  -- TODO: This is probably not associative
   parser1 <|> parser2 = ParserT \input -> parseT parser1 input >>= \case
     Result.Success value rest -> pure (Result.Success value rest)
 

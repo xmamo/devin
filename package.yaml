@@ -24,6 +24,9 @@ default-extensions:
   - DeriveFoldable
   - DeriveTraversable
 
+  # Class and instances declarations
+  - FlexibleInstances
+
   # Literals
   - NegativeLiterals
   - OverloadedStrings
@@ -76,4 +79,6 @@ tests:
   devin-test:
     main: Spec.hs
     source-dirs: test
-    dependencies: [devin]
+    ghc-options: [-Wno-orphans]
+    dependencies: [QuickCheck, quickcheck-instances, checkers, hspec, hspec-checkers, devin]
+    build-tools: [hspec-discover:hspec-discover]
