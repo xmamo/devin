@@ -28,6 +28,9 @@
   - -XOverloadedStrings
   - -XOverloadedLabels
 
+  # Type signatures
+  - -XScopedTypeVariables
+
   # Bindings and generalisation
   - -XNoMonomorphismRestriction
 

@@ -10,7 +10,7 @@ import Result (Result)
 import Instances ()
 
 
-spec :: SpecWith ()
+spec :: Spec
 spec = describe "Result" do
   testBatch (functor (undefined :: Result (String, String, String)))
   testBatch (foldable (undefined :: Result (String, String, String, Integer, String)))

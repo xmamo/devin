@@ -32,6 +32,9 @@ default-extensions:
   - OverloadedStrings
   - OverloadedLabels
 
+  # Type signatures
+  - ScopedTypeVariables
+
   # Bindings and generalisation
   - NoMonomorphismRestriction
 

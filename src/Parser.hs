@@ -125,11 +125,11 @@ either parser1 parser2 = (Left <$> parser1) <|> (Right <$> parser2)
 
 
 separatedBy :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
-separatedBy parser comma = separatedBy1 parser comma <|> pure []
+separatedBy parser separator = separatedBy1 parser separator <|> pure []
 
 
 separatedBy1 :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
-separatedBy1 parser comma = (:) <$> parser <*> many (comma *> parser)
+separatedBy1 parser separator = (:) <$> parser <*> many (separator *> parser)
 
 
 label :: Monad m => Text -> ParserT m a -> ParserT m a

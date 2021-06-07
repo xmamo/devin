@@ -11,10 +11,10 @@ import Instances ()
 
 
 instance Show (ParserT a b) where
-  show _ = "Parser"
+  show _ = undefined
 
 
-spec :: SpecWith ()
+spec :: Spec
 spec = describe "Parser" do
   testBatch (functor (undefined :: Parser (String, String, String)))
   testBatch (applicative (undefined :: Parser (String, String, String)))
