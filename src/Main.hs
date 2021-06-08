@@ -181,7 +181,8 @@ onActivate isApplication = do
 
             startTextIter <- #getIterAtOffset codeTextBuffer (Type.start error)
             (line, column) <- Helpers.getLineColumn startTextIter
-            pure (Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ") <> Type.description error)
+            let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
+            pure (prefix <> Type.description error)
 
           set logTextBuffer [#text := Text.intercalate "\n" log]
 

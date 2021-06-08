@@ -17,6 +17,7 @@ module Parser (
 import Prelude hiding (either)
 import Control.Applicative
 import Control.Monad
+import Data.Functor
 import Data.Functor.Identity
 import Data.List
 
@@ -91,7 +92,7 @@ instance Monad m => Alternative (ParserT m) where
 
 
 instance MonadTrans ParserT where
-  lift ma = ParserT \input -> (\a -> Result.Success a input) <$> ma
+  lift ma = ParserT \input -> ma <&> \a -> Result.Success a input
 
 
 parse :: Parser a -> Input -> Result a
@@ -121,7 +122,7 @@ text t = ParserT \(Input position text) -> case Text.stripPrefix t text of
 
 
 either :: Monad m => ParserT m a -> ParserT m b -> ParserT m (Either a b)
-either parser1 parser2 = (Left <$> parser1) <|> (Right <$> parser2)
+either parser1 parser2 = fmap Left parser1 <|> fmap Right parser2
 
 
 separatedBy :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
