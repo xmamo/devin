@@ -41,9 +41,9 @@ declarations = s *> Parser.separatedBy declaration s <* s <* Parser.eoi
 variableDeclaration :: Parser (Syntax.Declaration ())
 variableDeclaration = do
   varKeyword <- keyword "var"
+  variableId <- s *> identifier
 
   Parser.commit do
-    variableId <- s *> identifier
     colon <- s *> charToken ':'
     typeId <- s *> identifier <* s
 
