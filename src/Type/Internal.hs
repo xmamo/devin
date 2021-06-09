@@ -24,7 +24,7 @@ checkDeclarations environment declarations = do
 
 checkDeclaration :: Pass -> Environment -> Syntax.Declaration () -> Writer [Error] Environment
 checkDeclaration pass environment declaration = case (pass, declaration) of
-  (_, Syntax.FunctionDeclaration {functionId, parameters, result, body}) -> do
+  (_, Syntax.FunctionDeclaration {functionId, parameters, returnInfo, body}) -> do
     let Environment _ variables functions = environment
         Syntax.Identifier _ functionName = functionId
 
@@ -38,7 +38,7 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
 
       Nothing -> pure ([], environment)
 
-    (returnType, Environment types'' variables'' functions'') <- case result of
+    (returnType, Environment types'' variables'' functions'') <- case returnInfo of
       Just (_, returnTypeId) -> lookupType environment' returnTypeId
       _ -> pure (Unit, environment')
 
@@ -57,11 +57,17 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
         when (returnType /= Unit && not doesReturn) (tell [MissingReturnPathError functionId parameterTypes])
         pure (Environment types'' variables functions)
 
-  (Pass2, Syntax.VariableDeclaration {variableId = Syntax.Identifier _ variableName, typeId, value}) -> do
+  (Pass2, Syntax.VariableDeclaration {variableId, typeInfo = Just (_, typeId), value}) -> do
+    let Syntax.Identifier _ variableName = variableId
     (t, environment') <- lookupType environment typeId
     (valueType, Environment types'' variables'' functions'') <- checkExpression environment' value
     when (valueType /= t) (tell [InvalidTypeError value t valueType])
     pure (Environment types'' ((Unicode.collate variableName, t) : variables'') functions'')
+
+  (Pass2, Syntax.VariableDeclaration {variableId, typeInfo = Nothing, value}) -> do
+    let Syntax.Identifier _ variableName = variableId
+    (valueType, Environment types' variables' functions') <- checkExpression environment value
+    pure (Environment types' ((Unicode.collate variableName, valueType) : variables') functions')
 
   _ -> pure environment
 

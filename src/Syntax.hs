@@ -39,8 +39,7 @@ data Declaration a where
   VariableDeclaration :: {
     varKeyword :: Token,
     variableId :: Identifier,
-    colon :: Token,
-    typeId :: Identifier,
+    typeInfo :: Maybe (Token, Identifier),
     equalSign :: Token,
     value :: Expression a,
     semicolon :: Token,
@@ -53,7 +52,7 @@ data Declaration a where
     open :: Token,
     parameters :: Maybe ((Identifier, Token, Identifier), [(Token, Identifier, Token, Identifier)]),
     close :: Token,
-    result :: Maybe (Token, Identifier),
+    returnInfo :: Maybe (Token, Identifier),
     body :: Statement a,
     extra :: a
   } -> Declaration a

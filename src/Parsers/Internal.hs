@@ -26,7 +26,7 @@ import Control.Monad.Trans.Writer
 import Parser (ParserT)
 import qualified Parser
 import Span (Span (Span))
-import Syntax (Syntax)
+import Syntax (Syntax, Declaration (typeInfo))
 import qualified Syntax
 import qualified Unicode
 
@@ -42,14 +42,13 @@ variableDeclaration :: Parser (Syntax.Declaration ())
 variableDeclaration = do
   varKeyword <- keyword "var"
   variableId <- s *> identifier
+  typeInfo <- optional ((,) <$> (s *> charToken ':') <*> Parser.commit (s *> identifier))
 
   Parser.commit do
-    colon <- s *> charToken ':'
-    typeId <- s *> identifier <* s
     equalSign <- s *> charToken '='
     value <- s *> expression
     semicolon <- s *> charToken ';'
-    pure Syntax.VariableDeclaration {varKeyword, variableId, colon, typeId, equalSign, value, semicolon, extra = ()}
+    pure Syntax.VariableDeclaration {varKeyword, variableId, typeInfo, equalSign, value, semicolon, extra = ()}
 
 
 functionDeclaration :: Parser (Syntax.Declaration ())
@@ -75,9 +74,9 @@ functionDeclaration = do
       Nothing -> pure Nothing
 
     close <- s *> charToken ')' <* s
-    result <- optional ((,) <$> (s *> textToken "->") <*> Parser.commit (s *> identifier))
+    returnInfo <- optional ((,) <$> (s *> textToken "->") <*> Parser.commit (s *> identifier))
     body <- s *> statement
-    pure Syntax.FunctionDeclaration {defKeyword, functionId, open, parameters, close, result, body, extra = ()}
+    pure Syntax.FunctionDeclaration {defKeyword, functionId, open, parameters, close, returnInfo, body, extra = ()}
 
 
 declaration :: Parser (Syntax.Declaration ())
