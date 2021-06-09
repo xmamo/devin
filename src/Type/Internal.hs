@@ -8,7 +8,6 @@ module Type.Internal (
 import Control.Monad
 import Data.Either
 import Data.Foldable
-import Data.Functor.Classes
 
 import Control.Monad.Trans.Writer
 
@@ -47,7 +46,7 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
       Pass1 -> do
         let key = Unicode.collate functionName
 
-        if any (\(k, pts, _) -> k == key && liftEq isCompatible pts parameterTypes) (head functions'') then do
+        if any (\(k, pts, _) -> k == key && pts == parameterTypes) (head functions'') then do
           tell [DuplicateFunctionDefinition functionId parameterTypes]
           pure (Environment types'' variables functions'')
         else
@@ -55,13 +54,13 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
 
       Pass2 -> do
         (doesReturn, _) <- checkStatement returnType (Environment types'' variables'' functions) body
-        unless (isCompatible returnType Unit || doesReturn) (tell [MissingReturnPathError functionId parameterTypes])
+        when (returnType /= Unit && not doesReturn) (tell [MissingReturnPathError functionId parameterTypes])
         pure (Environment types'' variables functions)
 
   (Pass2, Syntax.VariableDeclaration {variableId = Syntax.Identifier _ variableName, typeId, value}) -> do
     (t, environment') <- lookupType environment typeId
     (valueType, Environment types'' variables'' functions'') <- checkExpression environment' value
-    unless (isCompatible valueType t) (tell [InvalidTypeError value t valueType])
+    when (valueType /= t) (tell [InvalidTypeError value t valueType])
     pure (Environment types'' ((Unicode.collate variableName, t) : variables'') functions'')
 
   _ -> pure environment
@@ -75,36 +74,36 @@ checkStatement expectedType environment statement = case statement of
 
   Syntax.IfStatement {predicate, trueBranch} -> do
     (predicateType, environment') <- checkExpression environment predicate
-    unless (isCompatible predicateType Bool) (tell [InvalidTypeError predicate Bool predicateType])
+    when (predicateType /= Bool) (tell [InvalidTypeError predicate Bool predicateType])
     checkStatement expectedType environment' trueBranch
     pure (False, environment')
 
   Syntax.IfElseStatement {predicate, trueBranch, falseBranch} -> do
     (predicateType, environment') <- checkExpression environment predicate
-    unless (isCompatible predicateType Bool) (tell [InvalidTypeError predicate Bool predicateType])
+    when (predicateType /= Bool) (tell [InvalidTypeError predicate Bool predicateType])
     (doesTrueBranchReturn, _) <- checkStatement expectedType environment' trueBranch
     (doesFalseBrachReturn, _) <- checkStatement expectedType environment' falseBranch
     pure (doesTrueBranchReturn && doesFalseBrachReturn, environment')
 
   Syntax.WhileStatement {predicate, body} -> do
     (predicateType, environment') <- checkExpression environment predicate
-    unless (isCompatible predicateType Bool) (tell [InvalidTypeError predicate Bool predicateType])
+    when (predicateType /= Bool) (tell [InvalidTypeError predicate Bool predicateType])
     checkStatement expectedType environment' body
     pure (False, environment')
 
   Syntax.DoWhileStatement {body, predicate} -> do
     (doesReturn, _) <- checkStatement expectedType environment body
     (predicateType, environment') <- checkExpression environment predicate
-    unless (isCompatible predicateType Bool) (tell [InvalidTypeError predicate Bool predicateType])
+    when (predicateType /= Bool) (tell [InvalidTypeError predicate Bool predicateType])
     pure (doesReturn, environment')
 
   Syntax.ReturnStatement {result = Just result} -> do
     (resultType, environment') <- checkExpression environment result
-    unless (isCompatible resultType expectedType) (tell [InvalidReturnTypeError statement expectedType resultType])
+    when (resultType /= expectedType) (tell [InvalidReturnTypeError statement expectedType resultType])
     pure (True, environment')
 
   Syntax.ReturnStatement {result = Nothing} -> do
-    unless (isCompatible expectedType Unit) (tell [MissingReturnValueError statement expectedType])
+    when (expectedType /= Unit) (tell [MissingReturnValueError statement expectedType])
     pure (True, environment)
 
   Syntax.BlockStatement {elements} -> do
@@ -237,7 +236,7 @@ lookupVariableType environment variableId = do
   let Environment types variables functions = environment
       Syntax.Identifier _ variableName = variableId
       key = Unicode.collate variableName
-  
+
   case lookup key variables of
     Just t -> pure (t, environment)
 
@@ -257,13 +256,7 @@ lookupFunctionType environment functionId parameterTypes = go functions
       tell [UnknownFunctionError functionId parameterTypes]
       pure (Error, Environment types variables (((key, parameterTypes, Error) : head functions) : tail functions))
 
-    go functions = case find (\(k, pts, _) -> k == key && liftEq isCompatible pts parameterTypes) (head functions) of
-      Just (_, _, returnType) | Error `notElem` parameterTypes -> pure (returnType, environment)
+    go functions = case find (\(k, pts, _) -> k == key && pts == parameterTypes) (head functions) of
+      Just (_, _, returnType) | not (any isError parameterTypes) -> pure (returnType, environment)
       Just _ -> pure (Error, environment)
       Nothing -> go (tail functions)
-
-
-isCompatible :: Type -> Type -> Bool
-isCompatible Error _ = True
-isCompatible _ Error = True
-isCompatible t1 t2 = t1 == t2

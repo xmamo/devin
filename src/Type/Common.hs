@@ -3,6 +3,7 @@ module Type.Common (
   Environment (..),
   Pass (..),
   Error (..),
+  isError,
   description,
   span,
   start,
@@ -16,6 +17,7 @@ import qualified Data.Text as Text
 
 import Span (Span)
 import qualified Syntax
+import qualified Unicode
 
 
 data Type where
@@ -26,11 +28,16 @@ data Type where
   Function :: [Type] -> Type -> Type
   Unknown :: Text -> Type
   Error :: Type
-  deriving (Eq, Show, Read)
+  deriving (Show, Read)
 
 
 data Environment where
-  Environment :: [(Text, Type)] -> [(Text, Type)] -> [[(Text, [Type], Type)]] -> Environment
+  Environment :: {
+    types :: [(Text, Type)],
+    variables :: [(Text, Type)],
+    functions :: [[(Text, [Type], Type)]]
+  } -> Environment
+
   deriving (Eq, Show, Read)
 
 
@@ -45,7 +52,6 @@ data Error where
   UnknownIdentifierError :: Syntax.Identifier -> Error
   UnknownFunctionError :: Syntax.Identifier -> [Type] -> Error
   DuplicateFunctionDefinition :: Syntax.Identifier -> [Type] -> Error
-  UninitializedVariableError :: Syntax.Identifier -> Error
   InvalidUnaryError :: Syntax.UnaryOperator -> Type -> Error
   InvalidBinaryError :: Syntax.BinaryOperator -> Type -> Type -> Error
   InvalidAssignError :: Syntax.AssignOperator -> Type -> Type -> Error
@@ -54,6 +60,23 @@ data Error where
   MissingReturnValueError :: Syntax.Statement () -> Type -> Error
   MissingReturnPathError :: Syntax.Identifier -> [Type] -> Error
   deriving (Eq, Show, Read)
+
+
+instance Eq Type where
+  Error == _ = True
+  _ == Error = True
+  Unit == Unit = True
+  Bool == Bool = True
+  Int == Int = True
+  Float == Float = True
+  Function pts1 rt1 == Function pts2 rt2 = pts1 == pts2 && rt1 == rt2
+  Unknown n1 == Unknown n2 = Unicode.collate n1 == Unicode.collate n2
+  _ == _ = False
+
+
+isError :: Type -> Bool
+isError Error = True
+isError _ = False
 
 
 description :: Error -> Text
@@ -67,8 +90,6 @@ description = \case
 
   DuplicateFunctionDefinition (Syntax.Identifier _ name) parameterTypes ->
     "Function " <> name <> "(" <> labels parameterTypes <> ") already defined"
-
-  UninitializedVariableError (Syntax.Identifier _ name) -> "Uninitialized variable " <> name
 
   InvalidUnaryError unary operandType -> "Can’t apply unary " <> operator <> " to " <> label operandType
     where
@@ -134,7 +155,6 @@ span (UnknownTypeError typeId) = Syntax.span typeId
 span (UnknownIdentifierError name) = Syntax.span name
 span (UnknownFunctionError name _) = Syntax.span name
 span (DuplicateFunctionDefinition name _) = Syntax.span name
-span (UninitializedVariableError variable) = Syntax.span variable
 span (InvalidUnaryError unary _) = Syntax.span unary
 span (InvalidBinaryError binary _ _) = Syntax.span binary
 span (InvalidAssignError assign _ _) = Syntax.span assign
@@ -149,7 +169,6 @@ start (UnknownTypeError typeId) = Syntax.start typeId
 start (UnknownIdentifierError name) = Syntax.start name
 start (UnknownFunctionError name _) = Syntax.start name
 start (DuplicateFunctionDefinition name _) = Syntax.start name
-start (UninitializedVariableError variable) = Syntax.start variable
 start (InvalidUnaryError unary _) = Syntax.start unary
 start (InvalidBinaryError binary _ _) = Syntax.start binary
 start (InvalidAssignError assign _ _) = Syntax.start assign
@@ -164,7 +183,6 @@ end (UnknownTypeError typeId) = Syntax.end typeId
 end (UnknownIdentifierError name) = Syntax.end name
 end (UnknownFunctionError name _) = Syntax.end name
 end (DuplicateFunctionDefinition name _) = Syntax.end name
-end (UninitializedVariableError variable) = Syntax.end variable
 end (InvalidUnaryError unary _) = Syntax.end unary
 end (InvalidBinaryError binary _ _) = Syntax.end binary
 end (InvalidAssignError assign _ _) = Syntax.end assign

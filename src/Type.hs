@@ -3,6 +3,7 @@ module Type (
   Pass (..),
   Environment (..),
   Error (..),
+  isError,
   description,
   span,
   start,
