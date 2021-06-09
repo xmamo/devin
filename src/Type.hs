@@ -57,9 +57,9 @@ defaultEnvironment = Environment types variables functions
 
     variables =
       [
-        (Unicode.collate "unit", Unit, True),
-        (Unicode.collate "true", Bool, True),
-        (Unicode.collate "false", Bool, True)
+        (Unicode.collate "unit", Unit),
+        (Unicode.collate "true", Bool),
+        (Unicode.collate "false", Bool)
       ]
 
     functions =

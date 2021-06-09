@@ -37,15 +37,6 @@ class Syntax a where
 
 
 data Declaration a where
-  EmptyVariableDeclaration :: {
-    varKeyword :: Token,
-    variableId :: Identifier,
-    colon :: Token,
-    typeId :: Identifier,
-    semicolon :: Token,
-    extra :: a
-  } -> Declaration a
-
   VariableDeclaration :: {
     varKeyword :: Token,
     variableId :: Identifier,
@@ -230,11 +221,9 @@ data Comment where
 
 
 instance Syntax (Declaration a) where
-  start EmptyVariableDeclaration {varKeyword} = start varKeyword
   start VariableDeclaration {varKeyword} = start varKeyword
   start FunctionDeclaration {defKeyword} = start defKeyword
 
-  end EmptyVariableDeclaration {semicolon} = end semicolon
   end VariableDeclaration {semicolon} = end semicolon
   end FunctionDeclaration {body} = end body
 

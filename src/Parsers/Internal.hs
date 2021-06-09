@@ -46,15 +46,10 @@ variableDeclaration = do
   Parser.commit do
     colon <- s *> charToken ':'
     typeId <- s *> identifier <* s
-
-    Parser.either (charToken ';') (charToken '=') >>= \case
-      Left semicolon ->
-        pure Syntax.EmptyVariableDeclaration {varKeyword, variableId, colon, typeId, semicolon, extra = ()}
-
-      Right equalSign -> Parser.commit do
-        value <- s *> expression
-        semicolon <- s *> charToken ';'
-        pure Syntax.VariableDeclaration {varKeyword, variableId, colon, typeId, equalSign, value, semicolon, extra = ()}
+    equalSign <- s *> charToken '='
+    value <- s *> expression
+    semicolon <- s *> charToken ';'
+    pure Syntax.VariableDeclaration {varKeyword, variableId, colon, typeId, equalSign, value, semicolon, extra = ()}
 
 
 functionDeclaration :: Parser (Syntax.Declaration ())

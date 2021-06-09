@@ -216,11 +216,6 @@ highlightDeclaration isTextBuffer = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-    go Syntax.EmptyVariableDeclaration {varKeyword, variableId, typeId} = do
-      highlight textBuffer "keyword" (Syntax.span varKeyword)
-      highlight textBuffer "identifier" (Syntax.span variableId)
-      highlight textBuffer "type" (Syntax.span typeId)
-
     go Syntax.VariableDeclaration {varKeyword, variableId, typeId, value} = do
       highlight textBuffer "keyword" (Syntax.span varKeyword)
       highlight textBuffer "identifier" (Syntax.span variableId)
@@ -322,8 +317,6 @@ highlightDeclarationParentheses :: Gtk.IsTextBuffer a => a -> Syntax.Declaration
 highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go declaration
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
-    go Syntax.EmptyVariableDeclaration {} = pure False
 
     go Syntax.VariableDeclaration {value} = highlightExpressionParentheses textBuffer value insertTextIter
 
@@ -482,15 +475,6 @@ displayDeclaration isTextBuffer isTreeStore = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
     treeStore = isTreeStore `asA` Gtk.TreeStore
-
-    go treeIter d @ Syntax.EmptyVariableDeclaration {varKeyword, variableId, colon, typeId, semicolon} = do
-      treeIter' <- display textBuffer treeStore treeIter d "VariableDeclaration" False
-      display textBuffer treeStore treeIter' varKeyword "Token" True
-      display textBuffer treeStore treeIter' variableId "Identifier" True
-      display textBuffer treeStore treeIter' colon "Token" True
-      display textBuffer treeStore treeIter' typeId "Identifier" True
-      display textBuffer treeStore treeIter' semicolon "Token" True
-      pure treeIter'
 
     go treeIter d @ Syntax.VariableDeclaration {varKeyword, variableId, colon, typeId, equalSign, value, semicolon} = do
       treeIter' <- display textBuffer treeStore treeIter d "VariableAssignDeclaration" False

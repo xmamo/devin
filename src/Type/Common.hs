@@ -30,7 +30,7 @@ data Type where
 
 
 data Environment where
-  Environment :: [(Text, Type)] -> [(Text, Type, Bool)] -> [[(Text, [Type], Type)]] -> Environment
+  Environment :: [(Text, Type)] -> [(Text, Type)] -> [[(Text, [Type], Type)]] -> Environment
   deriving (Eq, Show, Read)
 
 

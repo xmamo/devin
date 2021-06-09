@@ -5,7 +5,6 @@ module Type.Internal (
   checkExpression
 ) where
 
-import Prelude hiding (span)
 import Control.Monad
 import Data.Either
 import Data.Foldable
@@ -36,7 +35,7 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
         where
           f (parameterTypes, environment) (Syntax.Identifier _ name, typeId) = do
             (t, Environment types' variables' functions') <- lookupType environment typeId
-            pure (parameterTypes ++ [t], Environment types' ((Unicode.collate name, t, True) : variables') functions')
+            pure (parameterTypes ++ [t], Environment types' ((Unicode.collate name, t) : variables') functions')
 
       Nothing -> pure ([], environment)
 
@@ -59,15 +58,11 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
         unless (isCompatible returnType Unit || doesReturn) (tell [MissingReturnPathError functionId parameterTypes])
         pure (Environment types'' variables functions)
 
-  (Pass2, Syntax.EmptyVariableDeclaration {variableId = Syntax.Identifier _ variableName, typeId}) -> do
-    (t, Environment types' variables' functions') <- lookupType environment typeId
-    pure (Environment types' ((Unicode.collate variableName, t, False) : variables') functions')
-
   (Pass2, Syntax.VariableDeclaration {variableId = Syntax.Identifier _ variableName, typeId, value}) -> do
     (t, environment') <- lookupType environment typeId
     (valueType, Environment types'' variables'' functions'') <- checkExpression environment' value
     unless (isCompatible valueType t) (tell [InvalidTypeError value t valueType])
-    pure (Environment types'' ((Unicode.collate variableName, t, True) : variables'') functions'')
+    pure (Environment types'' ((Unicode.collate variableName, t) : variables'') functions'')
 
   _ -> pure environment
 
@@ -81,27 +76,27 @@ checkStatement expectedType environment statement = case statement of
   Syntax.IfStatement {predicate, trueBranch} -> do
     (predicateType, environment') <- checkExpression environment predicate
     unless (isCompatible predicateType Bool) (tell [InvalidTypeError predicate Bool predicateType])
-    (_, environment'') <- checkStatement expectedType environment' trueBranch
-    pure (False, environment'')
+    checkStatement expectedType environment' trueBranch
+    pure (False, environment')
 
   Syntax.IfElseStatement {predicate, trueBranch, falseBranch} -> do
     (predicateType, environment') <- checkExpression environment predicate
     unless (isCompatible predicateType Bool) (tell [InvalidTypeError predicate Bool predicateType])
-    (doesTrueBranchReturn, environment'') <- checkStatement expectedType environment' trueBranch
-    (doesFalseBrachReturn, environment''') <- checkStatement expectedType environment'' falseBranch
-    pure (doesTrueBranchReturn && doesFalseBrachReturn, environment''')
+    (doesTrueBranchReturn, _) <- checkStatement expectedType environment' trueBranch
+    (doesFalseBrachReturn, _) <- checkStatement expectedType environment' falseBranch
+    pure (doesTrueBranchReturn && doesFalseBrachReturn, environment')
 
   Syntax.WhileStatement {predicate, body} -> do
     (predicateType, environment') <- checkExpression environment predicate
     unless (isCompatible predicateType Bool) (tell [InvalidTypeError predicate Bool predicateType])
-    (_, environment'') <- checkStatement expectedType environment' body
-    pure (False, environment'')
+    checkStatement expectedType environment' body
+    pure (False, environment')
 
   Syntax.DoWhileStatement {body, predicate} -> do
-    (doesReturn, environment') <- checkStatement expectedType environment body
-    (predicateType, environment'') <- checkExpression environment' predicate
+    (doesReturn, _) <- checkStatement expectedType environment body
+    (predicateType, environment') <- checkExpression environment predicate
     unless (isCompatible predicateType Bool) (tell [InvalidTypeError predicate Bool predicateType])
-    pure (doesReturn, environment'')
+    pure (doesReturn, environment')
 
   Syntax.ReturnStatement {result = Just result} -> do
     (resultType, environment') <- checkExpression environment result
@@ -131,7 +126,7 @@ checkExpression :: Environment -> Syntax.Expression () -> Writer [Error] (Type, 
 checkExpression environment = \case
   Syntax.IntegerExpression {} -> pure (Int, environment)
 
-  Syntax.VariableExpression {variableId} -> lookupVariableType True environment variableId
+  Syntax.VariableExpression {variableId} -> lookupVariableType environment variableId
 
   Syntax.CallExpression {targetId, arguments} -> do
     (argumentTs, environment') <- case arguments of
@@ -196,10 +191,7 @@ checkExpression environment = \case
 
   Syntax.AssignExpression {targetId, assign, value} -> do
     (valueType, environment') <- checkExpression environment value
-
-    (targetType, environment'') <- case assign of
-      Syntax.AssignOperator _ -> lookupVariableType False environment' targetId
-      _ -> lookupVariableType True environment' targetId
+    (targetType, environment'') <- lookupVariableType environment' targetId
 
     case (targetType, assign, valueType) of
       (Error, _, _) -> pure (Error, environment'')
@@ -240,24 +232,18 @@ lookupType environment typeId = do
       pure (Unknown typeName, Environment ((key, Error) : types) variables functions)
 
 
-lookupVariableType :: Bool -> Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
-lookupVariableType expectInitialized environment variableId = do
+lookupVariableType :: Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
+lookupVariableType environment variableId = do
   let Environment types variables functions = environment
       Syntax.Identifier _ variableName = variableId
       key = Unicode.collate variableName
-
-  case find (\(k, _, _) -> k == key) variables of
-    Just (_, t, True) -> pure (t, environment)
-
-    Just (_, t, False) | expectInitialized -> do
-      tell [UninitializedVariableError variableId]
-      pure (t, Environment types ((key, t, True) : variables) functions)
-
-    Just (_, t, False) -> pure (t, Environment types ((variableName, t, True) : variables) functions)
+  
+  case lookup key variables of
+    Just t -> pure (t, environment)
 
     Nothing -> do
       tell [UnknownIdentifierError variableId]
-      pure (Error, Environment types ((key, Error, expectInitialized) : variables) functions)
+      pure (Error, Environment types ((key, Error) : variables) functions)
 
 
 lookupFunctionType :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
