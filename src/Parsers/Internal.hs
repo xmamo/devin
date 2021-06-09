@@ -7,7 +7,7 @@ module Parsers.Internal (
   unaryOperator,
   binaryOperator,
   assignOperator,
-  integer,
+  literal,
   identifier,
   comment
 ) where
@@ -159,8 +159,8 @@ statement = asum
   ]
 
 
-integerExpression :: Parser (Syntax.Expression ())
-integerExpression = Syntax.IntegerExpression <$> integer <*> pure ()
+literalExpression :: Parser (Syntax.Expression ())
+literalExpression = Syntax.LiteralExpression <$> literal <*> pure ()
 
 
 variableExpression :: Parser (Syntax.Expression ())
@@ -196,7 +196,7 @@ unaryExpression = do
 
 
 operandExpression :: Parser (Syntax.Expression ())
-operandExpression = integerExpression <|> callExpression <|> unaryExpression <|> variableExpression
+operandExpression = literalExpression <|> callExpression <|> unaryExpression <|> variableExpression
 
 
 binaryExpressionOrOperandExpression :: Parser (Syntax.Expression ())
@@ -273,12 +273,26 @@ assignOperator = syntax $ asum
   ]
 
 
-integer :: Parser Syntax.Integer
-integer = Parser.label "integer" $ syntax do
+integerLiteral :: Parser Syntax.Literal
+integerLiteral = Parser.label "integer" $ syntax do
   sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> -1) <|> pure 1
   digits <- some (Parser.satisfy isDigit)
   let magnitude = foldl' (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
-  pure \span -> Syntax.Integer span (sign * magnitude)
+  pure \span -> Syntax.IntegerLiteral span (sign * magnitude)
+
+
+rationalLiteral :: Parser Syntax.Literal
+rationalLiteral = Parser.label "rational" $ syntax do
+  sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> -1) <|> pure 1
+  digits1 <- some (Parser.satisfy isDigit)
+  Parser.char '.'
+  digits2 <- some (Parser.satisfy isDigit)
+  let magnitude = foldl' (\a d -> 10 * a + toRational (digitToInt d)) 0 (digits1 ++ digits2) / 10 ^^ length digits2
+  pure \span -> Syntax.RationalLiteral span (sign * magnitude)
+
+
+literal :: Parser Syntax.Literal
+literal = rationalLiteral <|> integerLiteral
 
 
 -- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*

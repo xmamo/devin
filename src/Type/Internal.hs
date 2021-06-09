@@ -74,27 +74,27 @@ checkStatement expectedType environment statement = case statement of
 
   Syntax.IfStatement {predicate, trueBranch} -> do
     (predicateType, environment') <- checkExpression environment predicate
-    when (predicateType /= Bool) (tell [InvalidTypeError predicate Bool predicateType])
+    when (predicateType /= Boolean) (tell [InvalidTypeError predicate Boolean predicateType])
     checkStatement expectedType environment' trueBranch
     pure (False, environment')
 
   Syntax.IfElseStatement {predicate, trueBranch, falseBranch} -> do
     (predicateType, environment') <- checkExpression environment predicate
-    when (predicateType /= Bool) (tell [InvalidTypeError predicate Bool predicateType])
+    when (predicateType /= Boolean) (tell [InvalidTypeError predicate Boolean predicateType])
     (doesTrueBranchReturn, _) <- checkStatement expectedType environment' trueBranch
     (doesFalseBrachReturn, _) <- checkStatement expectedType environment' falseBranch
     pure (doesTrueBranchReturn && doesFalseBrachReturn, environment')
 
   Syntax.WhileStatement {predicate, body} -> do
     (predicateType, environment') <- checkExpression environment predicate
-    when (predicateType /= Bool) (tell [InvalidTypeError predicate Bool predicateType])
+    when (predicateType /= Boolean) (tell [InvalidTypeError predicate Boolean predicateType])
     checkStatement expectedType environment' body
     pure (False, environment')
 
   Syntax.DoWhileStatement {body, predicate} -> do
     (doesReturn, _) <- checkStatement expectedType environment body
     (predicateType, environment') <- checkExpression environment predicate
-    when (predicateType /= Bool) (tell [InvalidTypeError predicate Bool predicateType])
+    when (predicateType /= Boolean) (tell [InvalidTypeError predicate Boolean predicateType])
     pure (doesReturn, environment')
 
   Syntax.ReturnStatement {result = Just result} -> do
@@ -123,7 +123,9 @@ checkStatement expectedType environment statement = case statement of
 
 checkExpression :: Environment -> Syntax.Expression () -> Writer [Error] (Type, Environment)
 checkExpression environment = \case
-  Syntax.IntegerExpression {} -> pure (Int, environment)
+  Syntax.LiteralExpression {literal = Syntax.IntegerLiteral {}} -> pure (Integer, environment)
+
+  Syntax.LiteralExpression {literal = Syntax.RationalLiteral {}} -> pure (Rational, environment)
 
   Syntax.VariableExpression {variableId} -> lookupVariableType environment variableId
 
@@ -144,11 +146,11 @@ checkExpression environment = \case
 
     case (unary, operandType) of
       (_, Error) -> pure (Error, environment')
-      (Syntax.PlusOperator _, Int) -> pure (Int, environment')
-      (Syntax.PlusOperator _, Float) -> pure (Float, environment')
-      (Syntax.MinusOperator _, Int) -> pure (Int, environment')
-      (Syntax.MinusOperator _, Float) -> pure (Float, environment')
-      (Syntax.NotOperator _, Bool) -> pure (Bool, environment')
+      (Syntax.PlusOperator _, Integer) -> pure (Integer, environment')
+      (Syntax.PlusOperator _, Rational) -> pure (Rational, environment')
+      (Syntax.MinusOperator _, Integer) -> pure (Integer, environment')
+      (Syntax.MinusOperator _, Rational) -> pure (Rational, environment')
+      (Syntax.NotOperator _, Boolean) -> pure (Boolean, environment')
 
       _ -> do
         tell [InvalidUnaryError unary operandType]
@@ -161,28 +163,28 @@ checkExpression environment = \case
     case (leftType, binary, rightType) of
       (Error, _, _) -> pure (Error, environment'')
       (_, _, Error) -> pure (Error, environment'')
-      (Int, Syntax.AddOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.AddOperator _, Float) -> pure (Float, environment'')
-      (Int, Syntax.SubtractOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.SubtractOperator _, Float) -> pure (Float, environment'')
-      (Int, Syntax.MultiplyOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.MultiplyOperator _, Float) -> pure (Float, environment'')
-      (Int, Syntax.DivideOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.DivideOperator _, Float) -> pure (Float, environment'')
-      (Int, Syntax.RemainderOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.RemainderOperator _, Float) -> pure (Float, environment'')
-      (_, Syntax.EqualOperator _, _) -> pure (Bool, environment'')
-      (_, Syntax.NotEqualOperator _, _) -> pure (Bool, environment'')
-      (Int, Syntax.LessOperator _, Int) -> pure (Bool, environment'')
-      (Float, Syntax.LessOperator _, Float) -> pure (Bool, environment'')
-      (Int, Syntax.LessOrEqualOperator _, Int) -> pure (Bool, environment'')
-      (Float, Syntax.LessOrEqualOperator _, Float) -> pure (Bool, environment'')
-      (Int, Syntax.GreaterOperator _, Int) -> pure (Bool, environment'')
-      (Float, Syntax.GreaterOperator _, Float) -> pure (Bool, environment'')
-      (Int, Syntax.GreaterOrEqualOperator _, Int) -> pure (Bool, environment'')
-      (Float, Syntax.GreaterOrEqualOperator _, Float) -> pure (Bool, environment'')
-      (Bool, Syntax.AndOperator _, Bool) -> pure (Bool, environment'')
-      (Bool, Syntax.OrOperator _, Bool) -> pure (Bool, environment'')
+      (Integer, Syntax.AddOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.AddOperator _, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.SubtractOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.SubtractOperator _, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.MultiplyOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.MultiplyOperator _, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.DivideOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.DivideOperator _, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.RemainderOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.RemainderOperator _, Rational) -> pure (Rational, environment'')
+      (_, Syntax.EqualOperator _, _) -> pure (Boolean, environment'')
+      (_, Syntax.NotEqualOperator _, _) -> pure (Boolean, environment'')
+      (Integer, Syntax.LessOperator _, Integer) -> pure (Boolean, environment'')
+      (Rational, Syntax.LessOperator _, Rational) -> pure (Boolean, environment'')
+      (Integer, Syntax.LessOrEqualOperator _, Integer) -> pure (Boolean, environment'')
+      (Rational, Syntax.LessOrEqualOperator _, Rational) -> pure (Boolean, environment'')
+      (Integer, Syntax.GreaterOperator _, Integer) -> pure (Boolean, environment'')
+      (Rational, Syntax.GreaterOperator _, Rational) -> pure (Boolean, environment'')
+      (Integer, Syntax.GreaterOrEqualOperator _, Integer) -> pure (Boolean, environment'')
+      (Rational, Syntax.GreaterOrEqualOperator _, Rational) -> pure (Boolean, environment'')
+      (Boolean, Syntax.AndOperator _, Boolean) -> pure (Boolean, environment'')
+      (Boolean, Syntax.OrOperator _, Boolean) -> pure (Boolean, environment'')
 
       _ -> do
         tell [InvalidBinaryError binary leftType rightType]
@@ -196,19 +198,19 @@ checkExpression environment = \case
       (Error, _, _) -> pure (Error, environment'')
       (_, _, Error) -> pure (Error, environment'')
       (Unit, Syntax.AssignOperator _, Unit) -> pure (Unit, environment'')
-      (Bool, Syntax.AssignOperator _, Bool) -> pure (Bool, environment'')
-      (Int, Syntax.AssignOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.AssignOperator _, Float) -> pure (Float, environment'')
-      (Int, Syntax.AddAssignOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.AddAssignOperator _, Float) -> pure (Float, environment'')
-      (Int, Syntax.SubtractAssignOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.SubtractAssignOperator _, Float) -> pure (Float, environment'')
-      (Int, Syntax.MultiplyAssignOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.MultiplyAssignOperator _, Float) -> pure (Float, environment'')
-      (Int, Syntax.DivideAssignOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.DivideAssignOperator _, Float) -> pure (Float, environment'')
-      (Int, Syntax.RemainderAssignOperator _, Int) -> pure (Int, environment'')
-      (Float, Syntax.RemainderAssignOperator _, Float) -> pure (Float, environment'')
+      (Boolean, Syntax.AssignOperator _, Boolean) -> pure (Boolean, environment'')
+      (Integer, Syntax.AssignOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.AssignOperator _, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.AddAssignOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.AddAssignOperator _, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.SubtractAssignOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.SubtractAssignOperator _, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.MultiplyAssignOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.MultiplyAssignOperator _, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.DivideAssignOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.DivideAssignOperator _, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.RemainderAssignOperator _, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.RemainderAssignOperator _, Rational) -> pure (Rational, environment'')
 
       _ -> do
         tell [InvalidAssignError assign targetType valueType]

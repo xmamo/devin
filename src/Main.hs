@@ -48,7 +48,7 @@ onActivate isApplication = do
           ("keyword", "def:keyword"),
           ("identifier", "def:identifier"),
           ("type", "def:type"),
-          ("integer", "def:decimal"),
+          ("number", "def:number"),
           ("operator", "def:operator"),
           ("comment", "def:comment"),
           ("error", "def:error"),
@@ -285,7 +285,7 @@ highlightExpression isTextBuffer = go
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-    go Syntax.IntegerExpression {integer} = highlight textBuffer "integer" (Syntax.span integer)
+    go Syntax.LiteralExpression {literal} = highlight textBuffer "number" (Syntax.span literal)
 
     go Syntax.VariableExpression {variableId} = highlight textBuffer "identifier" (Syntax.span variableId)
 
@@ -396,7 +396,7 @@ highlightExpressionParentheses isTextBuffer expression insertTextIter = go expre
   where
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
 
-    go Syntax.IntegerExpression {} = pure False
+    go Syntax.LiteralExpression {} = pure False
 
     go Syntax.VariableExpression {} = pure False
 
@@ -590,9 +590,9 @@ displayExpression isTextBuffer isTreeStore = go
     textBuffer = isTextBuffer `asA` Gtk.TextBuffer
     treeStore = isTreeStore `asA` Gtk.TreeStore
 
-    go treeIter e @ Syntax.IntegerExpression {integer} = do
+    go treeIter e @ Syntax.LiteralExpression {literal} = do
       treeIter' <- display textBuffer treeStore treeIter e "IntegerExpression" False
-      display textBuffer treeStore treeIter' integer "Integer" True
+      displayLiteral textBuffer treeStore treeIter' literal
       pure treeIter'
 
     go treeIter e @ Syntax.VariableExpression {variableId} = do
@@ -692,6 +692,14 @@ displayAssignOperator isTextBuffer isTreeStore treeIter assign =
       Syntax.MultiplyAssignOperator _ -> "MultiplyAssignOperator"
       Syntax.DivideAssignOperator _ -> "DivideAssignOperator"
       Syntax.RemainderAssignOperator _ -> "RemainderAssignOperator"
+
+
+displayLiteral ::
+  (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.Literal -> IO (Maybe Gtk.TreeIter)
+displayLiteral isTextBuffer isTreeStore treeIter = \case
+  l @ Syntax.IntegerLiteral {} -> display isTextBuffer isTreeStore treeIter l "IntegerLiteral" True
+  l @ Syntax.RationalLiteral {} -> display isTextBuffer isTreeStore treeIter l "RationalLiteral" True
 
 
 display ::

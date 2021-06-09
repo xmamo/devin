@@ -6,15 +6,14 @@ module Syntax (
   UnaryOperator (..),
   BinaryOperator (..),
   AssignOperator (..),
-  Integer (..),
+  Literal (..),
   Identifier (..),
   Token (..),
   Comment (..),
   comparePrecedence
 ) where
 
-import Prelude hiding (Integer, span)
-import qualified Prelude
+import Prelude hiding (span)
 import Data.Ord
 
 import Data.Text (Text)
@@ -118,8 +117,8 @@ data Statement a where
   deriving (Eq, Show, Read)
 
 data Expression a where
-  IntegerExpression :: {
-    integer :: Integer,
+  LiteralExpression :: {
+    literal :: Literal,
     extra :: a
   } -> Expression a
 
@@ -200,8 +199,9 @@ data AssignOperator where
   deriving (Eq, Show, Read)
 
 
-data Integer where
-  Integer :: Span -> Prelude.Integer -> Integer
+data Literal where
+  IntegerLiteral :: Span -> Integer -> Literal
+  RationalLiteral :: Span -> Rational -> Literal
   deriving (Eq, Show, Read)
 
 
@@ -247,7 +247,7 @@ instance Syntax (Statement a) where
 
 
 instance Syntax (Expression a) where
-  span IntegerExpression {integer} = span integer
+  span LiteralExpression {literal} = span literal
   span VariableExpression {variableId} = span variableId
   span expression = Span (start expression) (end expression)
 
@@ -297,8 +297,9 @@ instance Syntax BinaryOperator where
   span (OrOperator s) = s
 
 
-instance Syntax Integer where
-  span (Integer s _) = s
+instance Syntax Literal where
+  span (IntegerLiteral s _) = s
+  span (RationalLiteral s _) = s
 
 
 instance Syntax Identifier where

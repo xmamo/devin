@@ -22,9 +22,9 @@ import qualified Unicode
 
 data Type where
   Unit :: Type
-  Bool :: Type
-  Int :: Type
-  Float :: Type
+  Boolean :: Type
+  Integer :: Type
+  Rational :: Type
   Function :: [Type] -> Type -> Type
   Unknown :: Text -> Type
   Error :: Type
@@ -66,9 +66,9 @@ instance Eq Type where
   Error == _ = True
   _ == Error = True
   Unit == Unit = True
-  Bool == Bool = True
-  Int == Int = True
-  Float == Float = True
+  Boolean == Boolean = True
+  Integer == Integer = True
+  Rational == Rational = True
   Function pts1 rt1 == Function pts2 rt2 = pts1 == pts2 && rt1 == rt2
   Unknown n1 == Unknown n2 = Unicode.collate n1 == Unicode.collate n2
   _ == _ = False
@@ -140,9 +140,9 @@ description = \case
 
   where
     label Unit = "Unit"
-    label Bool = "Bool"
-    label Int = "Int"
-    label Float = "Float"
+    label Boolean = "Boolean"
+    label Integer = "Integer"
+    label Rational = "Rational"
     label (Function parameterTypes returnType) = "(" <> labels parameterTypes <> ") -> " <> label returnType
     label (Unknown name) = name
     label Error = "⊥"

@@ -7,7 +7,7 @@ module Parsers (
   unaryOperator,
   binaryOperator,
   assignOperator,
-  integer,
+  literal,
   identifier,
   comment
 ) where
@@ -51,8 +51,8 @@ assignOperator :: Applicative m => Parser m Syntax.AssignOperator
 assignOperator = run Internal.assignOperator
 
 
-integer :: Applicative m => Parser m Syntax.Integer
-integer = run Internal.integer
+literal :: Applicative m => Parser m Syntax.Literal
+literal = run Internal.literal
 
 
 identifier :: Applicative m => Parser m Syntax.Identifier

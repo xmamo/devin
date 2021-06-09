@@ -51,16 +51,16 @@ defaultEnvironment = Environment types variables functions
     types =
       [
         (Unicode.collate "Unit", Unit),
-        (Unicode.collate "Bool", Bool),
-        (Unicode.collate "Int", Int),
-        (Unicode.collate "Float", Float)
+        (Unicode.collate "Boolean", Boolean),
+        (Unicode.collate "Integer", Integer),
+        (Unicode.collate "Rational", Rational)
       ]
 
     variables =
       [
         (Unicode.collate "unit", Unit),
-        (Unicode.collate "true", Bool),
-        (Unicode.collate "false", Bool)
+        (Unicode.collate "true", Boolean),
+        (Unicode.collate "false", Boolean)
       ]
 
     functions =
@@ -68,9 +68,9 @@ defaultEnvironment = Environment types variables functions
         [],
 
         [
-          (Unicode.collate "int", [Int], Int),
-          (Unicode.collate "int", [Float], Int),
-          (Unicode.collate "float", [Int], Float),
-          (Unicode.collate "float", [Float], Float)
+          (Unicode.collate "integer", [Integer], Integer),
+          (Unicode.collate "integer", [Rational], Integer),
+          (Unicode.collate "rational", [Integer], Rational),
+          (Unicode.collate "rational", [Rational], Rational)
         ]
       ]
