@@ -8,6 +8,9 @@ module Type.Internal (
 import Control.Monad
 import Data.Either
 import Data.Foldable
+import Data.Functor
+
+import qualified Data.Map as Map
 
 import Control.Monad.Trans.Writer
 
@@ -34,7 +37,8 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
         where
           f (parameterTypes, environment) (Syntax.Identifier _ name, typeId) = do
             (t, Environment types' variables' functions') <- lookupType environment typeId
-            pure (parameterTypes ++ [t], Environment types' ((Unicode.collate name, t) : variables') functions')
+            let variables'' = Map.insert (Unicode.collate name) t variables'
+            pure (parameterTypes ++ [t], Environment types' variables'' functions')
 
       Nothing -> pure ([], environment)
 
@@ -45,12 +49,17 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
     case pass of
       Pass1 -> do
         let key = Unicode.collate functionName
+        functions''' <- Map.alterF f key (head functions'') <&> (: tail functions'')
+        pure (Environment types'' variables functions''')
 
-        if any (\(k, pts, _) -> k == key && pts == parameterTypes) (head functions'') then do
-          tell [DuplicateFunctionDefinition functionId parameterTypes]
-          pure (Environment types'' variables functions'')
-        else
-          pure (Environment types'' variables (((key, parameterTypes, returnType) : head functions'') : tail functions''))
+        where
+          f (Just signatures) | any ((== parameterTypes) . fst) signatures = do
+            tell [DuplicateFunctionDefinition functionId parameterTypes]
+            pure (Just signatures)
+
+          f (Just signatures) = pure (Just ((parameterTypes, returnType) : signatures))
+
+          f Nothing = pure (Just [(parameterTypes, returnType)])
 
       Pass2 -> do
         (doesReturn, _) <- checkStatement returnType (Environment types'' variables'' functions) body
@@ -62,12 +71,14 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
     (t, environment') <- lookupType environment typeId
     (valueType, Environment types'' variables'' functions'') <- checkExpression environment' value
     when (valueType /= t) (tell [InvalidTypeError value t valueType])
-    pure (Environment types'' ((Unicode.collate variableName, t) : variables'') functions'')
+    let variables''' = Map.insert (Unicode.collate variableName) t variables''
+    pure (Environment types'' variables''' functions'')
 
   (Pass2, Syntax.VariableDeclaration {variableId, typeInfo = Nothing, value}) -> do
     let Syntax.Identifier _ variableName = variableId
     (valueType, Environment types' variables' functions') <- checkExpression environment value
-    pure (Environment types' ((Unicode.collate variableName, valueType) : variables') functions')
+    let variables'' = Map.insert (Unicode.collate variableName) valueType variables'
+    pure (Environment types' variables'' functions')
 
   _ -> pure environment
 
@@ -114,9 +125,12 @@ checkStatement expectedType environment statement = case statement of
 
   Syntax.BlockStatement {elements} -> do
     let Environment types variables functions = environment
-    environment' <- foldlM (checkDeclaration Pass1) (Environment types variables ([] : functions)) (lefts elements)
+        functions' = Map.empty : functions
+
+    environment' <- foldlM (checkDeclaration Pass1) (Environment types variables functions') (lefts elements)
     (doesReturn, _) <- foldlM f (False, environment') elements
     pure (doesReturn, environment)
+
     where
       f (doesReturn, environment) (Left declaration) = do
         environment' <- checkDeclaration Pass2 environment declaration
@@ -231,12 +245,12 @@ lookupType environment typeId = do
       Syntax.Identifier _ typeName = typeId
       key = Unicode.collate typeName
 
-  case lookup key types of
-    Just t -> pure (t, environment)
+  case Map.insertLookupWithKey (\_ _ old -> old) key Error types of
+    (Just t, types') -> pure (t, Environment types' variables functions)
 
-    Nothing -> do
+    (Nothing, types') -> do
       tell [UnknownTypeError typeId]
-      pure (Unknown typeName, Environment ((key, Error) : types) variables functions)
+      pure (Unknown typeName, Environment types' variables functions)
 
 
 lookupVariableType :: Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
@@ -245,12 +259,12 @@ lookupVariableType environment variableId = do
       Syntax.Identifier _ variableName = variableId
       key = Unicode.collate variableName
 
-  case lookup key variables of
-    Just t -> pure (t, environment)
+  case Map.insertLookupWithKey (\_ _ old -> old) key Error variables of
+    (Just t, variables') -> pure (t, Environment types variables' functions)
 
-    Nothing -> do
+    (Nothing, variables') -> do
       tell [UnknownIdentifierError variableId]
-      pure (Error, Environment types ((key, Error) : variables) functions)
+      pure (Error, Environment types variables' functions)
 
 
 lookupFunctionType :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
@@ -262,9 +276,12 @@ lookupFunctionType environment functionId parameterTypes = go functions
 
     go [] = do
       tell [UnknownFunctionError functionId parameterTypes]
-      pure (Error, Environment types variables (((key, parameterTypes, Error) : head functions) : tail functions))
+      pure (Error, Environment types variables [Map.singleton key [(parameterTypes, Error)]])
 
-    go functions = case find (\(k, pts, _) -> k == key && pts == parameterTypes) (head functions) of
-      Just (_, _, returnType) | not (any isError parameterTypes) -> pure (returnType, environment)
-      Just _ -> pure (Error, environment)
+    go functions = case Map.lookup key (head functions) of
+      Just signatures -> case lookup parameterTypes signatures of
+        Just _ | any isError parameterTypes -> pure (Error, environment)
+        Just returnType -> pure (returnType, environment)
+        Nothing -> go (tail functions)
+
       Nothing -> go (tail functions)

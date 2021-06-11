@@ -15,6 +15,8 @@ import Prelude hiding (span)
 import Data.Text (Text)
 import qualified Data.Text as Text
 
+import Data.Map (Map)
+
 import Span (Span)
 import qualified Syntax
 import qualified Unicode
@@ -33,9 +35,9 @@ data Type where
 
 data Environment where
   Environment :: {
-    types :: [(Text, Type)],
-    variables :: [(Text, Type)],
-    functions :: [[(Text, [Type], Type)]]
+    types :: Map Text Type,
+    variables :: Map Text Type,
+    functions :: [Map Text [([Type], Type)]]
   } -> Environment
 
   deriving (Eq, Show, Read)

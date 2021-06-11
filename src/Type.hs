@@ -17,6 +17,8 @@ module Type (
 
 import Prelude hiding (span)
 
+import qualified Data.Map as Map
+
 import Control.Monad.Trans.Writer
 
 import qualified Syntax
@@ -48,7 +50,7 @@ checkExpression environment expression =
 defaultEnvironment :: Environment
 defaultEnvironment = Environment types variables functions
   where
-    types =
+    types = Map.fromList
       [
         (Unicode.collate "Unit", Unit),
         (Unicode.collate "Boolean", Boolean),
@@ -56,7 +58,7 @@ defaultEnvironment = Environment types variables functions
         (Unicode.collate "Rational", Rational)
       ]
 
-    variables =
+    variables = Map.fromList
       [
         (Unicode.collate "unit", Unit),
         (Unicode.collate "true", Boolean),
@@ -65,12 +67,10 @@ defaultEnvironment = Environment types variables functions
 
     functions =
       [
-        [],
+        Map.empty,
 
-        [
-          (Unicode.collate "integer", [Integer], Integer),
-          (Unicode.collate "integer", [Rational], Integer),
-          (Unicode.collate "rational", [Integer], Rational),
-          (Unicode.collate "rational", [Rational], Rational)
+        Map.fromList [
+          (Unicode.collate "integer", [([Integer], Integer), ([Rational], Integer)]),
+          (Unicode.collate "rational", [([Integer], Rational), ([Rational], Rational)])
         ]
       ]

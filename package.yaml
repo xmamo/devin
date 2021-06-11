@@ -49,6 +49,7 @@ ghc-options:
 dependencies:
   - base
   - text
+  - containers
   - transformers
   - haskell-gi-base
   - gi-glib
