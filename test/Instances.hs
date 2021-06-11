@@ -1,6 +1,7 @@
 module Instances () where
 
 import Data.Foldable
+import Data.Functor
 import Data.Maybe
 import Control.Applicative
 
@@ -28,8 +29,8 @@ instance EqProp a => EqProp (Result a) where
     [
       isFatal1 =-= isFatal2,
       position1 =-= position2,
-      conjoin ((`elem` expectations2) <$> expectations1),
-      conjoin ((`elem` expectations1) <$> expectations2)
+      conjoin (expectations1 <&> (`elem` expectations2)),
+      conjoin (expectations2 <&> (`elem` expectations1))
     ]
 
   _ =-= _ = property False

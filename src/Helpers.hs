@@ -23,8 +23,8 @@ expectationsText expectations = "Expected " <> go expectations
 
 
 getInsertTextIter :: Gtk.IsTextBuffer a => a -> IO Gtk.TextIter
-getInsertTextIter isTextBuffer = do
-  let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
+getInsertTextIter textBuffer' = do
+  let textBuffer = textBuffer' `asA` Gtk.TextBuffer
   insertTextMark <- #getInsert textBuffer
   #getIterAtMark textBuffer insertTextMark
 
@@ -50,10 +50,10 @@ getLineColumn textIter = do
 
 
 getStyle :: (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b) => a -> b -> Text -> IO (Maybe GtkSource.Style)
-getStyle isLanguage isStyleScheme styleId = go styleId []
+getStyle language' styleScheme' styleId = go styleId []
   where
-    language = isLanguage `asA` GtkSource.Language
-    styleScheme = isStyleScheme `asA` GtkSource.StyleScheme
+    language = language' `asA` GtkSource.Language
+    styleScheme = styleScheme' `asA` GtkSource.StyleScheme
 
     go styleId seen = #getStyle styleScheme styleId >>= \case
       Just style -> pure (Just style)

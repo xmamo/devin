@@ -40,10 +40,8 @@ main = do
 
 
 onActivate :: Gtk.IsApplication a => a -> Gio.ApplicationActivateCallback
-onActivate isApplication = do
-  let application = isApplication `asA` Gtk.Application
-
-      styleIds =
+onActivate application = do
+  let styleIds =
         [
           ("keyword", "def:keyword"),
           ("identifier", "def:identifier"),
@@ -212,10 +210,8 @@ onActivate isApplication = do
 
 
 highlightDeclaration :: Gtk.IsTextBuffer a => a -> Syntax.Declaration b -> IO ()
-highlightDeclaration isTextBuffer = go
+highlightDeclaration textBuffer = go
   where
-    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
     go Syntax.VariableDeclaration {varKeyword, variableId, typeInfo, value} = do
       highlight textBuffer "keyword" (Syntax.span varKeyword)
       highlight textBuffer "identifier" (Syntax.span variableId)
@@ -241,10 +237,8 @@ highlightDeclaration isTextBuffer = go
 
 
 highlightStatement :: Gtk.IsTextBuffer a => a -> Syntax.Statement b -> IO ()
-highlightStatement isTextBuffer = go
+highlightStatement textBuffer = go
   where
-    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
     go Syntax.ExpressionStatement {value} = highlightExpression textBuffer value
 
     go Syntax.IfStatement {ifKeyword, predicate, trueBranch} = do
@@ -281,10 +275,8 @@ highlightStatement isTextBuffer = go
 
 
 highlightExpression :: Gtk.IsTextBuffer a => a -> Syntax.Expression b -> IO ()
-highlightExpression isTextBuffer = go
+highlightExpression textBuffer = go
   where
-    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
     go Syntax.LiteralExpression {literal} = highlight textBuffer "number" (Syntax.span literal)
 
     go Syntax.VariableExpression {variableId} = highlight textBuffer "identifier" (Syntax.span variableId)
@@ -314,10 +306,8 @@ highlightExpression isTextBuffer = go
 
 
 highlightDeclarationParentheses :: Gtk.IsTextBuffer a => a -> Syntax.Declaration b -> Gtk.TextIter -> IO Bool
-highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go declaration
+highlightDeclarationParentheses textBuffer declaration insertTextIter = go declaration
   where
-    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
     go Syntax.VariableDeclaration {value} = highlightExpressionParentheses textBuffer value insertTextIter
 
     go Syntax.FunctionDeclaration {open, close, body} = do
@@ -330,10 +320,8 @@ highlightDeclarationParentheses isTextBuffer declaration insertTextIter = go dec
 
 
 highlightStatementParentheses :: Gtk.IsTextBuffer a => a -> Syntax.Statement b -> Gtk.TextIter -> IO Bool
-highlightStatementParentheses isTextBuffer statement insertTextIter = go statement
+highlightStatementParentheses textBuffer statement insertTextIter = go statement
   where
-    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
     go Syntax.ExpressionStatement {value} = highlightExpressionParentheses textBuffer value insertTextIter
 
     go Syntax.IfStatement {predicate, trueBranch} = do
@@ -392,10 +380,8 @@ highlightStatementParentheses isTextBuffer statement insertTextIter = go stateme
 
 
 highlightExpressionParentheses :: Gtk.IsTextBuffer a => a -> Syntax.Expression b -> Gtk.TextIter -> IO Bool
-highlightExpressionParentheses isTextBuffer expression insertTextIter = go expression
+highlightExpressionParentheses textBuffer expression insertTextIter = go expression
   where
-    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-
     go Syntax.LiteralExpression {} = pure False
 
     go Syntax.VariableExpression {} = pure False
@@ -440,8 +426,8 @@ highlightExpressionParentheses isTextBuffer expression insertTextIter = go expre
 
 
 highlightParentheses :: (Gtk.IsTextBuffer a, Syntax b, Syntax c) => a -> b -> c -> Gtk.TextIter -> IO Bool
-highlightParentheses isTextBuffer open close insertTextIter = do
-  let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
+highlightParentheses textBuffer' open close insertTextIter = do
+  let textBuffer = textBuffer' `asA` Gtk.TextBuffer
 
   openStartTextIter <- #getIterAtOffset textBuffer (Syntax.start open)
   openEndTextIter <- #getIterAtOffset textBuffer (Syntax.end open)
@@ -461,8 +447,8 @@ highlightParentheses isTextBuffer open close insertTextIter = do
 
 
 highlight :: Gtk.IsTextBuffer a => a -> Text -> Span -> IO ()
-highlight isTextBuffer tagName span = do
-  let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
+highlight textBuffer' tagName span = do
+  let textBuffer = textBuffer' `asA` Gtk.TextBuffer
   startTextIter <- #getIterAtOffset textBuffer (Span.start span)
   endTextIter <- #getIterAtOffset textBuffer (Span.end span)
   #applyTagByName textBuffer tagName startTextIter endTextIter
@@ -471,11 +457,8 @@ highlight isTextBuffer tagName span = do
 displayDeclaration ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.Declaration c -> IO (Maybe Gtk.TreeIter)
-displayDeclaration isTextBuffer isTreeStore = go
+displayDeclaration textBuffer treeStore = go
   where
-    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-    treeStore = isTreeStore `asA` Gtk.TreeStore
-
     go treeIter d @ Syntax.VariableDeclaration {varKeyword, variableId, typeInfo, equalSign, value, semicolon} = do
       treeIter' <- display textBuffer treeStore treeIter d "VariableAssignDeclaration" False
       display textBuffer treeStore treeIter' varKeyword "Token" True
@@ -526,11 +509,8 @@ displayDeclaration isTextBuffer isTreeStore = go
 displayStatement ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement c -> IO (Maybe Gtk.TreeIter)
-displayStatement isTextBuffer isTreeStore = go
+displayStatement textBuffer treeStore = go
   where
-    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-    treeStore = isTreeStore `asA` Gtk.TreeStore
-
     go treeIter s @ Syntax.ExpressionStatement {value, semicolon} = do
       treeIter' <- display textBuffer treeStore treeIter s "ExpressionStatement" False
       displayExpression textBuffer treeStore treeIter' value
@@ -590,13 +570,10 @@ displayStatement isTextBuffer isTreeStore = go
 displayExpression ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression c -> IO (Maybe Gtk.TreeIter)
-displayExpression isTextBuffer isTreeStore = go
+displayExpression textBuffer treeStore = go
   where
-    textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-    treeStore = isTreeStore `asA` Gtk.TreeStore
-
     go treeIter e @ Syntax.LiteralExpression {literal} = do
-      treeIter' <- display textBuffer treeStore treeIter e "IntegerExpression" False
+      treeIter' <- display textBuffer treeStore treeIter e "LiteralExpression" False
       displayLiteral textBuffer treeStore treeIter' literal
       pure treeIter'
 
@@ -653,8 +630,7 @@ displayExpression isTextBuffer isTreeStore = go
 displayUnaryOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator -> IO (Maybe Gtk.TreeIter)
-displayUnaryOperator isTextBuffer isTreeStore treeIter unary =
-  display isTextBuffer isTreeStore treeIter unary label True
+displayUnaryOperator textBuffer treeStore treeIter unary = display textBuffer treeStore treeIter unary label True
   where
     label = case unary of
       Syntax.PlusOperator _ -> "PlusOperator"
@@ -665,8 +641,7 @@ displayUnaryOperator isTextBuffer isTreeStore treeIter unary =
 displayBinaryOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator -> IO (Maybe Gtk.TreeIter)
-displayBinaryOperator isTextBuffer isTreeStore treeIter binary =
-  display isTextBuffer isTreeStore treeIter binary label True
+displayBinaryOperator textBuffer treeStore treeIter binary = display textBuffer treeStore treeIter binary label True
   where
     label = case binary of
       Syntax.AddOperator _ -> "AddOperator"
@@ -687,8 +662,7 @@ displayBinaryOperator isTextBuffer isTreeStore treeIter binary =
 displayAssignOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator -> IO (Maybe Gtk.TreeIter)
-displayAssignOperator isTextBuffer isTreeStore treeIter assign =
-  display isTextBuffer isTreeStore treeIter assign label True
+displayAssignOperator textBuffer treeStore treeIter assign = display textBuffer treeStore treeIter assign label True
   where
     label = case assign of
       Syntax.AssignOperator _ -> "AssignOperator"
@@ -702,17 +676,17 @@ displayAssignOperator isTextBuffer isTreeStore treeIter assign =
 displayLiteral ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.Literal -> IO (Maybe Gtk.TreeIter)
-displayLiteral isTextBuffer isTreeStore treeIter = \case
-  l @ Syntax.IntegerLiteral {} -> display isTextBuffer isTreeStore treeIter l "IntegerLiteral" True
-  l @ Syntax.RationalLiteral {} -> display isTextBuffer isTreeStore treeIter l "RationalLiteral" True
+displayLiteral textBuffer treeStore treeIter = \case
+  l @ Syntax.IntegerLiteral {} -> display textBuffer treeStore treeIter l "IntegerLiteral" True
+  l @ Syntax.RationalLiteral {} -> display textBuffer treeStore treeIter l "RationalLiteral" True
 
 
 display ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax c) =>
   a -> b -> Maybe Gtk.TreeIter -> c -> Text -> Bool -> IO (Maybe Gtk.TreeIter)
-display isTextBuffer isTreeStore treeIter syntax label isLeaf = do
-  let textBuffer = isTextBuffer `asA` Gtk.TextBuffer
-      treeStore = isTreeStore `asA` Gtk.TreeStore
+display textBuffer' treeStore' treeIter syntax label isLeaf = do
+  let textBuffer = textBuffer' `asA` Gtk.TextBuffer
+      treeStore = treeStore' `asA` Gtk.TreeStore
 
   treeIter' <- #append treeStore treeIter
 

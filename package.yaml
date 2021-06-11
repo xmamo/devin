@@ -74,16 +74,16 @@ executables:
   devin:
     main: Main.hs
     source-dirs: app
-    default-extensions: [PackageImports]
-    ghc-options: [-threaded]
-    dependencies: [devin]
+    default-extensions: PackageImports
+    ghc-options: -threaded
+    dependencies: devin
 
 tests:
   devin-test:
     main: Spec.hs
     source-dirs: test
-    ghc-options: [-Wno-orphans]
-    build-tools: [hspec-discover:hspec-discover]
+    ghc-options: -Wno-orphans
+    build-tools: hspec-discover:hspec-discover
 
     dependencies:
       - QuickCheck
