@@ -32,10 +32,9 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
         Syntax.Identifier _ functionName = functionId
 
     (parameterTypes, environment') <- case parameters of
-      Just ((id, _, typeId), rest) ->
-        foldlM f ([], environment) ((id, typeId) : [(id, typeId) | (_, id, _, typeId) <- rest])
+      Just ((id, colon, typeId), rest) -> foldlM f ([], environment) ((undefined, id, colon, typeId) : rest)
         where
-          f (parameterTypes, environment) (Syntax.Identifier _ name, typeId) = do
+          f (parameterTypes, environment) (_, Syntax.Identifier _ name, _, typeId) = do
             (t, Environment types' variables' functions') <- lookupType environment typeId
             let variables'' = Map.insert (Unicode.collate name) t variables'
             pure (parameterTypes ++ [t], Environment types' variables'' functions')
@@ -143,17 +142,17 @@ checkStatement expectedType environment statement = case statement of
 
 checkExpression :: Environment -> Syntax.Expression () -> Writer [Error] (Type, Environment)
 checkExpression environment = \case
-  Syntax.LiteralExpression {literal = Syntax.IntegerLiteral {}} -> pure (Integer, environment)
+  Syntax.LiteralExpression {literal = Syntax.IntegerLiteral _ _} -> pure (Integer, environment)
 
-  Syntax.LiteralExpression {literal = Syntax.RationalLiteral {}} -> pure (Rational, environment)
+  Syntax.LiteralExpression {literal = Syntax.RationalLiteral _ _} -> pure (Rational, environment)
 
   Syntax.VariableExpression {variableId} -> lookupVariableType environment variableId
 
   Syntax.CallExpression {targetId, arguments} -> do
     (argumentTs, environment') <- case arguments of
-      Just (first, rest) -> foldlM f ([], environment) (first : map snd rest)
+      Just (first, rest) -> foldlM f ([], environment) ((undefined, first) : rest)
         where
-          f (argumentTs, environment) argument = do
+          f (argumentTs, environment) (_, argument) = do
             (t, environment') <- checkExpression environment argument
             pure (argumentTs ++ [t], environment')
 

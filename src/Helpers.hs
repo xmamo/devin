@@ -1,15 +1,37 @@
 module Helpers (
+  allM,
+  anyM,
+  andM,
+  orM,
   expectationsText,
   getInsertTextIter,
   getLineColumn,
   getStyle
 ) where
 
+import Data.Foldable
+
 import Data.Text (Text)
 
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
 import qualified GI.GtkSource as GtkSource
+
+
+allM :: (Foldable t, Monad m) => (a -> m Bool) -> t a -> m Bool
+allM f = foldlM (\a x -> if a then f x else pure False) True
+
+
+anyM :: (Foldable t, Monad m) => (a -> m Bool) -> t a -> m Bool
+anyM f = foldlM (\a x -> if a then pure True else f x) False
+
+
+andM :: (Foldable t, Monad m) => t (m Bool) -> m Bool
+andM = allM id
+
+
+orM :: (Foldable t, Monad m) => t (m Bool) -> m Bool
+orM = anyM id
 
 
 expectationsText :: [Text] -> Text
@@ -31,8 +53,6 @@ getInsertTextIter textBuffer' = do
 
 getLineColumn :: Integral a => Gtk.TextIter -> IO (a, a)
 getLineColumn textIter = do
-  line <- (1 +) . fromIntegral <$> #getLine textIter
-
   textIter' <- #copy textIter
   #setLineOffset textIter' 0
 
@@ -45,21 +65,22 @@ getLineColumn textIter = do
           #forwardCursorPosition textIter'
           go (column + 1)
 
+  line <- (1 +) . fromIntegral <$> #getLine textIter
   column <- go 1
   pure (line, column)
 
 
 getStyle :: (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b) => a -> b -> Text -> IO (Maybe GtkSource.Style)
-getStyle language' styleScheme' styleId = go styleId []
+getStyle language' styleScheme' = go []
   where
     language = language' `asA` GtkSource.Language
     styleScheme = styleScheme' `asA` GtkSource.StyleScheme
 
-    go styleId seen = #getStyle styleScheme styleId >>= \case
+    go seen styleId = #getStyle styleScheme styleId >>= \case
       Just style -> pure (Just style)
 
       Nothing | styleId `notElem` seen -> #getStyleFallback language styleId >>= \case
-        Just fallbackStyleId -> go fallbackStyleId (styleId : seen)
+        Just fallbackStyleId -> go (styleId : seen) fallbackStyleId
         Nothing -> pure Nothing
 
       Nothing -> pure Nothing
