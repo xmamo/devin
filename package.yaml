@@ -33,6 +33,7 @@ default-extensions:
   - OverloadedLabels
 
   # Type signatures
+  - ExplicitForAll
   - ScopedTypeVariables
 
   # Bindings and generalisation

@@ -29,6 +29,7 @@
   - -XOverloadedLabels
 
   # Type signatures
+  - -XExplicitForAll
   - -XScopedTypeVariables
 
   # Bindings and generalisation
@@ -43,6 +44,8 @@
 - warn: {name: Use String}
 - warn: {name: Use &&&}
 - warn: {name: Use Just}
+- group: {name: dollar, enabled: true}
+- group: {name: teaching, enabled: true}
 
 # Custom hints
 - warn: {lhs: (>>), rhs: (*>)}
