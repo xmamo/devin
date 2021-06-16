@@ -6,7 +6,6 @@ module Syntax (
   UnaryOperator (..),
   BinaryOperator (..),
   AssignOperator (..),
-  Literal (..),
   Identifier (..),
   Token (..),
   Comment (..),
@@ -23,6 +22,8 @@ import qualified Span
 
 
 class Syntax a where
+  {-# MINIMAL span | start, end #-}
+
   span :: a -> Span
   span syntax = Span (start syntax) (end syntax)
 
@@ -32,29 +33,25 @@ class Syntax a where
   end :: Integral b => a -> b
   end = Span.end . span
 
-  {-# MINIMAL span | start, end #-}
-
 
 data Declaration a where
   VariableDeclaration :: {
     varKeyword :: Token,
-    variableId :: Identifier,
-    typeInfo :: Maybe (Token, Identifier),
+    variableId :: Identifier (),
+    typeInfo :: Maybe (Token, Identifier ()),
     equalSign :: Token,
     value :: Expression a,
-    semicolon :: Token,
-    extra :: a
+    semicolon :: Token
   } -> Declaration a
 
   FunctionDeclaration :: {
     defKeyword :: Token,
-    functionId :: Identifier,
+    functionId :: Identifier (),
     open :: Token,
-    parameters :: Maybe ((Identifier, Token, Identifier), [(Token, Identifier, Token, Identifier)]),
+    parameters :: Maybe ((Identifier (), Token, Identifier ()), [(Token, Identifier (), Token, Identifier ())]),
     close :: Token,
-    returnInfo :: Maybe (Token, Identifier),
-    body :: Statement a,
-    extra :: a
+    returnInfo :: Maybe (Token, Identifier ()),
+    body :: Statement a
   } -> Declaration a
 
   deriving (Eq, Show, Read)
@@ -63,15 +60,13 @@ data Declaration a where
 data Statement a where
   ExpressionStatement :: {
     value :: Expression a,
-    semicolon :: Token,
-    extra :: a
+    semicolon :: Token
   } -> Statement a
 
   IfStatement :: {
     ifKeyword :: Token,
     predicate :: Expression a,
-    trueBranch :: Statement a,
-    extra :: a
+    trueBranch :: Statement a
   } -> Statement a
 
   IfElseStatement :: {
@@ -79,15 +74,13 @@ data Statement a where
     predicate :: Expression a,
     trueBranch :: Statement a,
     elseKeyword :: Token,
-    falseBranch :: Statement a,
-    extra :: a
+    falseBranch :: Statement a
   } -> Statement a
 
   WhileStatement :: {
     whileKeyword :: Token,
     predicate :: Expression a,
-    body :: Statement a,
-    extra :: a
+    body :: Statement a
   } -> Statement a
 
   DoWhileStatement :: {
@@ -95,39 +88,43 @@ data Statement a where
     body :: Statement a,
     whileKeyword :: Token,
     predicate :: Expression a,
-    semicolon :: Token,
-    extra :: a
+    semicolon :: Token
   } -> Statement a
 
   ReturnStatement :: {
     returnKeyword :: Token,
     result :: Maybe (Expression a),
-    semicolon :: Token,
-    extra :: a
+    semicolon :: Token
   } -> Statement a
 
   BlockStatement :: {
     open :: Token,
     elements :: [Either (Declaration a) (Statement a)],
-    close :: Token,
-    extra :: a
+    close :: Token
   } -> Statement a
 
   deriving (Eq, Show, Read)
 
 data Expression a where
-  LiteralExpression :: {
-    literal :: Literal,
+  IntegerExpression :: {
+    source :: Span,
+    integer :: Integer,
+    extra :: a
+  } -> Expression a
+
+  RationalExpression :: {
+    source :: Span,
+    rational :: Rational,
     extra :: a
   } -> Expression a
 
   VariableExpression :: {
-    variableId :: Identifier,
+    variableId :: Identifier a,
     extra :: a
   } -> Expression a
 
   CallExpression :: {
-    targetId :: Identifier,
+    targetId :: Identifier a,
     open :: Token,
     arguments :: Maybe (Expression a, [(Token, Expression a)]),
     close :: Token,
@@ -135,21 +132,21 @@ data Expression a where
   } -> Expression a
 
   UnaryExpression :: {
-    unary :: UnaryOperator,
+    unary :: UnaryOperator a,
     operand :: Expression a,
     extra :: a
   } -> Expression a
 
   BinaryExpression :: {
     left :: Expression a,
-    binary :: BinaryOperator,
+    binary :: BinaryOperator a,
     right :: Expression a,
     extra :: a
   } -> Expression a
 
   AssignExpression :: {
-    targetId :: Identifier,
-    assign :: AssignOperator,
+    targetId :: Identifier a,
+    assign :: AssignOperator a,
     value :: Expression a,
     extra :: a
   } -> Expression a
@@ -164,58 +161,52 @@ data Expression a where
   deriving (Eq, Show, Read)
 
 
-data UnaryOperator where
-  PlusOperator :: Span -> UnaryOperator
-  MinusOperator :: Span -> UnaryOperator
-  NotOperator :: Span -> UnaryOperator
+data UnaryOperator a where
+  PlusOperator :: {source :: Span, extra :: a} -> UnaryOperator a
+  MinusOperator :: {source :: Span, extra :: a} -> UnaryOperator a
+  NotOperator :: {source :: Span, extra :: a} -> UnaryOperator a
   deriving (Eq, Show, Read)
 
 
-data BinaryOperator where
-  AddOperator :: Span -> BinaryOperator
-  SubtractOperator :: Span -> BinaryOperator
-  MultiplyOperator :: Span -> BinaryOperator
-  DivideOperator :: Span -> BinaryOperator
-  RemainderOperator :: Span -> BinaryOperator
-  EqualOperator :: Span -> BinaryOperator
-  NotEqualOperator :: Span -> BinaryOperator
-  LessOperator :: Span -> BinaryOperator
-  LessOrEqualOperator :: Span -> BinaryOperator
-  GreaterOperator :: Span -> BinaryOperator
-  GreaterOrEqualOperator :: Span -> BinaryOperator
-  AndOperator :: Span -> BinaryOperator
-  OrOperator :: Span -> BinaryOperator
+data BinaryOperator a where
+  AddOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  SubtractOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  MultiplyOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  DivideOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  RemainderOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  EqualOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  NotEqualOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  LessOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  LessOrEqualOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  GreaterOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  GreaterOrEqualOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  AndOperator :: {source :: Span, extra :: a} -> BinaryOperator a
+  OrOperator :: {source :: Span, extra :: a} -> BinaryOperator a
   deriving (Eq, Show, Read)
 
 
-data AssignOperator where
-  AssignOperator :: Span -> AssignOperator
-  AddAssignOperator :: Span -> AssignOperator
-  SubtractAssignOperator :: Span -> AssignOperator
-  MultiplyAssignOperator :: Span -> AssignOperator
-  DivideAssignOperator :: Span -> AssignOperator
-  RemainderAssignOperator :: Span -> AssignOperator
+data AssignOperator a where
+  AssignOperator :: {source :: Span, extra :: a} -> AssignOperator a
+  AddAssignOperator :: {source :: Span, extra :: a} -> AssignOperator a
+  SubtractAssignOperator :: {source :: Span, extra :: a} -> AssignOperator a
+  MultiplyAssignOperator :: {source :: Span, extra :: a} -> AssignOperator a
+  DivideAssignOperator :: {source :: Span, extra :: a} -> AssignOperator a
+  RemainderAssignOperator :: {source :: Span, extra :: a} -> AssignOperator a
   deriving (Eq, Show, Read)
 
 
-data Literal where
-  IntegerLiteral :: Span -> Integer -> Literal
-  RationalLiteral :: Span -> Rational -> Literal
-  deriving (Eq, Show, Read)
-
-
-data Identifier where
-  Identifier :: Span -> Text -> Identifier
+data Identifier a where
+  Identifier :: {source :: Span, name :: Text, extra :: a} -> Identifier a
   deriving (Eq, Show, Read)
 
 
 data Token where
-  Token :: Span -> Token
+  Token :: {source :: Span} -> Token
   deriving (Eq, Show, Read)
 
 
 data Comment where
-  Comment :: Span -> Comment
+  Comment :: {source :: Span} -> Comment
   deriving (Eq, Show, Read)
 
 
@@ -246,7 +237,8 @@ instance Syntax (Statement a) where
 
 
 instance Syntax (Expression a) where
-  span LiteralExpression {literal} = span literal
+  span IntegerExpression {source} = source
+  span RationalExpression {source} = source
   span VariableExpression {variableId} = span variableId
   span expression = Span (start expression) (end expression)
 
@@ -265,67 +257,62 @@ instance Syntax (Expression a) where
   end expression = Span.end (span expression)
 
 
-instance Syntax UnaryOperator where
-  span (PlusOperator s) = s
-  span (MinusOperator s) = s
-  span (NotOperator s) = s
+instance Syntax (UnaryOperator a) where
+  span PlusOperator {source} = source
+  span MinusOperator {source} = source
+  span NotOperator {source} = source
 
 
-instance Syntax AssignOperator where
-  span (AssignOperator s) = s
-  span (AddAssignOperator s) = s
-  span (SubtractAssignOperator s) = s
-  span (MultiplyAssignOperator s) = s
-  span (DivideAssignOperator s) = s
-  span (RemainderAssignOperator s) = s
+instance Syntax (AssignOperator a) where
+  span AssignOperator {source} = source
+  span AddAssignOperator {source} = source
+  span SubtractAssignOperator {source} = source
+  span MultiplyAssignOperator {source} = source
+  span DivideAssignOperator {source} = source
+  span RemainderAssignOperator {source} = source
 
 
-instance Syntax BinaryOperator where
-  span (AddOperator s) = s
-  span (SubtractOperator s) = s
-  span (MultiplyOperator s) = s
-  span (DivideOperator s) = s
-  span (RemainderOperator s) = s
-  span (EqualOperator s) = s
-  span (NotEqualOperator s) = s
-  span (LessOperator s) = s
-  span (LessOrEqualOperator s) = s
-  span (GreaterOperator s) = s
-  span (GreaterOrEqualOperator s) = s
-  span (AndOperator s) = s
-  span (OrOperator s) = s
+instance Syntax (BinaryOperator a) where
+  span AddOperator {source} = source
+  span SubtractOperator {source} = source
+  span MultiplyOperator {source} = source
+  span DivideOperator {source} = source
+  span RemainderOperator {source} = source
+  span EqualOperator {source} = source
+  span NotEqualOperator {source} = source
+  span LessOperator {source} = source
+  span LessOrEqualOperator {source} = source
+  span GreaterOperator {source} = source
+  span GreaterOrEqualOperator {source} = source
+  span AndOperator {source} = source
+  span OrOperator {source} = source
 
 
-instance Syntax Literal where
-  span (IntegerLiteral s _) = s
-  span (RationalLiteral s _) = s
-
-
-instance Syntax Identifier where
-  span (Identifier s _) = s
+instance Syntax (Identifier a) where
+  span Identifier {source} = source
 
 
 instance Syntax Token where
-  span (Token s) = s
+  span Token {source} = source
 
 
 instance Syntax Comment where
-  span (Comment s) = s
+  span Comment {source} = source
 
 
-comparePrecedence :: BinaryOperator -> BinaryOperator -> Ordering
+comparePrecedence :: BinaryOperator a -> BinaryOperator a -> Ordering
 comparePrecedence = comparing precedence
   where
-    precedence (AddOperator _) = 4
-    precedence (SubtractOperator _) = 4
-    precedence (MultiplyOperator _) = 5
-    precedence (DivideOperator _) = 5
-    precedence (RemainderOperator _) = 5
-    precedence (EqualOperator _) = 2
-    precedence (NotEqualOperator _) = 2
-    precedence (LessOperator _) = 3
-    precedence (LessOrEqualOperator _) = 3
-    precedence (GreaterOperator _) = 3
-    precedence (GreaterOrEqualOperator _) = 3
-    precedence (AndOperator _) = 1
-    precedence (OrOperator _) = 1
+    precedence AddOperator {} = 4
+    precedence SubtractOperator {} = 4
+    precedence MultiplyOperator {} = 5
+    precedence DivideOperator {} = 5
+    precedence RemainderOperator {} = 5
+    precedence EqualOperator {} = 2
+    precedence NotEqualOperator {} = 2
+    precedence LessOperator {} = 3
+    precedence LessOrEqualOperator {} = 3
+    precedence GreaterOperator {} = 3
+    precedence GreaterOrEqualOperator {} = 3
+    precedence AndOperator {} = 1
+    precedence OrOperator {} = 1

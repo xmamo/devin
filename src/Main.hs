@@ -270,8 +270,10 @@ highlightStatement textBuffer = \case
 
 
 highlightExpression :: Gtk.IsTextBuffer a => a -> Syntax.Expression b -> IO ()
-highlightExpression textBuffer = \case
-  Syntax.LiteralExpression {literal} -> highlight textBuffer "number" (Syntax.span literal)
+highlightExpression textBuffer expression = case expression of
+  Syntax.IntegerExpression {} -> highlight textBuffer "number" (Syntax.span expression)
+
+  Syntax.RationalExpression {} -> highlight textBuffer "number" (Syntax.span expression)
 
   Syntax.VariableExpression {variableId} -> highlight textBuffer "identifier" (Syntax.span variableId)
 
@@ -358,7 +360,9 @@ highlightStatementParentheses textBuffer insertTextIter = \case
 
 highlightExpressionParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Expression b -> IO Bool
 highlightExpressionParentheses textBuffer insertTextIter = \case
-  Syntax.LiteralExpression {} -> pure False
+  Syntax.IntegerExpression {} -> pure False
+
+  Syntax.RationalExpression {} -> pure False
 
   Syntax.VariableExpression {} -> pure False
 
@@ -533,10 +537,9 @@ displayExpression ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression c -> IO (Maybe Gtk.TreeIter)
 displayExpression textBuffer treeStore treeIter expression = case expression of
-  Syntax.LiteralExpression {literal} -> do
-    treeIter' <- display textBuffer treeStore treeIter expression "LiteralExpression" False
-    displayLiteral textBuffer treeStore treeIter' literal
-    pure treeIter'
+  Syntax.IntegerExpression {} -> display textBuffer treeStore treeIter expression "IntegerExpression" True
+
+  Syntax.RationalExpression {} -> display textBuffer treeStore treeIter expression "RationalExpression" True
 
   Syntax.VariableExpression {variableId} -> do
     treeIter' <- display textBuffer treeStore treeIter expression "VariableExpression" False
@@ -591,50 +594,42 @@ displayExpression textBuffer treeStore treeIter expression = case expression of
 
 displayUnaryOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
-  a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator -> IO (Maybe Gtk.TreeIter)
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator c -> IO (Maybe Gtk.TreeIter)
 displayUnaryOperator textBuffer treeStore treeIter unary = case unary of
-  Syntax.PlusOperator _ -> display textBuffer treeStore treeIter unary "PlusOperator" True
-  Syntax.MinusOperator _ -> display textBuffer treeStore treeIter unary "MinusOperator" True
-  Syntax.NotOperator _ -> display textBuffer treeStore treeIter unary "NotOperator" True
+  Syntax.PlusOperator {} -> display textBuffer treeStore treeIter unary "PlusOperator" True
+  Syntax.MinusOperator {} -> display textBuffer treeStore treeIter unary "MinusOperator" True
+  Syntax.NotOperator {} -> display textBuffer treeStore treeIter unary "NotOperator" True
 
 
 displayBinaryOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
-  a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator -> IO (Maybe Gtk.TreeIter)
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator c -> IO (Maybe Gtk.TreeIter)
 displayBinaryOperator textBuffer treeStore treeIter binary = case binary of
-  Syntax.AddOperator _ -> display textBuffer treeStore treeIter binary "AddOperator" True
-  Syntax.SubtractOperator _ -> display textBuffer treeStore treeIter binary "SubtractOperator" True
-  Syntax.MultiplyOperator _ -> display textBuffer treeStore treeIter binary "MultiplyOperator" True
-  Syntax.DivideOperator _ -> display textBuffer treeStore treeIter binary "DivideOperator" True
-  Syntax.RemainderOperator _ -> display textBuffer treeStore treeIter binary "RemainderOperator" True
-  Syntax.EqualOperator _ -> display textBuffer treeStore treeIter binary "EqualOperator" True
-  Syntax.NotEqualOperator _ -> display textBuffer treeStore treeIter binary "NotEqualOperator" True
-  Syntax.LessOperator _ -> display textBuffer treeStore treeIter binary "LessOperator" True
-  Syntax.LessOrEqualOperator _ -> display textBuffer treeStore treeIter binary "LessOrEqualOperator" True
-  Syntax.GreaterOperator _ -> display textBuffer treeStore treeIter binary "GreaterOperator" True
-  Syntax.GreaterOrEqualOperator _ -> display textBuffer treeStore treeIter binary "GreaterOrEqualOperator" True
-  Syntax.AndOperator _ -> display textBuffer treeStore treeIter binary "AndOperator" True
-  Syntax.OrOperator _ -> display textBuffer treeStore treeIter binary "OrOperator" True
+  Syntax.AddOperator {} -> display textBuffer treeStore treeIter binary "AddOperator" True
+  Syntax.SubtractOperator {} -> display textBuffer treeStore treeIter binary "SubtractOperator" True
+  Syntax.MultiplyOperator {} -> display textBuffer treeStore treeIter binary "MultiplyOperator" True
+  Syntax.DivideOperator {} -> display textBuffer treeStore treeIter binary "DivideOperator" True
+  Syntax.RemainderOperator {} -> display textBuffer treeStore treeIter binary "RemainderOperator" True
+  Syntax.EqualOperator {} -> display textBuffer treeStore treeIter binary "EqualOperator" True
+  Syntax.NotEqualOperator {} -> display textBuffer treeStore treeIter binary "NotEqualOperator" True
+  Syntax.LessOperator {} -> display textBuffer treeStore treeIter binary "LessOperator" True
+  Syntax.LessOrEqualOperator {} -> display textBuffer treeStore treeIter binary "LessOrEqualOperator" True
+  Syntax.GreaterOperator {} -> display textBuffer treeStore treeIter binary "GreaterOperator" True
+  Syntax.GreaterOrEqualOperator {} -> display textBuffer treeStore treeIter binary "GreaterOrEqualOperator" True
+  Syntax.AndOperator {} -> display textBuffer treeStore treeIter binary "AndOperator" True
+  Syntax.OrOperator {} -> display textBuffer treeStore treeIter binary "OrOperator" True
 
 
 displayAssignOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
-  a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator -> IO (Maybe Gtk.TreeIter)
+  a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator c -> IO (Maybe Gtk.TreeIter)
 displayAssignOperator textBuffer treeStore treeIter assign = case assign of
-  Syntax.AssignOperator _ -> display textBuffer treeStore treeIter assign "AssignOperator" True
-  Syntax.AddAssignOperator _ -> display textBuffer treeStore treeIter assign "AddAssignOperator" True
-  Syntax.SubtractAssignOperator _ -> display textBuffer treeStore treeIter assign "SubtractAssignOperator" True
-  Syntax.MultiplyAssignOperator _ -> display textBuffer treeStore treeIter assign "MultiplyAssignOperator" True
-  Syntax.DivideAssignOperator _ -> display textBuffer treeStore treeIter assign "DivideAssignOperator" True
-  Syntax.RemainderAssignOperator _ -> display textBuffer treeStore treeIter assign "RemainderAssignOperator" True
-
-
-displayLiteral ::
-  (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
-  a -> b -> Maybe Gtk.TreeIter -> Syntax.Literal -> IO (Maybe Gtk.TreeIter)
-displayLiteral textBuffer treeStore treeIter literal = case literal of
-  Syntax.IntegerLiteral _ _ -> display textBuffer treeStore treeIter literal "IntegerLiteral" True
-  Syntax.RationalLiteral _ _ -> display textBuffer treeStore treeIter literal "RationalLiteral" True
+  Syntax.AssignOperator {} -> display textBuffer treeStore treeIter assign "AssignOperator" True
+  Syntax.AddAssignOperator {} -> display textBuffer treeStore treeIter assign "AddAssignOperator" True
+  Syntax.SubtractAssignOperator {} -> display textBuffer treeStore treeIter assign "SubtractAssignOperator" True
+  Syntax.MultiplyAssignOperator {} -> display textBuffer treeStore treeIter assign "MultiplyAssignOperator" True
+  Syntax.DivideAssignOperator {} -> display textBuffer treeStore treeIter assign "DivideAssignOperator" True
+  Syntax.RemainderAssignOperator {} -> display textBuffer treeStore treeIter assign "RemainderAssignOperator" True
 
 
 display ::

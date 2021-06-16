@@ -29,12 +29,12 @@ checkDeclaration :: Pass -> Environment -> Syntax.Declaration () -> Writer [Erro
 checkDeclaration pass environment declaration = case (pass, declaration) of
   (_, Syntax.FunctionDeclaration {functionId, parameters, returnInfo, body}) -> do
     let Environment _ variables functions = environment
-        Syntax.Identifier _ functionName = functionId
+        Syntax.Identifier _ functionName () = functionId
 
     (parameterTypes, environment') <- case parameters of
       Just ((id, colon, typeId), rest) -> foldlM f ([], environment) ((undefined, id, colon, typeId) : rest)
         where
-          f (parameterTypes, environment) (_, Syntax.Identifier _ name, _, typeId) = do
+          f (parameterTypes, environment) (_, Syntax.Identifier {name}, _, typeId) = do
             (t, Environment types' variables' functions') <- lookupType environment typeId
             let variables'' = Map.insert (Unicode.collate name) t variables'
             pure (parameterTypes ++ [t], Environment types' variables'' functions')
@@ -66,17 +66,17 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
         pure (Environment types'' variables functions)
 
   (Pass2, Syntax.VariableDeclaration {variableId, typeInfo = Just (_, typeId), value}) -> do
-    let Syntax.Identifier _ variableName = variableId
+    let Syntax.Identifier {name} = variableId
     (t, environment') <- lookupType environment typeId
     (valueType, Environment types'' variables'' functions'') <- checkExpression environment' value
     when (valueType /= t) (tell [InvalidTypeError value t valueType])
-    let variables''' = Map.insert (Unicode.collate variableName) t variables''
+    let variables''' = Map.insert (Unicode.collate name) t variables''
     pure (Environment types'' variables''' functions'')
 
   (Pass2, Syntax.VariableDeclaration {variableId, typeInfo = Nothing, value}) -> do
-    let Syntax.Identifier _ variableName = variableId
+    let Syntax.Identifier {name} = variableId
     (valueType, Environment types' variables' functions') <- checkExpression environment value
-    let variables'' = Map.insert (Unicode.collate variableName) valueType variables'
+    let variables'' = Map.insert (Unicode.collate name) valueType variables'
     pure (Environment types' variables'' functions')
 
   _ -> pure environment
@@ -141,12 +141,12 @@ checkStatement expectedType environment statement = case statement of
 
 
 checkExpression :: Environment -> Syntax.Expression () -> Writer [Error] (Type, Environment)
-checkExpression environment = \case
-  Syntax.LiteralExpression {literal = Syntax.IntegerLiteral _ _} -> pure (Integer, environment)
+checkExpression environment expression = case expression of
+  Syntax.IntegerExpression {} -> pure (Integer, environment)
 
-  Syntax.LiteralExpression {literal = Syntax.RationalLiteral _ _} -> pure (Rational, environment)
+  Syntax.RationalExpression {} -> pure (Rational, environment)
 
-  Syntax.VariableExpression {variableId} -> lookupVariableType environment variableId
+  Syntax.VariableExpression {variableId} -> lookupVariable environment variableId
 
   Syntax.CallExpression {targetId, arguments} -> do
     (argumentTs, environment') <- case arguments of
@@ -158,18 +158,18 @@ checkExpression environment = \case
 
       Nothing -> pure ([], environment)
 
-    lookupFunctionType environment' targetId argumentTs
+    lookupFunction environment' targetId argumentTs
 
   Syntax.UnaryExpression {unary, operand} -> do
     (operandType, environment') <- checkExpression environment operand
 
     case (unary, operandType) of
       (_, Error) -> pure (Error, environment')
-      (Syntax.PlusOperator _, Integer) -> pure (Integer, environment')
-      (Syntax.PlusOperator _, Rational) -> pure (Rational, environment')
-      (Syntax.MinusOperator _, Integer) -> pure (Integer, environment')
-      (Syntax.MinusOperator _, Rational) -> pure (Rational, environment')
-      (Syntax.NotOperator _, Boolean) -> pure (Boolean, environment')
+      (Syntax.PlusOperator {}, Integer) -> pure (Integer, environment')
+      (Syntax.PlusOperator {}, Rational) -> pure (Rational, environment')
+      (Syntax.MinusOperator {}, Integer) -> pure (Integer, environment')
+      (Syntax.MinusOperator {}, Rational) -> pure (Rational, environment')
+      (Syntax.NotOperator {}, Boolean) -> pure (Boolean, environment')
 
       _ -> do
         tell [InvalidUnaryError unary operandType]
@@ -182,28 +182,28 @@ checkExpression environment = \case
     case (leftType, binary, rightType) of
       (Error, _, _) -> pure (Error, environment'')
       (_, _, Error) -> pure (Error, environment'')
-      (Integer, Syntax.AddOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.AddOperator _, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.SubtractOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.SubtractOperator _, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.MultiplyOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.MultiplyOperator _, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.DivideOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.DivideOperator _, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.RemainderOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.RemainderOperator _, Rational) -> pure (Rational, environment'')
-      (_, Syntax.EqualOperator _, _) -> pure (Boolean, environment'')
-      (_, Syntax.NotEqualOperator _, _) -> pure (Boolean, environment'')
-      (Integer, Syntax.LessOperator _, Integer) -> pure (Boolean, environment'')
-      (Rational, Syntax.LessOperator _, Rational) -> pure (Boolean, environment'')
-      (Integer, Syntax.LessOrEqualOperator _, Integer) -> pure (Boolean, environment'')
-      (Rational, Syntax.LessOrEqualOperator _, Rational) -> pure (Boolean, environment'')
-      (Integer, Syntax.GreaterOperator _, Integer) -> pure (Boolean, environment'')
-      (Rational, Syntax.GreaterOperator _, Rational) -> pure (Boolean, environment'')
-      (Integer, Syntax.GreaterOrEqualOperator _, Integer) -> pure (Boolean, environment'')
-      (Rational, Syntax.GreaterOrEqualOperator _, Rational) -> pure (Boolean, environment'')
-      (Boolean, Syntax.AndOperator _, Boolean) -> pure (Boolean, environment'')
-      (Boolean, Syntax.OrOperator _, Boolean) -> pure (Boolean, environment'')
+      (Integer, Syntax.AddOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.AddOperator {}, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.SubtractOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.SubtractOperator {}, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.MultiplyOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.MultiplyOperator {}, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.DivideOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.DivideOperator {}, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.RemainderOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.RemainderOperator {}, Rational) -> pure (Rational, environment'')
+      (_, Syntax.EqualOperator {}, _) -> pure (Boolean, environment'')
+      (_, Syntax.NotEqualOperator {}, _) -> pure (Boolean, environment'')
+      (Integer, Syntax.LessOperator {}, Integer) -> pure (Boolean, environment'')
+      (Rational, Syntax.LessOperator {}, Rational) -> pure (Boolean, environment'')
+      (Integer, Syntax.LessOrEqualOperator {}, Integer) -> pure (Boolean, environment'')
+      (Rational, Syntax.LessOrEqualOperator {}, Rational) -> pure (Boolean, environment'')
+      (Integer, Syntax.GreaterOperator {}, Integer) -> pure (Boolean, environment'')
+      (Rational, Syntax.GreaterOperator {}, Rational) -> pure (Boolean, environment'')
+      (Integer, Syntax.GreaterOrEqualOperator {}, Integer) -> pure (Boolean, environment'')
+      (Rational, Syntax.GreaterOrEqualOperator {}, Rational) -> pure (Boolean, environment'')
+      (Boolean, Syntax.AndOperator {}, Boolean) -> pure (Boolean, environment'')
+      (Boolean, Syntax.OrOperator {}, Boolean) -> pure (Boolean, environment'')
 
       _ -> do
         tell [InvalidBinaryError binary leftType rightType]
@@ -211,25 +211,25 @@ checkExpression environment = \case
 
   Syntax.AssignExpression {targetId, assign, value} -> do
     (valueType, environment') <- checkExpression environment value
-    (targetType, environment'') <- lookupVariableType environment' targetId
+    (targetType, environment'') <- lookupVariable environment' targetId
 
     case (targetType, assign, valueType) of
       (Error, _, _) -> pure (Error, environment'')
       (_, _, Error) -> pure (Error, environment'')
-      (Unit, Syntax.AssignOperator _, Unit) -> pure (Unit, environment'')
-      (Boolean, Syntax.AssignOperator _, Boolean) -> pure (Boolean, environment'')
-      (Integer, Syntax.AssignOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.AssignOperator _, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.AddAssignOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.AddAssignOperator _, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.SubtractAssignOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.SubtractAssignOperator _, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.MultiplyAssignOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.MultiplyAssignOperator _, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.DivideAssignOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.DivideAssignOperator _, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.RemainderAssignOperator _, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.RemainderAssignOperator _, Rational) -> pure (Rational, environment'')
+      (Unit, Syntax.AssignOperator {}, Unit) -> pure (Unit, environment'')
+      (Boolean, Syntax.AssignOperator {}, Boolean) -> pure (Boolean, environment'')
+      (Integer, Syntax.AssignOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.AssignOperator {}, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.AddAssignOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.AddAssignOperator {}, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.SubtractAssignOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.SubtractAssignOperator {}, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.MultiplyAssignOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.MultiplyAssignOperator {}, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.DivideAssignOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.DivideAssignOperator {}, Rational) -> pure (Rational, environment'')
+      (Integer, Syntax.RemainderAssignOperator {}, Integer) -> pure (Integer, environment'')
+      (Rational, Syntax.RemainderAssignOperator {}, Rational) -> pure (Rational, environment'')
 
       _ -> do
         tell [InvalidAssignError assign targetType valueType]
@@ -238,25 +238,25 @@ checkExpression environment = \case
   Syntax.ParenthesizedExpression {inner} -> checkExpression environment inner
 
 
-lookupType :: Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
+lookupType :: Environment -> Syntax.Identifier () -> Writer [Error] (Type, Environment)
 lookupType environment typeId = do
   let Environment types variables functions = environment
-      Syntax.Identifier _ typeName = typeId
-      key = Unicode.collate typeName
+      Syntax.Identifier {name} = typeId
+      key = Unicode.collate name
 
   case Map.insertLookupWithKey (\_ _ old -> old) key Error types of
     (Just t, types') -> pure (t, Environment types' variables functions)
 
     (Nothing, types') -> do
       tell [UnknownTypeError typeId]
-      pure (Unknown typeName, Environment types' variables functions)
+      pure (Unknown name, Environment types' variables functions)
 
 
-lookupVariableType :: Environment -> Syntax.Identifier -> Writer [Error] (Type, Environment)
-lookupVariableType environment variableId = do
+lookupVariable :: Environment -> Syntax.Identifier () -> Writer [Error] (Type, Environment)
+lookupVariable environment variableId = do
   let Environment types variables functions = environment
-      Syntax.Identifier _ variableName = variableId
-      key = Unicode.collate variableName
+      Syntax.Identifier {name} = variableId
+      key = Unicode.collate name
 
   case Map.insertLookupWithKey (\_ _ old -> old) key Error variables of
     (Just t, variables') -> pure (t, Environment types variables' functions)
@@ -266,12 +266,12 @@ lookupVariableType environment variableId = do
       pure (Error, Environment types variables' functions)
 
 
-lookupFunctionType :: Environment -> Syntax.Identifier -> [Type] -> Writer [Error] (Type, Environment)
-lookupFunctionType environment functionId parameterTypes = go functions
+lookupFunction :: Environment -> Syntax.Identifier () -> [Type] -> Writer [Error] (Type, Environment)
+lookupFunction environment functionId parameterTypes = go functions
   where
     Environment types variables functions = environment
-    Syntax.Identifier _ functionName = functionId
-    key = Unicode.collate functionName
+    Syntax.Identifier {name} = functionId
+    key = Unicode.collate name
 
     go [] = do
       tell [UnknownFunctionError functionId parameterTypes]

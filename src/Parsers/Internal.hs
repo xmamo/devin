@@ -7,7 +7,6 @@ module Parsers.Internal (
   unaryOperator,
   binaryOperator,
   assignOperator,
-  literal,
   identifier,
   comment
 ) where
@@ -26,7 +25,6 @@ import Control.Monad.Trans.Writer
 import Parser (ParserT)
 import qualified Parser
 import Span (Span (Span))
-import Syntax (Syntax, Declaration (typeInfo))
 import qualified Syntax
 import qualified Unicode
 
@@ -48,7 +46,7 @@ variableDeclaration = do
     equalSign <- s *> charToken '='
     value <- s *> expression
     semicolon <- s *> charToken ';'
-    pure Syntax.VariableDeclaration {varKeyword, variableId, typeInfo, equalSign, value, semicolon, extra = ()}
+    pure Syntax.VariableDeclaration {varKeyword, variableId, typeInfo, equalSign, value, semicolon}
 
 
 functionDeclaration :: Parser (Syntax.Declaration ())
@@ -76,7 +74,7 @@ functionDeclaration = do
     close <- s *> charToken ')' <* s
     returnInfo <- optional ((,) <$> (s *> textToken "->") <*> Parser.commit (s *> identifier))
     body <- s *> statement
-    pure Syntax.FunctionDeclaration {defKeyword, functionId, open, parameters, close, returnInfo, body, extra = ()}
+    pure Syntax.FunctionDeclaration {defKeyword, functionId, open, parameters, close, returnInfo, body}
 
 
 declaration :: Parser (Syntax.Declaration ())
@@ -87,7 +85,7 @@ expressionStatement :: Parser (Syntax.Statement ())
 expressionStatement = do
   value <- expression
   semicolon <- Parser.commit (s *> charToken ';')
-  pure Syntax.ExpressionStatement {value, semicolon, extra = ()}
+  pure Syntax.ExpressionStatement {value, semicolon}
 
 
 ifElseStatementOrIfStatement :: Parser (Syntax.Statement ())
@@ -101,9 +99,9 @@ ifElseStatementOrIfStatement = do
     optional (s *> keyword "else") >>= \case
       Just elseKeyword -> do
         falseBranch <- Parser.commit (s *> statement)
-        pure Syntax.IfElseStatement {ifKeyword, predicate, trueBranch, elseKeyword, falseBranch, extra = ()}
+        pure Syntax.IfElseStatement {ifKeyword, predicate, trueBranch, elseKeyword, falseBranch}
 
-      Nothing -> pure Syntax.IfStatement {ifKeyword, predicate, trueBranch, extra = ()}
+      Nothing -> pure Syntax.IfStatement {ifKeyword, predicate, trueBranch}
 
 
 whileStatement :: Parser (Syntax.Statement ())
@@ -113,7 +111,7 @@ whileStatement = do
   Parser.commit do
     predicate <- s *> expression
     body <- s *> statement
-    pure Syntax.WhileStatement {whileKeyword, predicate, body, extra = ()}
+    pure Syntax.WhileStatement {whileKeyword, predicate, body}
 
 
 doWhileStatement :: Parser (Syntax.Statement ())
@@ -125,7 +123,7 @@ doWhileStatement = do
     whileKeyword <- s *> keyword "while"
     predicate <- s *> expression
     semicolon <- s *> charToken ';'
-    pure Syntax.DoWhileStatement {doKeyword, body, whileKeyword, predicate, semicolon, extra = ()}
+    pure Syntax.DoWhileStatement {doKeyword, body, whileKeyword, predicate, semicolon}
 
 
 returnStatement :: Parser (Syntax.Statement ())
@@ -133,7 +131,7 @@ returnStatement = do
   returnKeyword <- keyword "return"
   result <- optional (s *> expression)
   semicolon <- Parser.commit (s *> charToken ';')
-  pure Syntax.ReturnStatement {returnKeyword, result, semicolon, extra = ()}
+  pure Syntax.ReturnStatement {returnKeyword, result, semicolon}
 
 
 blockStatement :: Parser (Syntax.Statement ())
@@ -143,7 +141,7 @@ blockStatement = do
   Parser.commit do
     elements <- s *> Parser.separatedBy (Parser.either declaration statement) s
     close <- s *> charToken '}'
-    pure Syntax.BlockStatement {open, elements, close, extra = ()}
+    pure Syntax.BlockStatement {open, elements, close}
 
 
 statement :: Parser (Syntax.Statement ())
@@ -158,8 +156,26 @@ statement = asum
   ]
 
 
+integerExpression :: Parser (Syntax.Expression ())
+integerExpression = Parser.label "integer" $ syntax do
+  sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> -1) <|> pure 1
+  digits <- some (Parser.satisfy isDigit)
+  let magnitude = foldl' (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
+  pure \source -> Syntax.IntegerExpression {source, integer = sign * magnitude, extra = ()}
+
+
+rationalExpression :: Parser (Syntax.Expression ())
+rationalExpression = Parser.label "rational" $ syntax do
+  sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> -1) <|> pure 1
+  digits1 <- some (Parser.satisfy isDigit)
+  Parser.char '.'
+  digits2 <- some (Parser.satisfy isDigit)
+  let magnitude = foldl' (\a d -> 10 * a + toRational (digitToInt d)) 0 (digits1 ++ digits2) / 10 ^^ length digits2
+  pure \source -> Syntax.RationalExpression {source, rational = sign * magnitude, extra = ()}
+
+
 literalExpression :: Parser (Syntax.Expression ())
-literalExpression = Syntax.LiteralExpression <$> literal <*> pure ()
+literalExpression = rationalExpression <|> integerExpression
 
 
 variableExpression :: Parser (Syntax.Expression ())
@@ -188,7 +204,7 @@ unaryExpression = do
   unary <- unaryOperator
 
   operand <- case unary of
-    Syntax.NotOperator _ -> s *> operandExpression
+    Syntax.NotOperator {} -> s *> operandExpression
     _ -> Parser.commit (s *> operandExpression)
 
   pure Syntax.UnaryExpression {unary, operand, extra = ()}
@@ -232,8 +248,8 @@ expression :: Parser (Syntax.Expression ())
 expression = parenthesizedExpression <|> assignExpression <|> binaryExpressionOrOperandExpression
 
 
-unaryOperator :: Parser Syntax.UnaryOperator
-unaryOperator = syntax $ asum
+unaryOperator :: Parser (Syntax.UnaryOperator ())
+unaryOperator = fmap ($ ()) . syntax $ asum
   [
     Parser.char '+' $> Syntax.PlusOperator,
     Parser.char '-' $> Syntax.MinusOperator,
@@ -241,8 +257,8 @@ unaryOperator = syntax $ asum
   ]
 
 
-binaryOperator :: Parser Syntax.BinaryOperator
-binaryOperator = syntax $ asum
+binaryOperator :: Parser (Syntax.BinaryOperator ())
+binaryOperator = fmap ($ ()) . syntax $ asum
   [
     Parser.char '+' $> Syntax.AddOperator,
     Parser.char '-' $> Syntax.SubtractOperator,
@@ -260,8 +276,8 @@ binaryOperator = syntax $ asum
   ]
 
 
-assignOperator :: Parser Syntax.AssignOperator
-assignOperator = syntax $ asum
+assignOperator :: Parser (Syntax.AssignOperator ())
+assignOperator = fmap ($ ()) . syntax $ asum
   [
     Parser.char '=' $> Syntax.AssignOperator,
     Parser.text "+=" $> Syntax.AddAssignOperator,
@@ -272,34 +288,12 @@ assignOperator = syntax $ asum
   ]
 
 
-integerLiteral :: Parser Syntax.Literal
-integerLiteral = Parser.label "integer" $ syntax do
-  sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> -1) <|> pure 1
-  digits <- some (Parser.satisfy isDigit)
-  let magnitude = foldl' (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
-  pure \span -> Syntax.IntegerLiteral span (sign * magnitude)
-
-
-rationalLiteral :: Parser Syntax.Literal
-rationalLiteral = Parser.label "rational" $ syntax do
-  sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> -1) <|> pure 1
-  digits1 <- some (Parser.satisfy isDigit)
-  Parser.char '.'
-  digits2 <- some (Parser.satisfy isDigit)
-  let magnitude = foldl' (\a d -> 10 * a + toRational (digitToInt d)) 0 (digits1 ++ digits2) / 10 ^^ length digits2
-  pure \span -> Syntax.RationalLiteral span (sign * magnitude)
-
-
-literal :: Parser Syntax.Literal
-literal = rationalLiteral <|> integerLiteral
-
-
 -- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
-identifier :: Parser Syntax.Identifier
+identifier :: Parser (Syntax.Identifier ())
 identifier = Parser.label "identifier" $ syntax do
   start <- category [lu, ll, lt, lm, lo, nl, pc]
   continue <- Text.pack <$> many (category [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
-  pure \span -> Syntax.Identifier span (Text.cons start continue)
+  pure \source -> Syntax.Identifier {source, name = Text.cons start continue, extra = ()}
   where
     category categories = Parser.satisfy \c -> Unicode.category c `elem` categories
     lu = Unicode.UppercaseLetter
@@ -332,10 +326,10 @@ s = token (many (void (some (Parser.satisfy Unicode.isSpace)) <|> void comment))
 
 keyword :: Text -> Parser Syntax.Token
 keyword k = Parser.label ("keyword " <> k) do
-  Syntax.Identifier span name <- identifier
+  Syntax.Identifier {source, name} <- identifier
 
   if Unicode.collate name == Unicode.collate k then
-    pure (Syntax.Token span)
+    pure Syntax.Token {source}
   else
     empty
 
@@ -345,7 +339,7 @@ token parser = do
   start <- Parser.position
   parser
   end <- Parser.position
-  pure (Syntax.Token (Span start end))
+  pure Syntax.Token {source = Span start end}
 
 
 charToken :: Char -> Parser Syntax.Token
@@ -356,7 +350,7 @@ textToken :: Text -> Parser Syntax.Token
 textToken = token . Parser.text
 
 
-syntax :: Syntax a => Parser (Span -> a) -> Parser a
+syntax :: Parser (Span -> a) -> Parser a
 syntax parser = do
   start <- Parser.position
   f <- parser
@@ -364,7 +358,7 @@ syntax parser = do
   pure (f (Span start end))
 
 
-newBinary :: Syntax.Expression () -> Syntax.BinaryOperator -> Syntax.Expression () -> Syntax.Expression ()
+newBinary :: Syntax.Expression () -> Syntax.BinaryOperator () -> Syntax.Expression () -> Syntax.Expression ()
 newBinary left binary right = case (left, right) of
   (Syntax.BinaryExpression {}, _) -> undefined
 

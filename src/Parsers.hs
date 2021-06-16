@@ -7,7 +7,6 @@ module Parsers (
   unaryOperator,
   binaryOperator,
   assignOperator,
-  literal,
   identifier,
   comment
 ) where
@@ -39,23 +38,19 @@ expression :: Applicative m => Parser m (Syntax.Expression ())
 expression = run Internal.expression
 
 
-unaryOperator :: Applicative m => Parser m Syntax.UnaryOperator
+unaryOperator :: Applicative m => Parser m (Syntax.UnaryOperator ())
 unaryOperator = run Internal.unaryOperator
 
 
-binaryOperator :: Applicative m => Parser m Syntax.BinaryOperator
+binaryOperator :: Applicative m => Parser m (Syntax.BinaryOperator ())
 binaryOperator = run Internal.binaryOperator
 
 
-assignOperator :: Applicative m => Parser m Syntax.AssignOperator
+assignOperator :: Applicative m => Parser m (Syntax.AssignOperator ())
 assignOperator = run Internal.assignOperator
 
 
-literal :: Applicative m => Parser m Syntax.Literal
-literal = run Internal.literal
-
-
-identifier :: Applicative m => Parser m Syntax.Identifier
+identifier :: Applicative m => Parser m (Syntax.Identifier ())
 identifier = run Internal.identifier
 
 
