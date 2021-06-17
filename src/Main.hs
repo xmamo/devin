@@ -224,14 +224,14 @@ highlightDeclaration textBuffer = \case
   Syntax.VariableDeclaration {varKeyword, variableId, typeInfo, value} -> do
     highlight textBuffer "keyword" (Syntax.span varKeyword)
     highlight textBuffer "identifier" (Syntax.span variableId)
-    maybe (pure ()) (\(_, typeId) -> highlight textBuffer "type" (Syntax.span typeId)) typeInfo
+    maybe (pure ()) (highlight textBuffer "type" . Syntax.span . snd) typeInfo
     highlightExpression textBuffer value
 
   Syntax.FunctionDeclaration {defKeyword, functionId, parameters, returnInfo, body} -> do
     highlight textBuffer "keyword" (Syntax.span defKeyword)
     highlight textBuffer "identifier" (Syntax.span functionId)
     highlightParameters parameters
-    maybe (pure ()) (\(_, returnTypeId) -> highlight textBuffer "type" (Syntax.span returnTypeId)) returnInfo
+    maybe (pure ()) (highlight textBuffer "type" . Syntax.span . snd) returnInfo
     highlightStatement textBuffer body
 
   where
