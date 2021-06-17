@@ -9,6 +9,7 @@ module Syntax (
   Identifier (..),
   Token (..),
   Comment (..),
+  hasSideEffects,
   comparePrecedence
 ) where
 
@@ -298,6 +299,17 @@ instance Syntax Token where
 
 instance Syntax Comment where
   span Comment {source} = source
+
+
+hasSideEffects :: Expression a -> Bool
+hasSideEffects IntegerExpression {} = False
+hasSideEffects RationalExpression {} = False
+hasSideEffects VariableExpression {} = False
+hasSideEffects CallExpression {} = True
+hasSideEffects UnaryExpression {operand} = hasSideEffects operand
+hasSideEffects BinaryExpression {left, right} = hasSideEffects left || hasSideEffects right
+hasSideEffects AssignExpression {} = True
+hasSideEffects ParenthesizedExpression {inner} = hasSideEffects inner
 
 
 comparePrecedence :: BinaryOperator a -> BinaryOperator a -> Ordering

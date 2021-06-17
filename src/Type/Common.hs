@@ -54,11 +54,12 @@ data Error where
   UnknownTypeError :: Syntax.Identifier () -> Error
   UnknownIdentifierError :: Syntax.Identifier () -> Error
   UnknownFunctionError :: Syntax.Identifier () -> [Type] -> Error
-  DuplicateFunctionDefinition :: Syntax.Identifier () -> [Type] -> Error
+  FunctionRedefinitionError :: Syntax.Identifier () -> [Type] -> Error
   InvalidUnaryError :: Syntax.UnaryOperator () -> Type -> Error
   InvalidBinaryError :: Syntax.BinaryOperator () -> Type -> Type -> Error
   InvalidAssignError :: Syntax.AssignOperator () -> Type -> Type -> Error
   InvalidTypeError :: Syntax.Expression () -> Type -> Type -> Error
+  NoSideEffectsError :: Syntax.Statement () -> Error
   InvalidReturnTypeError :: Syntax.Statement () -> Type -> Type -> Error
   MissingReturnValueError :: Syntax.Statement () -> Type -> Error
   MissingReturnPathError :: Syntax.Identifier () -> [Type] -> Error
@@ -84,14 +85,16 @@ isError _ = False
 
 description :: Error -> Text
 description = \case
-  UnknownTypeError (Syntax.Identifier _ name ()) -> "Unknown type " <> name
+  UnknownTypeError (Syntax.Identifier _ name ()) ->
+    "Unknown type " <> name
 
-  UnknownIdentifierError (Syntax.Identifier _ name ()) -> "Unknown identifier " <> name
+  UnknownIdentifierError (Syntax.Identifier _ name ()) ->
+    "Unknown identifier " <> name
 
   UnknownFunctionError (Syntax.Identifier _ name ()) parameterTypes ->
     "Unknown function " <> name <> "(" <> labels parameterTypes <> ")"
 
-  DuplicateFunctionDefinition (Syntax.Identifier _ name ()) parameterTypes ->
+  FunctionRedefinitionError (Syntax.Identifier _ name ()) parameterTypes ->
     "Function " <> name <> "(" <> labels parameterTypes <> ") already defined"
 
   InvalidUnaryError unary operandType -> "Can’t apply unary " <> operator <> " to " <> label operandType
@@ -133,10 +136,14 @@ description = \case
   InvalidTypeError _ expectedType actualType ->
     "Invalid type: expected " <> label expectedType <> ", but got " <> label actualType
 
+  NoSideEffectsError _ ->
+    "Statement has no side effects"
+
   InvalidReturnTypeError _ expectedType actualType ->
     "Invalid return type: expected " <> label expectedType <> ", but got " <> label actualType
 
-  MissingReturnValueError _ expectedType -> "Missing return value: expected " <> label expectedType
+  MissingReturnValueError _ expectedType ->
+    "Missing return value: expected " <> label expectedType
 
   MissingReturnPathError (Syntax.Identifier _ name ()) parameterTypes ->
     name <> "(" <> labels parameterTypes <> "): not all code paths return a value"
@@ -157,11 +164,12 @@ span :: Error -> Span
 span (UnknownTypeError typeId) = Syntax.span typeId
 span (UnknownIdentifierError name) = Syntax.span name
 span (UnknownFunctionError name _) = Syntax.span name
-span (DuplicateFunctionDefinition name _) = Syntax.span name
+span (FunctionRedefinitionError name _) = Syntax.span name
 span (InvalidUnaryError unary _) = Syntax.span unary
 span (InvalidBinaryError binary _ _) = Syntax.span binary
 span (InvalidAssignError assign _ _) = Syntax.span assign
 span (InvalidTypeError expression _ _) = Syntax.span expression
+span (NoSideEffectsError statement) = Syntax.span statement
 span (InvalidReturnTypeError statement _ _) = Syntax.span statement
 span (MissingReturnValueError statement _) = Syntax.span statement
 span (MissingReturnPathError name _) = Syntax.span name
@@ -171,11 +179,12 @@ start :: Integral a => Error -> a
 start (UnknownTypeError typeId) = Syntax.start typeId
 start (UnknownIdentifierError name) = Syntax.start name
 start (UnknownFunctionError name _) = Syntax.start name
-start (DuplicateFunctionDefinition name _) = Syntax.start name
+start (FunctionRedefinitionError name _) = Syntax.start name
 start (InvalidUnaryError unary _) = Syntax.start unary
 start (InvalidBinaryError binary _ _) = Syntax.start binary
 start (InvalidAssignError assign _ _) = Syntax.start assign
 start (InvalidTypeError expression _ _) = Syntax.start expression
+start (NoSideEffectsError statement) = Syntax.start statement
 start (InvalidReturnTypeError statement _ _) = Syntax.start statement
 start (MissingReturnValueError statement _) = Syntax.start statement
 start (MissingReturnPathError name _) = Syntax.start name
@@ -185,11 +194,12 @@ end :: Integral a => Error -> a
 end (UnknownTypeError typeId) = Syntax.end typeId
 end (UnknownIdentifierError name) = Syntax.end name
 end (UnknownFunctionError name _) = Syntax.end name
-end (DuplicateFunctionDefinition name _) = Syntax.end name
+end (FunctionRedefinitionError name _) = Syntax.end name
 end (InvalidUnaryError unary _) = Syntax.end unary
 end (InvalidBinaryError binary _ _) = Syntax.end binary
 end (InvalidAssignError assign _ _) = Syntax.end assign
 end (InvalidTypeError expression _ _) = Syntax.end expression
+end (NoSideEffectsError statement) = Syntax.end statement
 end (InvalidReturnTypeError statement _ _) = Syntax.end statement
 end (MissingReturnValueError statement _) = Syntax.end statement
 end (MissingReturnPathError name _) = Syntax.end name

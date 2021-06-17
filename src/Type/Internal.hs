@@ -55,7 +55,7 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
 
         where
           f (Just signatures) | any ((== parameterTypes) . fst) signatures = do
-            tell [DuplicateFunctionDefinition functionId parameterTypes]
+            tell [FunctionRedefinitionError functionId parameterTypes]
             pure (Just signatures)
 
           f (Just signatures) = pure (Just ((parameterTypes, returnType) : signatures))
@@ -88,6 +88,7 @@ checkStatement :: Type -> Environment -> Syntax.Statement () -> Writer [Error] (
 checkStatement expectedType environment statement = case statement of
   Syntax.ExpressionStatement {value} -> do
     (_, environment') <- checkExpression environment value
+    unless (Syntax.hasSideEffects value) (tell [NoSideEffectsError statement])
     pure (False, environment')
 
   Syntax.IfStatement {predicate, trueBranch} -> do
