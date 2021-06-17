@@ -41,7 +41,7 @@ main = do
 
 onActivate :: Gtk.IsApplication a => a -> Gio.ApplicationActivateCallback
 onActivate application = do
-  let styleIds =
+  let styles =
         [
           ("keyword", "def:keyword"),
           ("identifier", "def:identifier"),
@@ -56,7 +56,7 @@ onActivate application = do
   -- Create defaultLanguage and codeTreeStore, which are needed later:
 
   languageManager <- new GtkSource.LanguageManager []
-  defaultLanguage <- fromJust <$> #getLanguage languageManager "def"
+  defaultLanguage <- #getLanguage languageManager "def"
 
   codeTreeStore <- new Gtk.TreeStore []
   #setColumnTypes codeTreeStore [gtypeString, gtypeString]
@@ -113,14 +113,21 @@ onActivate application = do
   #setHighlightMatchingBrackets codeTextBuffer False
   #setHighlightSyntax codeTextBuffer False
 
-  styleScheme <- fromJust <$> #getStyleScheme codeTextBuffer
+  styleScheme <- #getStyleScheme codeTextBuffer
   tagTable <- #getTagTable codeTextBuffer
 
-  for_ styleIds \(tagName, styleId) -> do
+  for_ styles \(tagName, styleId) -> do
     tag <- new GtkSource.Tag [#name := tagName]
-    style <- fromJust <$> Helpers.getStyle defaultLanguage styleScheme styleId
-    #apply style tag
     #add tagTable tag
+
+    style <- case (styleScheme, defaultLanguage) of
+      (Just styleScheme, Just language) -> Helpers.getStyle language styleScheme styleId
+      (Just styleScheme, Nothing) -> #getStyle styleScheme styleId
+      (Nothing, _) -> pure Nothing
+
+    case style of
+      Just style -> #apply style tag
+      Nothing -> pure ()
 
   -- Set up codeTreeView:
 
@@ -153,7 +160,7 @@ onActivate application = do
           swapMVar declarationsVar declarations
 
           (startTextIter, endTextIter) <- #getBounds codeTextBuffer
-          for_ styleIds \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
+          for_ styles \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
 
           insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
 
@@ -189,7 +196,7 @@ onActivate application = do
         #removeTagByName codeTextBuffer "error" startTextIter endTextIter
 
         startTextIter <- #getIterAtOffset codeTextBuffer (fromIntegral position)
-        for_ styleIds \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
+        for_ styles \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
         #applyTagByName codeTextBuffer "error" startTextIter endTextIter
 
         (line, column) <- Helpers.getLineColumn startTextIter
