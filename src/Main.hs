@@ -53,10 +53,16 @@ onActivate application = do
           ("bracket", "bracket-match")
         ]
 
-  -- Create defaultLanguage and codeTreeStore, which are needed later:
+  -- Create defaultLanguage, codeTextBuffer and codeTreeStore, which are needed later:
 
   languageManager <- new GtkSource.LanguageManager []
   defaultLanguage <- #getLanguage languageManager "def"
+
+  codeTextBuffer <- new GtkSource.Buffer
+    [
+      #highlightMatchingBrackets := False,
+      #highlightSyntax := False
+    ]
 
   codeTreeStore <- new Gtk.TreeStore []
   #setColumnTypes codeTreeStore [gtypeString, gtypeString]
@@ -65,11 +71,12 @@ onActivate application = do
 
   codeSourceView <- new GtkSource.View
     [
+      #buffer := codeTextBuffer,
+      #monospace := True,
       #autoIndent := True,
       #highlightCurrentLine := True,
       #showLineNumbers := True,
-      #tabWidth := 4,
-      #monospace := True
+      #tabWidth := 4
     ]
 
   codeTreeView <- new Gtk.TreeView
@@ -108,10 +115,6 @@ onActivate application = do
     ]
 
   -- Set up codeSourceView:
-
-  codeTextBuffer <- unsafeCastTo GtkSource.Buffer =<< #getBuffer codeSourceView
-  #setHighlightMatchingBrackets codeTextBuffer False
-  #setHighlightSyntax codeTextBuffer False
 
   styleScheme <- #getStyleScheme codeTextBuffer
   tagTable <- #getTagTable codeTextBuffer
