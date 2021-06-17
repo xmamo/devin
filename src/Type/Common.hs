@@ -11,6 +11,7 @@ module Type.Common (
 ) where
 
 import Prelude hiding (span)
+import Data.List.NonEmpty (NonEmpty)
 
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -37,7 +38,7 @@ data Environment where
   Environment :: {
     types :: Map Text Type,
     variables :: Map Text Type,
-    functions :: [Map Text [([Type], Type)]]
+    functions :: NonEmpty (Map Text [([Type], Type)])
   } -> Environment
 
   deriving (Eq, Show, Read)

@@ -9,6 +9,8 @@ import Control.Monad
 import Data.Either
 import Data.Foldable
 import Data.Functor
+import Data.List.NonEmpty (NonEmpty ((:|)), (<|))
+import qualified Data.List.NonEmpty as NonEmpty
 
 import qualified Data.Map as Map
 
@@ -48,7 +50,7 @@ checkDeclaration pass environment declaration = case (pass, declaration) of
     case pass of
       Pass1 -> do
         let key = Unicode.collate functionName
-        functions''' <- Map.alterF f key (head functions'') <&> (: tail functions'')
+        functions''' <- Map.alterF f key (NonEmpty.head functions'') <&> (:| NonEmpty.tail functions'')
         pure (Environment types'' variables functions''')
 
         where
@@ -124,7 +126,7 @@ checkStatement expectedType environment statement = case statement of
 
   Syntax.BlockStatement {elements} -> do
     let Environment types variables functions = environment
-        functions' = Map.empty : functions
+        functions' = Map.empty <| functions
 
     environment' <- foldlM (checkDeclaration Pass1) (Environment types variables functions') (lefts elements)
     (doesReturn, _) <- foldlM f (False, environment') elements
@@ -273,14 +275,17 @@ lookupFunction environment functionId parameterTypes = go functions
     Syntax.Identifier {name} = functionId
     key = Unicode.collate name
 
-    go [] = do
-      tell [UnknownFunctionError functionId parameterTypes]
-      pure (Error, Environment types variables [Map.singleton key [(parameterTypes, Error)]])
+    go functions = do
+      let (head, tail) = NonEmpty.uncons functions
 
-    go functions = case Map.lookup key (head functions) of
-      Just signatures -> case lookup parameterTypes signatures of
+      case lookup parameterTypes =<< Map.lookup key head of
         Just _ | any isError parameterTypes -> pure (Error, environment)
-        Just returnType -> pure (returnType, environment)
-        Nothing -> go (tail functions)
 
-      Nothing -> go (tail functions)
+        Just returnType -> pure (returnType, environment)
+
+        Nothing -> case tail of
+          Just tail -> go tail
+
+          Nothing -> do
+            tell [UnknownFunctionError functionId parameterTypes]
+            pure (Error, Environment types variables (Map.singleton key [(parameterTypes, Error)] :| []))

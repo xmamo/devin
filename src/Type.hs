@@ -16,6 +16,7 @@ module Type (
 ) where
 
 import Prelude hiding (span)
+import qualified Data.List.NonEmpty as NonEmpty
 
 import qualified Data.Map as Map
 
@@ -65,7 +66,7 @@ defaultEnvironment = Environment types variables functions
         (Unicode.collate "false", Boolean)
       ]
 
-    functions =
+    functions = NonEmpty.fromList
       [
         Map.empty,
 
