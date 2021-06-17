@@ -278,14 +278,13 @@ lookupFunction environment functionId parameterTypes = go functions
     go functions = do
       let (head, tail) = NonEmpty.uncons functions
 
-      case lookup parameterTypes =<< Map.lookup key head of
-        Just _ | any isError parameterTypes -> pure (Error, environment)
+      case (lookup parameterTypes =<< Map.lookup key head, tail) of
+        (Just _, _) | any isError parameterTypes -> pure (Error, environment)
 
-        Just returnType -> pure (returnType, environment)
+        (Just returnType, _) -> pure (returnType, environment)
 
-        Nothing -> case tail of
-          Just tail -> go tail
+        (Nothing, Just tail) -> go tail
 
-          Nothing -> do
-            tell [UnknownFunctionError functionId parameterTypes]
-            pure (Error, Environment types variables (Map.singleton key [(parameterTypes, Error)] :| []))
+        (Nothing, Nothing) -> do
+          tell [UnknownFunctionError functionId parameterTypes]
+          pure (Error, Environment types variables (Map.singleton key [(parameterTypes, Error)] :| []))
