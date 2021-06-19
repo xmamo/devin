@@ -13,6 +13,8 @@ default-extensions:
 
   # Types
   - GADTs
+  - DataKinds
+  - TypeApplications
 
   # Records
   - DisambiguateRecordFields
@@ -26,7 +28,9 @@ default-extensions:
   - DeriveTraversable
 
   # Class and instances declarations
+  - MultiParamTypeClasses
   - FlexibleInstances
+  - UndecidableInstances
 
   # Literals
   - NegativeLiterals
@@ -39,11 +43,6 @@ default-extensions:
 
   # Bindings and generalisation
   - NoMonomorphismRestriction
-
-  - DataKinds
-  - MultiParamTypeClasses
-  - UndecidableInstances
-  - TypeApplications
 
 ghc-options:
   - -O2

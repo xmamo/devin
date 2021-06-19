@@ -9,11 +9,14 @@
 
   # Types
   - -XGADTs
+  - -XDataKinds
+  - -XTypeApplications
 
   # Records
   - -XDisambiguateRecordFields
   - -XDuplicateRecordFields
   - -XNamedFieldPuns
+  - -XRecordWildCards
 
   # Deriving mechanism
   - -XDeriveFunctor
@@ -21,7 +24,9 @@
   - -XDeriveTraversable
 
   # Class and instances declarations
+  - -XMultiParamTypeClasses
   - -XFlexibleInstances
+  - -XUndecidableInstances
 
   # Literals
   - -XNegativeLiterals
