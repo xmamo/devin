@@ -2,6 +2,7 @@ module Type.Common (
   Type (..),
   Environment (..),
   Error (..),
+  label,
   isCompatible,
   description,
   span,
@@ -27,7 +28,7 @@ data Type where
   Boolean :: Type
   Integer :: Type
   Rational :: Type
-  Function :: {parameterTypes :: [Type], returnType :: Type} -> Type
+  Function :: {parameters :: [Type], result :: Type} -> Type
   Unknown :: {name :: Text} -> Type
   Error :: Type
   deriving (Show, Read)
@@ -54,8 +55,8 @@ instance Eq Type where
   Boolean == Boolean = True
   Integer == Integer = True
   Rational == Rational = True
-  Function pts1 rt1 == Function pts2 rt2 = pts1 == pts2 && rt1 == rt2
-  Unknown n1 == Unknown n2 = Unicode.collate n1 == Unicode.collate n2
+  Function parameters1 result1 == Function parameters2 result2 = parameters1 == parameters2 && result1 == result2
+  Unknown name1 == Unknown name2 = Unicode.collate name1 == Unicode.collate name2
   Error == Error = True
   _ == _ = False
 
@@ -68,6 +69,16 @@ data Environment where
   } -> Environment
 
   deriving (Eq, Show, Read)
+
+
+label :: Type -> Text
+label Unit = "Unit"
+label Boolean = "Boolean"
+label Integer = "Integer"
+label Rational = "Rational"
+label Function{parameters, result} = "(" <> Text.intercalate ", " (label <$> parameters) <> ") → " <> label result
+label Unknown{name} = name
+label Error = "⊥"
 
 
 isCompatible :: Type -> Type -> Bool
@@ -85,10 +96,10 @@ description = \case
     "Unknown variable " <> variableId.name
 
   UnknownFunctionError{functionId, parameters} ->
-    "Unknown function " <> functionId.name <> "(" <> labels parameters <> ")"
+    "Unknown function " <> functionId.name <> "(" <> Text.intercalate ", " (label <$> parameters) <> ")"
 
   FunctionRedefinitionError{functionId, parameters} ->
-    "Function " <> functionId.name <> "(" <> labels parameters <> ") already defined"
+    "Function " <> functionId.name <> "(" <> Text.intercalate ", " (label <$> parameters) <> ") already defined"
 
   InvalidUnaryError{unary, operand} ->
     "Can’t apply unary " <> operator <> " to " <> label operand
@@ -140,18 +151,7 @@ description = \case
     "Missing return value: expected " <> label expected
 
   MissingReturnPathError{functionId, parameters} ->
-    functionId.name <> "(" <> labels parameters <> "): not all code paths return a value"
-
-  where
-    label Unit = "Unit"
-    label Boolean = "Boolean"
-    label Integer = "Integer"
-    label Rational = "Rational"
-    label (Function parameterTypes returnType) = "(" <> labels parameterTypes <> ") -> " <> label returnType
-    label (Unknown name) = name
-    label Error = "⊥"
-
-    labels types = Text.intercalate ", " (label <$> types)
+    functionId.name <> "(" <> Text.intercalate ", " (label <$> parameters) <> "): not all code paths return a value"
 
 
 span :: Error -> Span

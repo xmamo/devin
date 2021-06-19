@@ -136,7 +136,7 @@ separatedBy1 parser separator = (:) <$> parser <*> many (separator *> parser)
 label :: Monad m => Text -> ParserT m a -> ParserT m a
 label l parser = ParserT \input@(Input position _) -> parseT parser input >>= \case
   Result.Success value rest -> pure (Result.Success value rest)
-  Result.Failure recoverable _ _ -> pure (Result.Failure recoverable position [l])
+  Result.Failure isFatal _ _ -> pure (Result.Failure isFatal position [l])
 
 
 commit :: Monad m => ParserT m a -> ParserT m a

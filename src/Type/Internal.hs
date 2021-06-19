@@ -188,7 +188,7 @@ checkExpression environment expression = case expression of
     (rest', environment'') <- foldlM f ([], environment') rest
     let arguments' = Just (first', rest')
     (targetId', environment''') <- checkFunction environment'' targetId (first'.t : [a.t | (_, a) <- rest'])
-    pure (Syntax.CallExpression targetId' open arguments' close targetId'.t.returnType, environment''')
+    pure (Syntax.CallExpression targetId' open arguments' close targetId'.t.result, environment''')
     where
       f (arguments, environment) (comma, argument) = do
         (argument', environment') <- checkExpression environment argument
@@ -196,7 +196,7 @@ checkExpression environment expression = case expression of
 
   Syntax.CallExpression{targetId, open, arguments = Nothing, close} -> do
     (targetId', environment') <- checkFunction environment targetId []
-    pure (Syntax.CallExpression targetId' open Nothing close targetId'.t.returnType, environment')
+    pure (Syntax.CallExpression targetId' open Nothing close targetId'.t.result, environment')
 
   Syntax.UnaryExpression{unary, operand} -> do
     (operand', environment') <- checkExpression environment operand

@@ -2,6 +2,7 @@ module Type (
   Type (..),
   Environment (..),
   Error (..),
+  label,
   isCompatible,
   description,
   span,
