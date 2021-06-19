@@ -554,7 +554,7 @@ displayExpression textBuffer treeStore treeIter expression = case expression of
 
   Syntax.VariableExpression{variableId} -> do
     treeIter' <- display textBuffer treeStore treeIter expression "VariableExpression" (Just expression.t) False
-    display textBuffer treeStore treeIter' variableId "Identifier" Nothing True
+    display textBuffer treeStore treeIter' variableId "Identifier" (Just variableId.t) True
     pure treeIter'
 
   Syntax.CallExpression{targetId, open, arguments, close} -> do

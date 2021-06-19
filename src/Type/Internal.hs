@@ -285,8 +285,9 @@ checkType environment@Environment{types} typeId@Syntax.Identifier{s, name} = do
   case Map.insertLookupWithKey (\_ _ old -> old) key Error types of
     (Just t, types') -> pure (Syntax.Identifier s name t, environment{types = types'})
 
-    (Nothing, types') -> do
+    (Nothing, _) -> do
       tell [UnknownTypeError typeId]
+      let types' =  Map.insert key (Unknown name) types
       pure (Syntax.Identifier s name (Unknown name), environment{types = types'})
 
 
@@ -299,7 +300,8 @@ checkVariable environment@Environment{variables} variableId = do
 
     (Nothing, _) -> do
       tell [UnknownVariableError variableId]
-      pure (variableId $> Error, environment)
+      let variables' = Map.insert key Error variables
+      pure (variableId $> Error, environment{variables = variables'})
 
 
 checkFunction :: Environment -> Syntax.Identifier () -> [Type] -> Writer [Error] (Syntax.Identifier Type, Environment)
