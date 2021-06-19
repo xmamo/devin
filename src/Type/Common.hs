@@ -3,7 +3,7 @@ module Type.Common (
   Environment (..),
   Error (..),
   label,
-  isCompatible,
+  areCompatible,
   description,
   span,
   start,
@@ -81,10 +81,10 @@ label Unknown{name} = name
 label Error = "⊥"
 
 
-isCompatible :: Type -> Type -> Bool
-Error `isCompatible` _ = True
-_ `isCompatible` Error = True
-type1 `isCompatible` type2 = type1 == type2
+areCompatible :: Type -> Type -> Bool
+areCompatible Error  _ = True
+areCompatible _ Error = True
+areCompatible type1 type2 = type1 == type2
 
 
 description :: Error -> Text

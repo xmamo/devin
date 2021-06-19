@@ -3,7 +3,7 @@ module Type (
   Environment (..),
   Error (..),
   label,
-  isCompatible,
+  areCompatible,
   description,
   span,
   start,
