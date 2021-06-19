@@ -1,9 +1,8 @@
 module Type.Common (
   Type (..),
   Environment (..),
-  Pass (..),
   Error (..),
-  isError,
+  isCompatible,
   description,
   span,
   start,
@@ -28,10 +27,37 @@ data Type where
   Boolean :: Type
   Integer :: Type
   Rational :: Type
-  Function :: [Type] -> Type -> Type
-  Unknown :: Text -> Type
+  Function :: {parameterTypes :: [Type], returnType :: Type} -> Type
+  Unknown :: {name :: Text} -> Type
   Error :: Type
   deriving (Show, Read)
+
+
+data Error where
+  UnknownTypeError :: {typeId :: Syntax.Identifier ()} -> Error
+  UnknownVariableError :: {variableId :: Syntax.Identifier ()} -> Error
+  UnknownFunctionError :: {functionId :: Syntax.Identifier (), parameters :: [Type]} -> Error
+  FunctionRedefinitionError :: {functionId :: Syntax.Identifier (), parameters :: [Type]} -> Error
+  InvalidUnaryError :: {unary :: Syntax.UnaryOperator (), operand :: Type} -> Error
+  InvalidBinaryError :: {binary :: Syntax.BinaryOperator (), left :: Type, right :: Type} -> Error
+  InvalidAssignError :: {assign :: Syntax.AssignOperator (), target :: Type, value :: Type} -> Error
+  InvalidTypeError :: {expression :: Syntax.Expression (), expected :: Type, actual :: Type} -> Error
+  NoSideEffectsError :: {statement :: Syntax.Statement ()} -> Error
+  InvalidReturnTypeError :: {statement :: Syntax.Statement (), expected :: Type, actual :: Type} -> Error
+  MissingReturnValueError :: {statement :: Syntax.Statement (), expected :: Type} -> Error
+  MissingReturnPathError :: {functionId :: Syntax.Identifier (), parameters :: [Type]} -> Error
+  deriving (Eq, Show, Read)
+
+
+instance Eq Type where
+  Unit == Unit = True
+  Boolean == Boolean = True
+  Integer == Integer = True
+  Rational == Rational = True
+  Function pts1 rt1 == Function pts2 rt2 = pts1 == pts2 && rt1 == rt2
+  Unknown n1 == Unknown n2 = Unicode.collate n1 == Unicode.collate n2
+  Error == Error = True
+  _ == _ = False
 
 
 data Environment where
@@ -44,109 +70,77 @@ data Environment where
   deriving (Eq, Show, Read)
 
 
-data Pass where
-  Pass1 :: Pass
-  Pass2 :: Pass
-  deriving (Eq, Ord, Enum, Bounded, Show, Read)
-
-
-data Error where
-  UnknownTypeError :: Syntax.Identifier () -> Error
-  UnknownIdentifierError :: Syntax.Identifier () -> Error
-  UnknownFunctionError :: Syntax.Identifier () -> [Type] -> Error
-  FunctionRedefinitionError :: Syntax.Identifier () -> [Type] -> Error
-  InvalidUnaryError :: Syntax.UnaryOperator () -> Type -> Error
-  InvalidBinaryError :: Syntax.BinaryOperator () -> Type -> Type -> Error
-  InvalidAssignError :: Syntax.AssignOperator () -> Type -> Type -> Error
-  InvalidTypeError :: Syntax.Expression () -> Type -> Type -> Error
-  NoSideEffectsError :: Syntax.Statement () -> Error
-  InvalidReturnTypeError :: Syntax.Statement () -> Type -> Type -> Error
-  MissingReturnValueError :: Syntax.Statement () -> Type -> Error
-  MissingReturnPathError :: Syntax.Identifier () -> [Type] -> Error
-  deriving (Eq, Show, Read)
-
-
-instance Eq Type where
-  Error == _ = True
-  _ == Error = True
-  Unit == Unit = True
-  Boolean == Boolean = True
-  Integer == Integer = True
-  Rational == Rational = True
-  Function pts1 rt1 == Function pts2 rt2 = pts1 == pts2 && rt1 == rt2
-  Unknown n1 == Unknown n2 = Unicode.collate n1 == Unicode.collate n2
-  _ == _ = False
-
-
-isError :: Type -> Bool
-isError Error = True
-isError _ = False
+isCompatible :: Type -> Type -> Bool
+Error `isCompatible` _ = True
+_ `isCompatible` Error = True
+type1 `isCompatible` type2 = type1 == type2
 
 
 description :: Error -> Text
 description = \case
-  UnknownTypeError (Syntax.Identifier _ name ()) ->
-    "Unknown type " <> name
+  UnknownTypeError{typeId} ->
+    "Unknown type " <> typeId.name
 
-  UnknownIdentifierError (Syntax.Identifier _ name ()) ->
-    "Unknown identifier " <> name
+  UnknownVariableError{variableId} ->
+    "Unknown variable " <> variableId.name
 
-  UnknownFunctionError (Syntax.Identifier _ name ()) parameterTypes ->
-    "Unknown function " <> name <> "(" <> labels parameterTypes <> ")"
+  UnknownFunctionError{functionId, parameters} ->
+    "Unknown function " <> functionId.name <> "(" <> labels parameters <> ")"
 
-  FunctionRedefinitionError (Syntax.Identifier _ name ()) parameterTypes ->
-    "Function " <> name <> "(" <> labels parameterTypes <> ") already defined"
+  FunctionRedefinitionError{functionId, parameters} ->
+    "Function " <> functionId.name <> "(" <> labels parameters <> ") already defined"
 
-  InvalidUnaryError unary operandType -> "Can’t apply unary " <> operator <> " to " <> label operandType
+  InvalidUnaryError{unary, operand} ->
+    "Can’t apply unary " <> operator <> " to " <> label operand
     where
       operator = case unary of
-        Syntax.PlusOperator {} -> "+"
-        Syntax.MinusOperator {} -> "-"
-        Syntax.NotOperator {} -> "not"
+        Syntax.PlusOperator{} -> "+"
+        Syntax.MinusOperator{} -> "-"
+        Syntax.NotOperator{} -> "not"
 
-  InvalidBinaryError binary leftType rightType ->
-    "Can’t apply binary " <> operator <> " between " <> label leftType <> " and " <> label rightType
+  InvalidBinaryError{binary, left, right} ->
+    "Can’t apply binary " <> operator <> " between " <> label left <> " and " <> label right
     where
       operator = case binary of
-        Syntax.AddOperator {} -> "+"
-        Syntax.SubtractOperator {} -> "-"
-        Syntax.MultiplyOperator {} -> "*"
-        Syntax.DivideOperator {} -> "/"
-        Syntax.RemainderOperator {} -> "%"
-        Syntax.EqualOperator {} -> "=="
-        Syntax.NotEqualOperator {} -> "!="
-        Syntax.LessOperator {} -> "<"
-        Syntax.LessOrEqualOperator {} -> "<="
-        Syntax.GreaterOperator {} -> ">"
-        Syntax.GreaterOrEqualOperator {} -> ">="
-        Syntax.AndOperator {} -> "and"
-        Syntax.OrOperator {} -> "or"
+        Syntax.AddOperator{} -> "+"
+        Syntax.SubtractOperator{} -> "-"
+        Syntax.MultiplyOperator{} -> "*"
+        Syntax.DivideOperator{} -> "/"
+        Syntax.RemainderOperator{} -> "%"
+        Syntax.EqualOperator{} -> "=="
+        Syntax.NotEqualOperator{} -> "!="
+        Syntax.LessOperator{} -> "<"
+        Syntax.LessOrEqualOperator{} -> "<="
+        Syntax.GreaterOperator{} -> ">"
+        Syntax.GreaterOrEqualOperator{} -> ">="
+        Syntax.AndOperator{} -> "and"
+        Syntax.OrOperator{} -> "or"
 
-  InvalidAssignError assign targetType valueType ->
-    "Can’t apply assign " <> operator <> " to " <> label targetType <> " and " <> label valueType
+  InvalidAssignError{assign, target, value} ->
+    "Can’t apply assign " <> operator <> " to " <> label target <> " and " <> label value
     where
       operator = case assign of
-        Syntax.AssignOperator {} -> "="
-        Syntax.AddAssignOperator {} -> "+="
-        Syntax.SubtractAssignOperator {} -> "-="
-        Syntax.MultiplyAssignOperator {} -> "*="
-        Syntax.DivideAssignOperator {} -> "/="
-        Syntax.RemainderAssignOperator {} -> "%="
+        Syntax.AssignOperator{} -> "="
+        Syntax.AddAssignOperator{} -> "+="
+        Syntax.SubtractAssignOperator{} -> "-="
+        Syntax.MultiplyAssignOperator{} -> "*="
+        Syntax.DivideAssignOperator{} -> "/="
+        Syntax.RemainderAssignOperator{} -> "%="
 
-  InvalidTypeError _ expectedType actualType ->
-    "Invalid type: expected " <> label expectedType <> ", but got " <> label actualType
+  InvalidTypeError{expected, actual} ->
+    "Invalid type: expected " <> label expected <> ", but got " <> label actual
 
-  NoSideEffectsError _ ->
+  NoSideEffectsError{} ->
     "Statement has no side effects"
 
-  InvalidReturnTypeError _ expectedType actualType ->
-    "Invalid return type: expected " <> label expectedType <> ", but got " <> label actualType
+  InvalidReturnTypeError{expected, actual}->
+    "Invalid return type: expected " <> label expected <> ", but got " <> label actual
 
-  MissingReturnValueError _ expectedType ->
-    "Missing return value: expected " <> label expectedType
+  MissingReturnValueError{expected} ->
+    "Missing return value: expected " <> label expected
 
-  MissingReturnPathError (Syntax.Identifier _ name ()) parameterTypes ->
-    name <> "(" <> labels parameterTypes <> "): not all code paths return a value"
+  MissingReturnPathError{functionId, parameters} ->
+    functionId.name <> "(" <> labels parameters <> "): not all code paths return a value"
 
   where
     label Unit = "Unit"
@@ -161,45 +155,45 @@ description = \case
 
 
 span :: Error -> Span
-span (UnknownTypeError typeId) = Syntax.span typeId
-span (UnknownIdentifierError name) = Syntax.span name
-span (UnknownFunctionError name _) = Syntax.span name
-span (FunctionRedefinitionError name _) = Syntax.span name
-span (InvalidUnaryError unary _) = Syntax.span unary
-span (InvalidBinaryError binary _ _) = Syntax.span binary
-span (InvalidAssignError assign _ _) = Syntax.span assign
-span (InvalidTypeError expression _ _) = Syntax.span expression
-span (NoSideEffectsError statement) = Syntax.span statement
-span (InvalidReturnTypeError statement _ _) = Syntax.span statement
-span (MissingReturnValueError statement _) = Syntax.span statement
-span (MissingReturnPathError name _) = Syntax.span name
+span UnknownTypeError{typeId} = Syntax.span typeId
+span UnknownVariableError{variableId} = Syntax.span variableId
+span UnknownFunctionError{functionId} = Syntax.span functionId
+span FunctionRedefinitionError{functionId} = Syntax.span functionId
+span InvalidUnaryError{unary} = Syntax.span unary
+span InvalidBinaryError{binary} = Syntax.span binary
+span InvalidAssignError{assign} = Syntax.span assign
+span InvalidTypeError{expression} = Syntax.span expression
+span NoSideEffectsError{statement} = Syntax.span statement
+span InvalidReturnTypeError{statement} = Syntax.span statement
+span MissingReturnValueError{statement} = Syntax.span statement
+span MissingReturnPathError{functionId} = Syntax.span functionId
 
 
 start :: Integral a => Error -> a
-start (UnknownTypeError typeId) = Syntax.start typeId
-start (UnknownIdentifierError name) = Syntax.start name
-start (UnknownFunctionError name _) = Syntax.start name
-start (FunctionRedefinitionError name _) = Syntax.start name
-start (InvalidUnaryError unary _) = Syntax.start unary
-start (InvalidBinaryError binary _ _) = Syntax.start binary
-start (InvalidAssignError assign _ _) = Syntax.start assign
-start (InvalidTypeError expression _ _) = Syntax.start expression
-start (NoSideEffectsError statement) = Syntax.start statement
-start (InvalidReturnTypeError statement _ _) = Syntax.start statement
-start (MissingReturnValueError statement _) = Syntax.start statement
-start (MissingReturnPathError name _) = Syntax.start name
+start UnknownTypeError{typeId} = Syntax.start typeId
+start UnknownVariableError{variableId} = Syntax.start variableId
+start UnknownFunctionError{functionId} = Syntax.start functionId
+start FunctionRedefinitionError{functionId} = Syntax.start functionId
+start InvalidUnaryError{unary} = Syntax.start unary
+start InvalidBinaryError{binary} = Syntax.start binary
+start InvalidAssignError{assign} = Syntax.start assign
+start InvalidTypeError{expression} = Syntax.start expression
+start NoSideEffectsError{statement} = Syntax.start statement
+start InvalidReturnTypeError{statement} = Syntax.start statement
+start MissingReturnValueError{statement} = Syntax.start statement
+start MissingReturnPathError{functionId} = Syntax.start functionId
 
 
 end :: Integral a => Error -> a
-end (UnknownTypeError typeId) = Syntax.end typeId
-end (UnknownIdentifierError name) = Syntax.end name
-end (UnknownFunctionError name _) = Syntax.end name
-end (FunctionRedefinitionError name _) = Syntax.end name
-end (InvalidUnaryError unary _) = Syntax.end unary
-end (InvalidBinaryError binary _ _) = Syntax.end binary
-end (InvalidAssignError assign _ _) = Syntax.end assign
-end (InvalidTypeError expression _ _) = Syntax.end expression
-end (NoSideEffectsError statement) = Syntax.end statement
-end (InvalidReturnTypeError statement _ _) = Syntax.end statement
-end (MissingReturnValueError statement _) = Syntax.end statement
-end (MissingReturnPathError name _) = Syntax.end name
+end UnknownTypeError{typeId} = Syntax.end typeId
+end UnknownVariableError{variableId} = Syntax.end variableId
+end UnknownFunctionError{functionId} = Syntax.end functionId
+end FunctionRedefinitionError{functionId} = Syntax.end functionId
+end InvalidUnaryError{unary} = Syntax.end unary
+end InvalidBinaryError{binary} = Syntax.end binary
+end InvalidAssignError{assign} = Syntax.end assign
+end InvalidTypeError{expression} = Syntax.end expression
+end NoSideEffectsError{statement} = Syntax.end statement
+end InvalidReturnTypeError{statement} = Syntax.end statement
+end MissingReturnValueError{statement} = Syntax.end statement
+end MissingReturnPathError{functionId} = Syntax.end functionId

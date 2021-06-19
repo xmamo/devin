@@ -1,14 +1,18 @@
 module Type.Internal (
   checkDeclarations,
-  checkDeclaration,
+  checkDeclaration1,
+  checkDeclaration2,
   checkStatement,
-  checkExpression
+  checkExpression,
+  checkType,
+  checkVariable,
+  checkFunction
 ) where
 
 import Control.Monad
-import Data.Either
 import Data.Foldable
 import Data.Functor
+import Data.Functor.Classes
 import Data.List.NonEmpty (NonEmpty ((:|)), (<|))
 import qualified Data.List.NonEmpty as NonEmpty
 
@@ -17,275 +21,303 @@ import qualified Data.Map as Map
 import Control.Monad.Trans.Writer
 
 import qualified Syntax
-import Type.Common
 import qualified Unicode
 
+import Type.Common
 
-checkDeclarations :: Foldable t => Environment -> t (Syntax.Declaration ()) -> Writer [Error] Environment
+
+checkDeclarations :: Environment -> [Syntax.Declaration ()] -> Writer [Error] ([Syntax.Declaration Type], Environment)
 checkDeclarations environment declarations = do
-  environment' <- foldlM (checkDeclaration Pass1) environment declarations
-  foldlM (checkDeclaration Pass2) environment' declarations
+  environment' <- foldlM checkDeclaration1 environment declarations
+  foldlM g ([], environment') declarations
+  where
+    g (declarations, environment) declaration = do
+      (declaration', environment') <- checkDeclaration2 environment declaration
+      pure (declarations ++ [declaration'], environment')
 
 
-checkDeclaration :: Pass -> Environment -> Syntax.Declaration () -> Writer [Error] Environment
-checkDeclaration pass environment declaration = case (pass, declaration) of
-  (_, Syntax.FunctionDeclaration {functionId, parameters, returnInfo, body}) -> do
-    let Environment _ variables functions = environment
-        Syntax.Identifier _ functionName () = functionId
+checkDeclaration1 :: Environment -> Syntax.Declaration () -> Writer [Error] Environment
+checkDeclaration1 environment = \case
+  Syntax.VariableDeclaration{} -> pure environment
 
+  Syntax.FunctionDeclaration{functionId, parameters, returnInfo} -> do
     (parameterTypes, environment') <- case parameters of
-      Just ((id, colon, typeId), rest) -> foldlM f ([], environment) ((undefined, id, colon, typeId) : rest)
+      Just (id, colon, typeId, rest) -> foldlM f ([], environment) ((undefined, id, colon, typeId) : rest)
         where
-          f (parameterTypes, environment) (_, Syntax.Identifier {name}, _, typeId) = do
-            (t, Environment types' variables' functions') <- lookupType environment typeId
-            let variables'' = Map.insert (Unicode.collate name) t variables'
-            pure (parameterTypes ++ [t], Environment types' variables'' functions')
+          f (types, environment) (_, _, _, typeId) = do
+            (typeId', environment') <- checkType environment typeId
+            pure (types ++ [typeId'.t], environment')
 
       Nothing -> pure ([], environment)
 
-    (returnType, Environment types'' variables'' functions'') <- case returnInfo of
-      Just (_, returnTypeId) -> lookupType environment' returnTypeId
-      _ -> pure (Unit, environment')
+    (returnType, environment''@Environment{functions = functions''}) <- case returnInfo of
+      Just (_, typeId) -> do
+        (typeId', environment'') <- checkType environment' typeId
+        pure (typeId'.t, environment'')
 
-    case pass of
-      Pass1 -> do
-        let key = Unicode.collate functionName
-        functions''' <- Map.alterF f key (NonEmpty.head functions'') <&> (:| NonEmpty.tail functions'')
-        pure (Environment types'' variables functions''')
+      Nothing -> pure (Unit, environment')
 
+    let key = Unicode.collate functionId.name
+
+        f (Just signatures) | any (liftEq isCompatible parameterTypes . fst) signatures = do
+          tell [FunctionRedefinitionError functionId parameterTypes]
+          pure (Just signatures)
+
+        f (Just signatures) = pure (Just ((parameterTypes, returnType) : signatures))
+
+        f Nothing = pure (Just [(parameterTypes, returnType)])
+
+    functions''' <- Map.alterF f key (NonEmpty.head functions'') <&> (:| NonEmpty.tail functions'')
+    pure environment''{functions = functions'''}
+
+
+checkDeclaration2 :: Environment -> Syntax.Declaration () -> Writer [Error] (Syntax.Declaration Type, Environment)
+checkDeclaration2 environment = \case
+  Syntax.VariableDeclaration{varKeyword, variableId, typeInfo = Just (colon, typeId), equalSign, value, semicolon} -> do
+    (typeId', environment') <- checkType environment typeId
+    let typeInfo' = Just (colon, typeId')
+    (value', environment''@Environment{variables = variables''}) <- checkExpression environment' value
+    unless (value'.t `isCompatible` typeId'.t) (tell [InvalidTypeError value typeId'.t value'.t])
+    let environment''' = environment''{variables = Map.insert (Unicode.collate variableId.name) typeId'.t variables''}
+    let variableId' = Syntax.Identifier variableId.s variableId.name typeId'.t
+    pure (Syntax.VariableDeclaration varKeyword variableId' typeInfo' equalSign value' semicolon, environment''')
+
+  Syntax.VariableDeclaration{varKeyword, variableId, typeInfo = Nothing, equalSign, value, semicolon} -> do
+    (value', environment'@Environment{variables = variables'}) <- checkExpression environment value
+    let environment'' = environment'{variables = Map.insert (Unicode.collate variableId.name) value'.t variables'}
+    let variableId' = Syntax.Identifier variableId.s variableId.name value'.t
+    pure (Syntax.VariableDeclaration varKeyword variableId' Nothing equalSign value' semicolon, environment'')
+
+  Syntax.FunctionDeclaration{defKeyword, functionId, open, parameters, close, returnInfo, body} -> do
+    (locals, parameters', environment') <- case parameters of
+      Just (Syntax.Identifier{s, name}, colon, typeId, rest) -> do
+        (typeId', environment') <- checkType environment typeId
+        let id' = Syntax.Identifier s name typeId'.t
+        (locals, rest', environment'') <- foldlM f (Map.singleton (Unicode.collate name) id'.t, [], environment') rest
+        pure (locals, Just (id', colon, typeId', rest'), environment'')
         where
-          f (Just signatures) | any ((== parameterTypes) . fst) signatures = do
-            tell [FunctionRedefinitionError functionId parameterTypes]
-            pure (Just signatures)
+          f (locals, rest, environment) (comma, Syntax.Identifier s name _, colon, typeId) = do
+            (typeId', environment') <- checkType environment typeId
+            let id' = Syntax.Identifier s name typeId'.t
+            let locals' = Map.insert (Unicode.collate name) typeId'.t locals
+            pure (locals', rest ++ [(comma, id', colon, typeId')], environment')
 
-          f (Just signatures) = pure (Just ((parameterTypes, returnType) : signatures))
+      Nothing -> pure (Map.empty, Nothing, environment)
 
-          f Nothing = pure (Just [(parameterTypes, returnType)])
+    (returnType, returnInfo', environment''@Environment{variables = variables''}) <- case returnInfo of
+      Just (arrow, typeId) -> do
+        (typeId', environment'') <- checkType environment' typeId
+        pure (typeId'.t, Just (arrow, typeId'), environment'')
 
-      Pass2 -> do
-        (doesReturn, _) <- checkStatement returnType (Environment types'' variables'' functions) body
-        when (returnType /= Unit && not doesReturn) (tell [MissingReturnPathError functionId parameterTypes])
-        pure (Environment types'' variables functions)
+      Nothing -> pure (Unit, Nothing, environment')
 
-  (Pass2, Syntax.VariableDeclaration {variableId, typeInfo = Just (_, typeId), value}) -> do
-    let Syntax.Identifier {name} = variableId
-    (t, environment') <- lookupType environment typeId
-    (valueType, Environment types'' variables'' functions'') <- checkExpression environment' value
-    when (valueType /= t) (tell [InvalidTypeError value t valueType])
-    let variables''' = Map.insert (Unicode.collate name) t variables''
-    pure (Environment types'' variables''' functions'')
-
-  (Pass2, Syntax.VariableDeclaration {variableId, typeInfo = Nothing, value}) -> do
-    let Syntax.Identifier {name} = variableId
-    (valueType, Environment types' variables' functions') <- checkExpression environment value
-    let variables'' = Map.insert (Unicode.collate name) valueType variables'
-    pure (Environment types' variables'' functions')
-
-  _ -> pure environment
+    let functionId' = Syntax.Identifier functionId.s functionId.name (Function (Map.elems locals) returnType)
+    (body', _) <- checkStatement returnType (environment''{variables = Map.union locals variables''}) body
+    pure (Syntax.FunctionDeclaration defKeyword functionId' open parameters' close returnInfo' body', environment'')
 
 
-checkStatement :: Type -> Environment -> Syntax.Statement () -> Writer [Error] (Bool, Environment)
-checkStatement expectedType environment statement = case statement of
-  Syntax.ExpressionStatement {value} -> do
-    (_, environment') <- checkExpression environment value
+checkStatement :: Type -> Environment -> Syntax.Statement () -> Writer [Error] (Syntax.Statement Type, Environment)
+checkStatement expectedType environment@Environment{functions} statement = case statement of
+  Syntax.ExpressionStatement{value, semicolon} -> do
+    (value', environment') <- checkExpression environment value
     unless (Syntax.hasSideEffects value) (tell [NoSideEffectsError statement])
-    pure (False, environment')
+    pure (Syntax.ExpressionStatement value' semicolon, environment')
 
-  Syntax.IfStatement {predicate, trueBranch} -> do
-    (predicateType, environment') <- checkExpression environment predicate
-    when (predicateType /= Boolean) (tell [InvalidTypeError predicate Boolean predicateType])
-    checkStatement expectedType environment' trueBranch
-    pure (False, environment')
+  Syntax.IfStatement{ifKeyword, predicate, trueBranch} -> do
+    (predicate', environment') <- checkExpression environment predicate
+    unless (predicate'.t `isCompatible` Boolean) (tell [InvalidTypeError predicate Boolean predicate'.t])
+    (statement', _) <- checkStatement expectedType environment' trueBranch
+    pure (Syntax.IfStatement ifKeyword predicate' statement', environment')
 
-  Syntax.IfElseStatement {predicate, trueBranch, falseBranch} -> do
-    (predicateType, environment') <- checkExpression environment predicate
-    when (predicateType /= Boolean) (tell [InvalidTypeError predicate Boolean predicateType])
-    (doesTrueBranchReturn, _) <- checkStatement expectedType environment' trueBranch
-    (doesFalseBrachReturn, _) <- checkStatement expectedType environment' falseBranch
-    pure (doesTrueBranchReturn && doesFalseBrachReturn, environment')
+  Syntax.IfElseStatement{ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} -> do
+    (predicate', environment') <- checkExpression environment predicate
+    unless (predicate'.t `isCompatible` Boolean) (tell [InvalidTypeError predicate Boolean predicate'.t])
+    (trueBranch', _) <- checkStatement expectedType environment' trueBranch
+    (falseBranch', _) <- checkStatement expectedType environment' falseBranch
+    pure (Syntax.IfElseStatement ifKeyword predicate' trueBranch' elseKeyword falseBranch', environment')
 
-  Syntax.WhileStatement {predicate, body} -> do
-    (predicateType, environment') <- checkExpression environment predicate
-    when (predicateType /= Boolean) (tell [InvalidTypeError predicate Boolean predicateType])
-    checkStatement expectedType environment' body
-    pure (False, environment')
+  Syntax.WhileStatement{whileKeyword, predicate, body} -> do
+    (predicate', environment') <- checkExpression environment predicate
+    unless (predicate'.t `isCompatible` Boolean) (tell [InvalidTypeError predicate Boolean predicate'.t])
+    (statement', _) <- checkStatement expectedType environment' body
+    pure (Syntax.WhileStatement whileKeyword predicate' statement', environment')
 
-  Syntax.DoWhileStatement {body, predicate} -> do
-    (doesReturn, _) <- checkStatement expectedType environment body
-    (predicateType, environment') <- checkExpression environment predicate
-    when (predicateType /= Boolean) (tell [InvalidTypeError predicate Boolean predicateType])
-    pure (doesReturn, environment')
+  Syntax.DoWhileStatement{doKeyword, body, whileKeyword, predicate, semicolon} -> do
+    (statement', _) <- checkStatement expectedType environment body
+    (predicate', environment') <- checkExpression environment predicate
+    unless (predicate'.t `isCompatible` Boolean) (tell [InvalidTypeError predicate Boolean predicate'.t])
+    pure (Syntax.DoWhileStatement doKeyword statement' whileKeyword predicate' semicolon, environment')
 
-  Syntax.ReturnStatement {result = Just result} -> do
-    (resultType, environment') <- checkExpression environment result
-    when (resultType /= expectedType) (tell [InvalidReturnTypeError statement expectedType resultType])
-    pure (True, environment')
+  Syntax.ReturnStatement{returnKeyword, result = Just result, semicolon} -> do
+    (result', environment') <- checkExpression environment result
+    unless (result'.t `isCompatible` expectedType) (tell [InvalidReturnTypeError statement expectedType result'.t])
+    pure (Syntax.ReturnStatement returnKeyword (Just result') semicolon, environment')
 
-  Syntax.ReturnStatement {result = Nothing} -> do
-    when (expectedType /= Unit) (tell [MissingReturnValueError statement expectedType])
-    pure (True, environment)
+  Syntax.ReturnStatement{returnKeyword, result = Nothing, semicolon} -> do
+    unless (expectedType `isCompatible` Unit) (tell [MissingReturnValueError statement expectedType])
+    pure (Syntax.ReturnStatement returnKeyword Nothing semicolon, environment)
 
-  Syntax.BlockStatement {elements} -> do
-    let Environment types variables functions = environment
-        functions' = Map.empty <| functions
-
-    environment' <- foldlM (checkDeclaration Pass1) (Environment types variables functions') (lefts elements)
-    (doesReturn, _) <- foldlM f (False, environment') elements
-    pure (doesReturn, environment)
-
+  Syntax.BlockStatement{open, elements, close} -> do
+    environment' <- foldlM f environment{functions = Map.empty <| functions} elements
+    (elements'', _) <- foldlM g ([], environment') elements
+    pure (Syntax.BlockStatement open elements'' close, environment)
     where
-      f (doesReturn, environment) (Left declaration) = do
-        environment' <- checkDeclaration Pass2 environment declaration
-        pure (doesReturn, environment')
+      f environment = either (checkDeclaration1 environment) (const (pure environment))
 
-      f (doesReturn, environment) (Right statement) = do
-        (doesReturn', environment') <- checkStatement expectedType environment statement
-        pure (doesReturn || doesReturn', environment')
+      g (elements, environment) (Left declaration) = do
+        (declaration', environment') <- checkDeclaration2 environment declaration
+        pure (elements ++ [Left declaration'], environment')
+
+      g (elements, environment) (Right statement) = do
+        (statement', environment') <- checkStatement expectedType environment statement
+        pure (elements ++ [Right statement'], environment')
 
 
-checkExpression :: Environment -> Syntax.Expression () -> Writer [Error] (Type, Environment)
+checkExpression :: Environment -> Syntax.Expression () -> Writer [Error] (Syntax.Expression Type, Environment)
 checkExpression environment expression = case expression of
-  Syntax.IntegerExpression {} -> pure (Integer, environment)
+  Syntax.IntegerExpression{} -> pure (expression $> Integer, environment)
 
-  Syntax.RationalExpression {} -> pure (Rational, environment)
+  Syntax.RationalExpression{} -> pure (expression $> Rational, environment)
 
-  Syntax.VariableExpression {variableId} -> lookupVariable environment variableId
+  Syntax.VariableExpression{variableId} -> do
+    (variableId', environment') <- checkVariable environment variableId
+    pure (Syntax.VariableExpression variableId' variableId'.t, environment')
 
-  Syntax.CallExpression {targetId, arguments} -> do
-    (argumentTs, environment') <- case arguments of
-      Just (first, rest) -> foldlM f ([], environment) ((undefined, first) : rest)
-        where
-          f (argumentTs, environment) (_, argument) = do
-            (t, environment') <- checkExpression environment argument
-            pure (argumentTs ++ [t], environment')
+  Syntax.CallExpression{targetId, open, arguments = Just (first, rest), close} -> do
+    (first', environment') <- checkExpression environment first
+    (rest', environment'') <- foldlM f ([], environment') rest
+    let arguments' = Just (first', rest')
+    (targetId', environment''') <- checkFunction environment'' targetId (first'.t : [a.t | (_, a) <- rest'])
+    pure (Syntax.CallExpression targetId' open arguments' close targetId'.t.returnType, environment''')
+    where
+      f (arguments, environment) (comma, argument) = do
+        (argument', environment') <- checkExpression environment argument
+        pure (arguments ++ [(comma, argument')], environment')
 
-      Nothing -> pure ([], environment)
+  Syntax.CallExpression{targetId, open, arguments = Nothing, close} -> do
+    (targetId', environment') <- checkFunction environment targetId []
+    pure (Syntax.CallExpression targetId' open Nothing close targetId'.t.returnType, environment')
 
-    lookupFunction environment' targetId argumentTs
+  Syntax.UnaryExpression{unary, operand} -> do
+    (operand', environment') <- checkExpression environment operand
 
-  Syntax.UnaryExpression {unary, operand} -> do
-    (operandType, environment') <- checkExpression environment operand
+    t <- case (unary, operand'.t) of
+      (_, Error) -> pure Error
+      (Syntax.PlusOperator{}, Integer) -> pure Integer
+      (Syntax.PlusOperator{}, Rational) -> pure Rational
+      (Syntax.MinusOperator{}, Integer) -> pure Integer
+      (Syntax.MinusOperator{}, Rational) -> pure Rational
+      (Syntax.NotOperator{}, Boolean) -> pure Boolean
+      _ -> tell [InvalidUnaryError unary operand'.t] $> Error
 
-    case (unary, operandType) of
-      (_, Error) -> pure (Error, environment')
-      (Syntax.PlusOperator {}, Integer) -> pure (Integer, environment')
-      (Syntax.PlusOperator {}, Rational) -> pure (Rational, environment')
-      (Syntax.MinusOperator {}, Integer) -> pure (Integer, environment')
-      (Syntax.MinusOperator {}, Rational) -> pure (Rational, environment')
-      (Syntax.NotOperator {}, Boolean) -> pure (Boolean, environment')
+    let unary' = unary $> Function [operand'.t] t
+    pure (Syntax.UnaryExpression unary' operand' t, environment')
 
-      _ -> do
-        tell [InvalidUnaryError unary operandType]
-        pure (Error, environment')
+  Syntax.BinaryExpression{left, binary, right} -> do
+    (left', environment') <- checkExpression environment left
+    (right', environment'') <- checkExpression environment' right
 
-  Syntax.BinaryExpression {left, binary, right} -> do
-    (leftType, environment') <- checkExpression environment left
-    (rightType, environment'') <- checkExpression environment' right
+    t <- case (left'.t, binary, right'.t) of
+      (Error, _, _) -> pure Error
+      (_, _, Error) -> pure Error
+      (Integer, Syntax.AddOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.AddOperator{}, Rational) -> pure Rational
+      (Integer, Syntax.SubtractOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.SubtractOperator{}, Rational) -> pure Rational
+      (Integer, Syntax.MultiplyOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.MultiplyOperator{}, Rational) -> pure Rational
+      (Integer, Syntax.DivideOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.DivideOperator{}, Rational) -> pure Rational
+      (Integer, Syntax.RemainderOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.RemainderOperator{}, Rational) -> pure Rational
+      (_, Syntax.EqualOperator{}, _) -> pure Boolean
+      (_, Syntax.NotEqualOperator{}, _) -> pure Boolean
+      (Integer, Syntax.LessOperator{}, Integer) -> pure Boolean
+      (Rational, Syntax.LessOperator{}, Rational) -> pure Boolean
+      (Integer, Syntax.LessOrEqualOperator{}, Integer) -> pure Boolean
+      (Rational, Syntax.LessOrEqualOperator{}, Rational) -> pure Boolean
+      (Integer, Syntax.GreaterOperator{}, Integer) -> pure Boolean
+      (Rational, Syntax.GreaterOperator{}, Rational) -> pure Boolean
+      (Integer, Syntax.GreaterOrEqualOperator{}, Integer) -> pure Boolean
+      (Rational, Syntax.GreaterOrEqualOperator{}, Rational) -> pure Boolean
+      (Boolean, Syntax.AndOperator{}, Boolean) -> pure Boolean
+      (Boolean, Syntax.OrOperator{}, Boolean) -> pure Boolean
+      _ -> tell [InvalidBinaryError binary left'.t right'.t] $> Error
 
-    case (leftType, binary, rightType) of
-      (Error, _, _) -> pure (Error, environment'')
-      (_, _, Error) -> pure (Error, environment'')
-      (Integer, Syntax.AddOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.AddOperator {}, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.SubtractOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.SubtractOperator {}, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.MultiplyOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.MultiplyOperator {}, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.DivideOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.DivideOperator {}, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.RemainderOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.RemainderOperator {}, Rational) -> pure (Rational, environment'')
-      (_, Syntax.EqualOperator {}, _) -> pure (Boolean, environment'')
-      (_, Syntax.NotEqualOperator {}, _) -> pure (Boolean, environment'')
-      (Integer, Syntax.LessOperator {}, Integer) -> pure (Boolean, environment'')
-      (Rational, Syntax.LessOperator {}, Rational) -> pure (Boolean, environment'')
-      (Integer, Syntax.LessOrEqualOperator {}, Integer) -> pure (Boolean, environment'')
-      (Rational, Syntax.LessOrEqualOperator {}, Rational) -> pure (Boolean, environment'')
-      (Integer, Syntax.GreaterOperator {}, Integer) -> pure (Boolean, environment'')
-      (Rational, Syntax.GreaterOperator {}, Rational) -> pure (Boolean, environment'')
-      (Integer, Syntax.GreaterOrEqualOperator {}, Integer) -> pure (Boolean, environment'')
-      (Rational, Syntax.GreaterOrEqualOperator {}, Rational) -> pure (Boolean, environment'')
-      (Boolean, Syntax.AndOperator {}, Boolean) -> pure (Boolean, environment'')
-      (Boolean, Syntax.OrOperator {}, Boolean) -> pure (Boolean, environment'')
+    let binary' = binary $> Function [left'.t, right'.t] t
+    pure (Syntax.BinaryExpression left' binary' right' t, environment'')
 
-      _ -> do
-        tell [InvalidBinaryError binary leftType rightType]
-        pure (Error, environment'')
+  Syntax.AssignExpression{targetId, assign, value} -> do
+    (targetId', environment') <- checkVariable environment targetId
+    (value', environment'') <- checkExpression environment' value
 
-  Syntax.AssignExpression {targetId, assign, value} -> do
-    (valueType, environment') <- checkExpression environment value
-    (targetType, environment'') <- lookupVariable environment' targetId
+    t <- case (targetId'.t, assign, value'.t) of
+      (Error, _, _) -> pure Error
+      (_, _, Error) -> pure Error
+      (Unit, Syntax.AssignOperator{}, Unit) -> pure Unit
+      (Boolean, Syntax.AssignOperator{}, Boolean) -> pure Boolean
+      (Integer, Syntax.AssignOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.AssignOperator{}, Rational) -> pure Rational
+      (Integer, Syntax.AddAssignOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.AddAssignOperator{}, Rational) -> pure Rational
+      (Integer, Syntax.SubtractAssignOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.SubtractAssignOperator{}, Rational) -> pure Rational
+      (Integer, Syntax.MultiplyAssignOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.MultiplyAssignOperator{}, Rational) -> pure Rational
+      (Integer, Syntax.DivideAssignOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.DivideAssignOperator{}, Rational) -> pure Rational
+      (Integer, Syntax.RemainderAssignOperator{}, Integer) -> pure Integer
+      (Rational, Syntax.RemainderAssignOperator{}, Rational) -> pure Rational
+      _ -> tell [InvalidAssignError assign targetId'.t value'.t] $> Error
 
-    case (targetType, assign, valueType) of
-      (Error, _, _) -> pure (Error, environment'')
-      (_, _, Error) -> pure (Error, environment'')
-      (Unit, Syntax.AssignOperator {}, Unit) -> pure (Unit, environment'')
-      (Boolean, Syntax.AssignOperator {}, Boolean) -> pure (Boolean, environment'')
-      (Integer, Syntax.AssignOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.AssignOperator {}, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.AddAssignOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.AddAssignOperator {}, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.SubtractAssignOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.SubtractAssignOperator {}, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.MultiplyAssignOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.MultiplyAssignOperator {}, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.DivideAssignOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.DivideAssignOperator {}, Rational) -> pure (Rational, environment'')
-      (Integer, Syntax.RemainderAssignOperator {}, Integer) -> pure (Integer, environment'')
-      (Rational, Syntax.RemainderAssignOperator {}, Rational) -> pure (Rational, environment'')
+    let assign' = assign $> Function [targetId'.t, value'.t] t
+    pure (Syntax.AssignExpression targetId' assign' value' value'.t, environment'')
 
-      _ -> do
-        tell [InvalidAssignError assign targetType valueType]
-        pure (Error, environment'')
-
-  Syntax.ParenthesizedExpression {inner} -> checkExpression environment inner
+  Syntax.ParenthesizedExpression{open, inner, close} -> do
+    (inner', environment') <- checkExpression environment inner
+    pure (Syntax.ParenthesizedExpression open inner' close inner'.t, environment')
 
 
-lookupType :: Environment -> Syntax.Identifier () -> Writer [Error] (Type, Environment)
-lookupType environment typeId = do
-  let Environment types variables functions = environment
-      Syntax.Identifier {name} = typeId
-      key = Unicode.collate name
+checkType :: Environment -> Syntax.Identifier () -> Writer [Error] (Syntax.Identifier Type, Environment)
+checkType environment@Environment{types} typeId@Syntax.Identifier{s, name} = do
+  let key = Unicode.collate typeId.name
 
   case Map.insertLookupWithKey (\_ _ old -> old) key Error types of
-    (Just t, types') -> pure (t, Environment types' variables functions)
+    (Just t, types') -> pure (Syntax.Identifier s name t, environment{types = types'})
 
     (Nothing, types') -> do
       tell [UnknownTypeError typeId]
-      pure (Unknown name, Environment types' variables functions)
+      pure (Syntax.Identifier s name (Unknown name), environment{types = types'})
 
 
-lookupVariable :: Environment -> Syntax.Identifier () -> Writer [Error] (Type, Environment)
-lookupVariable environment variableId = do
-  let Environment types variables functions = environment
-      Syntax.Identifier {name} = variableId
-      key = Unicode.collate name
+checkVariable :: Environment -> Syntax.Identifier () -> Writer [Error] (Syntax.Identifier Type, Environment)
+checkVariable environment@Environment{variables} variableId = do
+  let key = Unicode.collate variableId.name
 
   case Map.insertLookupWithKey (\_ _ old -> old) key Error variables of
-    (Just t, variables') -> pure (t, Environment types variables' functions)
+    (Just t, variables') -> pure (variableId $> t, environment{variables = variables'})
 
-    (Nothing, variables') -> do
-      tell [UnknownIdentifierError variableId]
-      pure (Error, Environment types variables' functions)
+    (Nothing, _) -> do
+      tell [UnknownVariableError variableId]
+      pure (variableId $> Error, environment)
 
 
-lookupFunction :: Environment -> Syntax.Identifier () -> [Type] -> Writer [Error] (Type, Environment)
-lookupFunction environment functionId parameterTypes = go functions
+checkFunction :: Environment -> Syntax.Identifier () -> [Type] -> Writer [Error] (Syntax.Identifier Type, Environment)
+checkFunction environment@Environment{functions} targetId parameterTypes = go functions
   where
-    Environment types variables functions = environment
-    Syntax.Identifier {name} = functionId
-    key = Unicode.collate name
+    key = Unicode.collate targetId.name
 
     go functions = do
       let (head, tail) = NonEmpty.uncons functions
 
-      case (lookup parameterTypes =<< Map.lookup key head, tail) of
-        (Just _, _) | any isError parameterTypes -> pure (Error, environment)
+      case (find (liftEq isCompatible parameterTypes . fst) =<< Map.lookup key head, tail) of
+        (Just _, _) | Error `elem` parameterTypes -> pure (targetId $> Function parameterTypes Error, environment)
 
-        (Just returnType, _) -> pure (returnType, environment)
+        (Just (_, returnType), _) -> pure (targetId $> Function parameterTypes returnType, environment)
 
         (Nothing, Just tail) -> go tail
 
         (Nothing, Nothing) -> do
-          tell [UnknownFunctionError functionId parameterTypes]
-          pure (Error, Environment types variables (Map.singleton key [(parameterTypes, Error)] :| []))
+          tell [UnknownFunctionError targetId parameterTypes]
+          let functions' = Map.singleton key [(parameterTypes, Error)] :| []
+          pure (targetId $> Function parameterTypes Error, environment{functions = functions'})

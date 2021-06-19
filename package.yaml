@@ -18,6 +18,7 @@ default-extensions:
   - DisambiguateRecordFields
   - DuplicateRecordFields
   - NamedFieldPuns
+  - RecordWildCards
 
   # Deriving mechanism
   - DeriveFunctor
@@ -39,19 +40,27 @@ default-extensions:
   # Bindings and generalisation
   - NoMonomorphismRestriction
 
+  - DataKinds
+  - MultiParamTypeClasses
+  - UndecidableInstances
+  - TypeApplications
+
 ghc-options:
+  - -O2
+  - -foptimal-applicative-do
+  - -fplugin=RecordDotPreprocessor
   - -Wall
   - -Wno-name-shadowing
   - -Wno-type-defaults
   - -Wno-unused-do-bind
-  - -O2
-  - -foptimal-applicative-do
 
 dependencies:
   - base
   - text
   - containers
   - transformers
+  - record-hasfield
+  - record-dot-preprocessor
   - haskell-gi-base
   - gi-glib
   - gi-gio

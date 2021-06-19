@@ -15,8 +15,9 @@ import Control.Monad.Trans.Writer
 
 import Parser (ParserT (ParserT))
 import qualified Parser
-import qualified Parsers.Internal as Internal
 import qualified Syntax
+
+import qualified Parsers.Internal as Internal
 
 
 type Parser m a = ParserT m (a, [Syntax.Comment])
