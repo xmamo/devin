@@ -50,6 +50,16 @@ data Error where
   deriving (Eq, Show, Read)
 
 
+data Environment where
+  Environment :: {
+    types :: Map Text Type,
+    variables :: Map Text Type,
+    functions :: NonEmpty (Map Text [([Type], Type)])
+  } -> Environment
+
+  deriving (Eq, Show, Read)
+
+
 instance Eq Type where
   Unit == Unit = True
   Boolean == Boolean = True
@@ -59,16 +69,6 @@ instance Eq Type where
   Unknown name1 == Unknown name2 = Unicode.collate name1 == Unicode.collate name2
   Error == Error = True
   _ == _ = False
-
-
-data Environment where
-  Environment :: {
-    types :: Map Text Type,
-    variables :: Map Text Type,
-    functions :: NonEmpty (Map Text [([Type], Type)])
-  } -> Environment
-
-  deriving (Eq, Show, Read)
 
 
 label :: Type -> Text

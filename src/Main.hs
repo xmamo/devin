@@ -56,7 +56,7 @@ onActivate application = do
 
   -- Create defaultLanguage, codeTextBuffer and codeTreeStore, which are needed later:
 
-  languageManager <- new GtkSource.LanguageManager []
+  languageManager <- GtkSource.languageManagerGetDefault
   defaultLanguage <- #getLanguage languageManager "def"
 
   codeTextBuffer <- new GtkSource.Buffer
@@ -542,6 +542,7 @@ displayStatement textBuffer treeStore treeIter statement = case statement of
     displayElement treeIter (Left declaration) = displayDeclaration textBuffer treeStore treeIter declaration
     displayElement treeIter (Right statement) = displayStatement textBuffer treeStore treeIter statement
 
+
 displayExpression ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>
   a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression Type -> IO (Maybe Gtk.TreeIter)
@@ -601,6 +602,7 @@ displayExpression textBuffer treeStore treeIter expression = case expression of
       for_ rest \(comma, argument) -> do
         display textBuffer treeStore treeIter comma "Token" Nothing True
         displayExpression textBuffer treeStore treeIter argument
+
 
 displayUnaryOperator ::
   (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) =>

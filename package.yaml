@@ -58,14 +58,14 @@ dependencies:
   - text
   - containers
   - transformers
-  - record-hasfield
-  - record-dot-preprocessor
   - haskell-gi-base
   - gi-glib
   - gi-gio
   - gi-gtk
   - gi-gtk-hs
   - gi-gtksource
+  - record-hasfield
+  - record-dot-preprocessor
 
 library:
   source-dirs: src
