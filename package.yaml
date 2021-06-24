@@ -30,6 +30,7 @@ default-extensions:
   # Class and instances declarations
   - MultiParamTypeClasses
   - FlexibleInstances
+  - FlexibleContexts
   - UndecidableInstances
 
   # Literals
@@ -71,6 +72,10 @@ library:
   source-dirs: src
 
   exposed-modules:
+    - Checker
+    - Checkers
+    - Environment
+    - Error
     - Input
     - Main
     - Parser

@@ -26,6 +26,7 @@
   # Class and instances declarations
   - -XMultiParamTypeClasses
   - -XFlexibleInstances
+  - -XFlexibleContexts
   - -XUndecidableInstances
 
   # Literals

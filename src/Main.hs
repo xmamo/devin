@@ -18,6 +18,10 @@ import qualified GI.Gtk as Gtk
 import qualified Data.GI.Gtk.Threading as Gtk
 import qualified GI.GtkSource as GtkSource
 
+import qualified Checker
+import qualified Checkers
+import qualified Environment
+import qualified Error
 import qualified Helpers
 import Input (Input (Input))
 import qualified Parser
@@ -44,14 +48,14 @@ onActivate :: Gtk.IsApplication a => a -> Gio.ApplicationActivateCallback
 onActivate application = do
   let styles =
         [
+          ("bracket", "bracket-match"),
           ("keyword", "def:keyword"),
           ("identifier", "def:identifier"),
           ("type", "def:type"),
           ("number", "def:number"),
           ("operator", "def:operator"),
           ("comment", "def:comment"),
-          ("error", "def:error"),
-          ("bracket", "bracket-match")
+          ("error", "def:error")
         ]
 
   -- Create defaultLanguage, codeTextBuffer and codeTreeStore, which are needed later:
@@ -177,7 +181,7 @@ onActivate application = do
 
           set logTextBuffer [#text := ""]
 
-        let (declarations', _, errors) = Type.checkDeclarations Type.defaultEnvironment declarations
+        let (declarations', _, errors) = Checker.run (Checkers.checkDeclarations declarations) Environment.predefined
 
         Gtk.postGUIASync do
           (startTextIter, endTextIter) <- #getBounds codeTextBuffer
@@ -188,12 +192,12 @@ onActivate application = do
           #expandAll codeTreeView
 
           log <- for errors \error -> do
-            highlight codeTextBuffer "error" (Type.span error)
+            highlight codeTextBuffer "error" (Error.span error)
 
-            startTextIter <- #getIterAtOffset codeTextBuffer (Type.start error)
+            startTextIter <- #getIterAtOffset codeTextBuffer (Error.start error)
             (line, column) <- Helpers.getLineColumn startTextIter
             let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
-            pure (prefix <> Type.description error)
+            pure (prefix <> Error.description error)
 
           set logTextBuffer [#text := Text.intercalate "\n" log]
 
