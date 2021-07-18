@@ -4,6 +4,9 @@ module Checker (
   getTypes,
   getVariables,
   getFunctions,
+  setTypes,
+  setVariables,
+  setFunctions,
   updateTypes,
   updateFunctions,
   updateVariables,
@@ -12,7 +15,6 @@ module Checker (
 ) where
 
 import Data.List
-import Data.List.NonEmpty (NonEmpty)
 
 import Data.Text (Text)
 
@@ -24,7 +26,7 @@ import qualified Error
 import Type (Type)
 
 
-data Checker a where
+newtype Checker a where
   Checker :: (Environment -> (a, Environment, [Error])) -> Checker a
   deriving (Functor)
 
@@ -60,20 +62,32 @@ getVariables :: Checker (Map Text Type)
 getVariables = Checker \environment -> (environment.variables, environment, [])
 
 
-getFunctions :: Checker (NonEmpty (Map Text [([Type], Type)]))
+getFunctions :: Checker [Map Text [([Type], Type)]]
 getFunctions = Checker \environment -> (environment.functions, environment, [])
 
 
+setTypes :: Map Text Type -> Checker ()
+setTypes types = Checker \environment -> ((), environment{types}, [])
+
+
+setVariables :: Map Text Type -> Checker ()
+setVariables variables = Checker \environment -> ((), environment{variables}, [])
+
+
+setFunctions :: [Map Text [([Type], Type)]] -> Checker ()
+setFunctions functions = Checker \environment -> ((), environment{functions}, [])
+
+
 updateTypes :: (Map Text Type -> Map Text Type) -> Checker ()
-updateTypes f = Checker \environment -> ((), environment{types = f environment.types}, [])
+updateTypes f = setTypes . f =<< getTypes
 
 
 updateVariables :: (Map Text Type -> Map Text Type) -> Checker ()
-updateVariables f = Checker \environment -> ((), environment{variables = f environment.variables}, [])
+updateVariables f = setVariables . f =<< getVariables
 
 
-updateFunctions :: (NonEmpty (Map Text [([Type], Type)]) -> NonEmpty (Map Text [([Type], Type)])) -> Checker ()
-updateFunctions f = Checker \environment -> ((), environment{functions = f environment.functions}, [])
+updateFunctions :: ([Map Text [([Type], Type)]] -> [Map Text [([Type], Type)]]) -> Checker ()
+updateFunctions f = setFunctions . f =<< getFunctions
 
 
 report :: Error -> Checker ()

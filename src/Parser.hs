@@ -55,18 +55,25 @@ instance Monad m => Applicative (ParserT m) where
   pure value = ParserT (pure . Result.Success value)
 
   parser1 <*> parser2 = ParserT $ parseT parser1 >=> \case
-    Result.Success f rest -> fmap f <$> parseT parser2 rest
-    Result.Failure isFatal position expectations -> pure (Result.Failure isFatal position expectations)
+    Result.Success f rest ->
+      fmap f <$> parseT parser2 rest
+
+    Result.Failure isFatal position expectations ->
+      pure (Result.Failure isFatal position expectations)
 
 
 instance Monad m => Monad (ParserT m) where
   parser >>= f = ParserT $ parseT parser >=> \case
-    Result.Success value rest -> parseT (f value) rest
-    Result.Failure isFatal position expectations -> pure (Result.Failure isFatal position expectations)
+    Result.Success value rest ->
+      parseT (f value) rest
+
+    Result.Failure isFatal position expectations ->
+      pure (Result.Failure isFatal position expectations)
 
 
 instance Monad m => MonadFail (ParserT m) where
-  fail label = ParserT \(Input position _) -> pure (Result.Failure False position [Text.pack label])
+  fail label = ParserT \(Input position _) ->
+    pure (Result.Failure False position [Text.pack label])
 
 
 instance Monad m => MonadPlus (ParserT m)
@@ -99,7 +106,7 @@ parse :: Parser a -> Input -> Result a
 parse parser input = runIdentity (parseT parser input)
 
 
-position :: Applicative m => Integral a => ParserT m a
+position :: Applicative m => Num a => ParserT m a
 position = ParserT \input -> pure (Result.Success (Input.position input) input)
 
 

@@ -42,10 +42,12 @@ description = \case
     "Unknown variable " <> variableId.name
 
   UnknownFunction{functionId, parameters} ->
-    "Unknown function " <> functionId.name <> "(" <> Text.intercalate ", " (Type.label <$> parameters) <> ")"
+    let parameterList = "(" <> Text.intercalate ", " (Type.label <$> parameters) <> ")"
+     in "Unknown function " <> functionId.name <> parameterList
 
   FunctionRedefinition{functionId, parameters} ->
-    "Function " <> functionId.name <> "(" <> Text.intercalate ", " (Type.label <$> parameters) <> ") already defined"
+    let parameterList = "(" <> Text.intercalate ", " (Type.label <$> parameters) <> ")"
+     in "Function " <> functionId.name <> parameterList <> "already defined"
 
   InvalidUnary{unary, operand} ->
     "Can’t apply unary " <> operator <> " to " <> Type.label operand
@@ -97,7 +99,8 @@ description = \case
     "Missing return value: expected " <> Type.label expected
 
   MissingReturnPath{functionId, parameters} ->
-    functionId.name <> "(" <> Text.intercalate ", " (Type.label <$> parameters) <> "): not all code paths return a value"
+    let parameterList = "(" <> Text.intercalate ", " (Type.label <$> parameters) <> ")"
+     in functionId.name <> parameterList <> ": not all code paths return a value"
 
 
 span :: Error -> Span
@@ -115,7 +118,7 @@ span MissingReturnValue{statement} = Syntax.span statement
 span MissingReturnPath{functionId} = Syntax.span functionId
 
 
-start :: Integral a => Error -> a
+start :: Num a => Error -> a
 start UnknownType{typeId} = Syntax.start typeId
 start UnknownVariable{variableId} = Syntax.start variableId
 start UnknownFunction{functionId} = Syntax.start functionId
@@ -130,7 +133,7 @@ start MissingReturnValue{statement} = Syntax.start statement
 start MissingReturnPath{functionId} = Syntax.start functionId
 
 
-end :: Integral a => Error -> a
+end :: Num a => Error -> a
 end UnknownType{typeId} = Syntax.end typeId
 end UnknownVariable{variableId} = Syntax.end variableId
 end UnknownFunction{functionId} = Syntax.end functionId

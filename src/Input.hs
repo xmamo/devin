@@ -12,7 +12,7 @@ data Input where
   deriving (Eq, Show, Read)
 
 
-position :: Integral a => Input -> a
+position :: Num a => Input -> a
 position (Input p _) = fromIntegral p
 
 

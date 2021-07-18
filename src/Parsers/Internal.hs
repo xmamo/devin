@@ -59,19 +59,28 @@ functionDeclaration = do
 
     first <- optional do
       id <- s *> identifier
-      Parser.commit ((id,,) <$> (s *> charToken ':') <*> (s *> identifier))
+
+      Parser.commit do
+        colon <- s *> charToken ':'
+        typeId <- s *> identifier
+        pure (id, colon, typeId)
 
     parameters <- case first of
       Just (id, colon, typeId) -> do
         rest <- many do
           comma <- s *> charToken ','
-          Parser.commit ((comma,,,) <$> (s *> identifier) <*> (s *> charToken ':') <*> (s *> identifier))
+
+          Parser.commit do
+            id <- s *> identifier
+            colon <- s *> charToken ':'
+            typeId <- s *> s *> identifier
+            pure (comma, id, colon, typeId)
 
         pure (Just (id, colon, typeId, rest))
 
       Nothing -> pure Nothing
 
-    close <- s *> charToken ')' <* s
+    close <- s *> charToken ')'
     returnInfo <- optional ((,) <$> (s *> textToken "->") <*> Parser.commit (s *> identifier))
     body <- s *> statement
     pure (Syntax.FunctionDeclaration defKeyword functionId open parameters close returnInfo body)
@@ -82,7 +91,10 @@ declaration = variableDeclaration <|> functionDeclaration
 
 
 expressionStatement :: Parser (Syntax.Statement ())
-expressionStatement = Syntax.ExpressionStatement <$> expression <*> Parser.commit (s *> charToken ';')
+expressionStatement = do
+  value <- expression
+  semicolon <- Parser.commit (s *> charToken ';')
+  pure (Syntax.ExpressionStatement value semicolon)
 
 
 ifElseStatementOrIfStatement :: Parser (Syntax.Statement ())
@@ -165,10 +177,9 @@ rationalExpression :: Parser (Syntax.Expression ())
 rationalExpression = Parser.label "rational" $ syntax do
   sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> -1) <|> pure 1
   digits1 <- some (Parser.satisfy isDigit)
-  Parser.char '.'
-  digits2 <- some (Parser.satisfy isDigit)
-  let magnitude = foldl' (\a d -> 10 * a + toRational (digitToInt d)) 0 (digits1 ++ digits2) / 10 ^^ length digits2
-  pure \span -> Syntax.RationalExpression span (sign * magnitude) ()
+  digits2 <- Parser.char '.' *> some (Parser.satisfy isDigit)
+  let mantissa = foldl' (\a d -> 10 * a + toRational (digitToInt d)) 0 (digits1 ++ digits2)
+  pure \span -> Syntax.RationalExpression span (sign * mantissa * (0.1 ^^ length digits2)) ()
 
 
 literalExpression :: Parser (Syntax.Expression ())
@@ -176,7 +187,9 @@ literalExpression = rationalExpression <|> integerExpression
 
 
 variableExpression :: Parser (Syntax.Expression ())
-variableExpression = Syntax.VariableExpression <$> identifier <*> pure ()
+variableExpression = do
+  variableId <- identifier
+  pure (Syntax.VariableExpression variableId ())
 
 
 callExpression :: Parser (Syntax.Expression ())
@@ -197,6 +210,17 @@ callExpression = do
     pure (Syntax.CallExpression targetId open arguments close ())
 
 
+operandExpression :: Parser (Syntax.Expression ())
+operandExpression = asum
+  [
+    parenthesizedExpression,
+    literalExpression,
+    callExpression,
+    unaryExpression,
+    variableExpression
+  ]
+
+
 unaryExpression :: Parser (Syntax.Expression ())
 unaryExpression = do
   unary <- unaryOperator
@@ -206,10 +230,6 @@ unaryExpression = do
     _ -> Parser.commit (s *> operandExpression)
 
   pure (Syntax.UnaryExpression unary operand ())
-
-
-operandExpression :: Parser (Syntax.Expression ())
-operandExpression = literalExpression <|> callExpression <|> unaryExpression <|> variableExpression
 
 
 binaryExpressionOrOperandExpression :: Parser (Syntax.Expression ())
@@ -243,7 +263,7 @@ parenthesizedExpression = do
 
 
 expression :: Parser (Syntax.Expression ())
-expression = parenthesizedExpression <|> assignExpression <|> binaryExpressionOrOperandExpression
+expression = assignExpression <|> binaryExpressionOrOperandExpression
 
 
 unaryOperator :: Parser (Syntax.UnaryOperator ())
@@ -262,7 +282,7 @@ binaryOperator = fmap ($ ()) . syntax $ asum
     Parser.char '-' $> Syntax.SubtractOperator,
     Parser.char '*' $> Syntax.MultiplyOperator,
     Parser.char '/' $> Syntax.DivideOperator,
-    Parser.char '%' $> Syntax.DivideOperator,
+    Parser.char '%' $> Syntax.RemainderOperator,
     Parser.text "==" $> Syntax.EqualOperator,
     Parser.text "!=" $> Syntax.NotEqualOperator,
     Parser.text "<=" $> Syntax.LessOrEqualOperator,
@@ -272,6 +292,7 @@ binaryOperator = fmap ($ ()) . syntax $ asum
     keyword "and" $> Syntax.AndOperator,
     keyword "or" $> Syntax.OrOperator
   ]
+
 
 assignOperator :: Parser (Syntax.AssignOperator ())
 assignOperator = fmap ($ ()) . syntax $ asum
@@ -359,8 +380,8 @@ newBinary :: Syntax.Expression () -> Syntax.BinaryOperator () -> Syntax.Expressi
 newBinary left binary right = case (left, right) of
   (Syntax.BinaryExpression{}, _) -> undefined
 
-  (_, right@Syntax.BinaryExpression{})
-    | Syntax.comparePrecedence binary right.binary >= EQ ->
-      Syntax.BinaryExpression (Syntax.BinaryExpression left binary right.left ()) right.binary right.right ()
+  (_, right@Syntax.BinaryExpression{}) | Syntax.comparePrecedence binary right.binary >= EQ ->
+    let left' = Syntax.BinaryExpression left binary right.left ()
+     in Syntax.BinaryExpression left' right.binary right.right ()
 
   _ -> Syntax.BinaryExpression left binary right ()

@@ -5,6 +5,7 @@ import Data.Functor
 import Data.Maybe
 import Control.Applicative
 
+import Data.Text (Text)
 import qualified Data.Text as Text
 
 import Test.QuickCheck hiding (Result)
@@ -18,12 +19,18 @@ import Parser (Parser)
 import qualified Parser
 
 
-instance EqProp Input where
+instance EqProp Text where
   (=-=) = eq
 
 
+instance EqProp Input where
+  Input position1 rest1 =-= Input position2 rest2 =
+    position1 =-= position2 .&&. rest1 =-= rest2
+
+
 instance EqProp a => EqProp (Result a) where
-  Result.Success value1 rest1 =-= Result.Success value2 rest2 = value1 =-= value2 .&&. rest1 =-= rest2
+  Result.Success value1 rest1 =-= Result.Success value2 rest2 =
+    value1 =-= value2 .&&. rest1 =-= rest2
 
   Result.Failure isFatal1 position1 expectations1 =-= Result.Failure isFatal2 position2 expectations2 = conjoin
     [
@@ -37,7 +44,8 @@ instance EqProp a => EqProp (Result a) where
 
 
 instance EqProp a => EqProp (Parser a) where
-  parser1 =-= parser2 = forAll arbitrary (\input -> Parser.parse parser1 input =-= Parser.parse parser2 input)
+  parser1 =-= parser2 =
+    forAll arbitrary \input -> Parser.parse parser1 input =-= Parser.parse parser2 input
 
 
 instance Arbitrary Input where

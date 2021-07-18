@@ -3,9 +3,6 @@ module Environment (
   predefined
 ) where
 
-import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NonEmpty
-
 import Data.Text (Text)
 
 import Data.Map (Map)
@@ -20,7 +17,7 @@ data Environment where
   Environment :: {
     types :: Map Text Type,
     variables :: Map Text Type,
-    functions :: NonEmpty (Map Text [([Type], Type)])
+    functions :: [Map Text [([Type], Type)]]
   } -> Environment
 
   deriving (Eq, Show, Read)
@@ -32,24 +29,24 @@ predefined = Environment types variables functions
     types = Map.fromList
       [
         (Unicode.collate "Unit", Type.Unit),
-        (Unicode.collate "Boolean", Type.Boolean),
-        (Unicode.collate "Integer", Type.Integer),
-        (Unicode.collate "Rational", Type.Rational)
+        (Unicode.collate "Bool", Type.Bool),
+        (Unicode.collate "Int", Type.Int),
+        (Unicode.collate "Float", Type.Float)
       ]
 
     variables = Map.fromList
       [
         (Unicode.collate "unit", Type.Unit),
-        (Unicode.collate "true", Type.Boolean),
-        (Unicode.collate "false", Type.Boolean)
+        (Unicode.collate "true", Type.Bool),
+        (Unicode.collate "false", Type.Bool)
       ]
 
-    functions = NonEmpty.fromList
+    functions =
       [
         Map.empty,
 
         Map.fromList [
-          (Unicode.collate "integer", [([Type.Integer], Type.Integer), ([Type.Rational], Type.Integer)]),
-          (Unicode.collate "rational", [([Type.Integer], Type.Rational), ([Type.Rational], Type.Rational)])
+          (Unicode.collate "int", [([Type.Int], Type.Int), ([Type.Float], Type.Int)]),
+          (Unicode.collate "float", [([Type.Int], Type.Float), ([Type.Float], Type.Float)])
         ]
       ]
