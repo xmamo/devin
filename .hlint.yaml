@@ -1,45 +1,61 @@
 - arguments:
   - -XHaskell2010
 
-  # Syntax
-  - -XApplicativeDo
+  # GHC2021
+  - -XBangPatterns
+  - -XBinaryLiterals
+  - -XConstrainedClassMethods
+  - -XConstraintKinds
+  - -XDeriveDataTypeable
+  - -XDeriveFoldable
+  - -XDeriveFunctor
+  - -XDeriveGeneric
+  - -XDeriveLift
+  - -XDeriveTraversable
+  - -XEmptyCase
+  - -XEmptyDataDeriving
+  - -XExistentialQuantification
+  - -XExplicitForAll
+  - -XFlexibleContexts
+  - -XFlexibleInstances
+  - -XGADTSyntax
+  - -XGeneralizedNewtypeDeriving
+  - -XHexFloatLiterals
+  - -XImportQualifiedPost
+  - -XInstanceSigs
+  - -XKindSignatures
+  - -XMultiParamTypeClasses
+  - -XNamedFieldPuns
+  - -XNamedWildCards
+  - -XNumericUnderscores
+  - -XPolyKinds
+  - -XPostfixOperators
+  - -XRankNTypes
+  - -XScopedTypeVariables
+  - -XStandaloneDeriving
+  - -XStandaloneKindSignatures
   - -XTupleSections
+  - -XTypeApplications
+  - -XTypeOperators
+  - -XTypeSynonymInstances
+
+  # Syntax
   - -XLambdaCase
   - -XBlockArguments
 
   # Types
-  - -XGADTs
+  - -XTypeFamilies
   - -XDataKinds
-  - -XTypeApplications
 
   # Records
-  - -XDisambiguateRecordFields
   - -XDuplicateRecordFields
-  - -XNamedFieldPuns
-  - -XRecordWildCards
-
-  # Deriving mechanism
-  - -XDeriveFunctor
-  - -XDeriveFoldable
-  - -XDeriveTraversable
 
   # Class and instances declarations
-  - -XMultiParamTypeClasses
-  - -XFlexibleInstances
-  - -XFlexibleContexts
   - -XUndecidableInstances
 
   # Literals
-  - -XNegativeLiterals
   - -XOverloadedStrings
   - -XOverloadedLabels
-
-  # Type signatures
-  - -XExplicitForAll
-  - -XScopedTypeVariables
-
-  # Bindings and generalisation
-  - -XNoMonomorphismRestriction
 
 # Overrides
 - ignore: {name: Use <$>}

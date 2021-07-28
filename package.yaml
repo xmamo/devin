@@ -5,45 +5,61 @@ category: Language
 author: Matteo Morena
 
 default-extensions:
-  # Syntax
-  - ApplicativeDo
+  # GHC2021
+  - BangPatterns
+  - BinaryLiterals
+  - ConstrainedClassMethods
+  - ConstraintKinds
+  - DeriveDataTypeable
+  - DeriveFoldable
+  - DeriveFunctor
+  - DeriveGeneric
+  - DeriveLift
+  - DeriveTraversable
+  - EmptyCase
+  - EmptyDataDeriving
+  - ExistentialQuantification
+  - ExplicitForAll
+  - FlexibleContexts
+  - FlexibleInstances
+  - GADTSyntax
+  - GeneralizedNewtypeDeriving
+  - HexFloatLiterals
+  - ImportQualifiedPost
+  - InstanceSigs
+  - KindSignatures
+  - MultiParamTypeClasses
+  - NamedFieldPuns
+  - NamedWildCards
+  - NumericUnderscores
+  - PolyKinds
+  - PostfixOperators
+  - RankNTypes
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - StandaloneKindSignatures
   - TupleSections
+  - TypeApplications
+  - TypeOperators
+  - TypeSynonymInstances
+
+  # Syntax
   - LambdaCase
   - BlockArguments
 
   # Types
-  - GADTs
+  - TypeFamilies
   - DataKinds
-  - TypeApplications
 
   # Records
-  - DisambiguateRecordFields
   - DuplicateRecordFields
-  - NamedFieldPuns
-  - RecordWildCards
-
-  # Deriving mechanism
-  - DeriveFunctor
-  - DeriveFoldable
-  - DeriveTraversable
 
   # Class and instances declarations
-  - MultiParamTypeClasses
-  - FlexibleInstances
-  - FlexibleContexts
   - UndecidableInstances
 
   # Literals
-  - NegativeLiterals
   - OverloadedStrings
   - OverloadedLabels
-
-  # Type signatures
-  - ExplicitForAll
-  - ScopedTypeVariables
-
-  # Bindings and generalisation
-  - NoMonomorphismRestriction
 
 ghc-options:
   - -O2

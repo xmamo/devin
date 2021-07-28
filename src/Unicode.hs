@@ -98,4 +98,4 @@ isNewline _ = False
 
 
 collate :: Text -> Text
-collate text = unsafePerformIO (GLib.utf8CollateKey text -1)
+collate text = unsafePerformIO (GLib.utf8CollateKey text (-1))
