@@ -12,6 +12,7 @@ import Data.Traversable
 
 import qualified Data.Map as Map
 
+import qualified CallTarget
 import Checker (Checker)
 import qualified Checker
 import qualified Error
@@ -21,24 +22,26 @@ import qualified Type
 import qualified Unicode
 
 
-checkDeclarations :: [Syntax.Declaration ()] -> Checker [Syntax.Declaration Type]
+checkDeclarations :: [Syntax.Declaration] -> Checker [Syntax.Declaration]
 checkDeclarations declarations = do
   for_ declarations checkDeclaration1
   for declarations checkDeclaration2
 
 
-checkDeclaration1 :: Syntax.Declaration () -> Checker ()
+checkDeclaration1 :: Syntax.Declaration -> Checker ()
 checkDeclaration1 = \case
   Syntax.VariableDeclaration{} -> pure ()
 
-  Syntax.FunctionDeclaration{functionId, parameters, returnInfo} -> do
-    parameterTypes <- case parameters of
+  Syntax.FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
+    parameters <- case parameters of
       Just (id, colon, typeId, rest) ->
         for ((undefined, id, colon, typeId) : rest) \(_, _, _, typeId) -> do
           typeId' <- checkType typeId
-          pure typeId'.t
+          pure id{t = typeId'.t}
 
       Nothing -> pure []
+
+    let parameterTypes = [parameter.t | parameter <- parameters]
 
     returnType <- case returnInfo of
       Just (_, typeId) -> do
@@ -51,24 +54,25 @@ checkDeclaration1 = \case
     let key = Unicode.collate functionId.name
 
     case functions of
-      [] -> Checker.setFunctions [Map.singleton key [(parameterTypes, returnType)]]
+      [] -> Checker.setFunctions
+        [Map.singleton key [(parameterTypes, returnType, CallTarget.UserDefined parameters body)]]
 
       (head : tail) -> case Map.lookup key head of
-        Just signatures | any (liftEq Type.areCompatible parameterTypes . fst) signatures ->
+        Just infos | any (\info -> liftEq Type.areCompatible parameterTypes info._1) infos ->
           Checker.report (Error.FunctionRedefinition functionId parameterTypes)
 
-        Just signatures ->
-          let signatures' = (parameterTypes, returnType) : signatures
-          in Checker.setFunctions (Map.insert key signatures' head : tail)
+        Just infos ->
+          let infos' = (parameterTypes, returnType, CallTarget.UserDefined parameters body) : infos
+           in Checker.setFunctions (Map.insert key infos' head : tail)
 
         Nothing ->
-          let signatures' = [(parameterTypes, returnType)]
-          in Checker.setFunctions (Map.insert key signatures' head : tail)
+          let infos' = [(parameterTypes, returnType, CallTarget.UserDefined parameters body)]
+           in Checker.setFunctions (Map.insert key infos' head : tail)
 
 
-checkDeclaration2 :: Syntax.Declaration () -> Checker (Syntax.Declaration Type)
-checkDeclaration2 = \case
-  Syntax.VariableDeclaration{varKeyword, variableId, typeInfo, equalSign, value, semicolon} -> do
+checkDeclaration2 :: Syntax.Declaration -> Checker Syntax.Declaration
+checkDeclaration2 declaration = case declaration of
+  Syntax.VariableDeclaration{variableId, typeInfo, value} -> do
     typeInfo' <- case typeInfo of
       Just (colon, typeId) -> do
         typeId' <- checkType typeId
@@ -83,25 +87,26 @@ checkDeclaration2 = \case
         let typeOk = Type.areCompatible value'.t typeId'.t
         unless typeOk (Checker.report (Error.InvalidType value typeId'.t value'.t))
         Checker.updateVariables (Map.insert (Unicode.collate variableId.name) typeId'.t)
-        pure (Syntax.Identifier variableId.s variableId.name typeId'.t)
+        pure variableId{t = typeId'.t}
 
       Nothing -> do
         Checker.updateVariables (Map.insert (Unicode.collate variableId.name) value'.t)
-        pure (Syntax.Identifier variableId.s variableId.name value'.t)
+        pure variableId{t = value'.t}
 
-    pure (Syntax.VariableDeclaration varKeyword variableId' typeInfo' equalSign value' semicolon)
+    pure declaration{variableId = variableId', typeInfo = typeInfo', value = value'}
 
-  Syntax.FunctionDeclaration{defKeyword, functionId, open, parameters, close, returnInfo, body} -> do
+  Syntax.FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
     (locals, parameters') <- case parameters of
       Just (id, colon, typeId, rest) -> do
         typeId' <- checkType typeId
 
         rest' <- for rest \(comma, id, colon, typeId) -> do
           typeId' <- checkType typeId
-          pure (comma, id $> typeId'.t, colon, typeId')
+          pure (comma, id{t = typeId'.t}, colon, typeId')
 
-        let id' = id $> typeId'.t
-        let locals = [id | (_, id, _, _) <- (undefined, id', undefined, typeId') : rest']
+        let id' = id{t = typeId'.t}
+            locals = id' : [id | (_, id, _, _) <- rest']
+
         pure (locals, Just (id', colon, typeId', rest'))
 
       Nothing -> pure ([], Nothing)
@@ -113,8 +118,7 @@ checkDeclaration2 = \case
 
       Nothing -> pure (Type.Unit, Nothing)
 
-    let t = Type.Function [local.t | local <- locals] returnType
-        functionId' = Syntax.Identifier functionId.s functionId.name t
+    let functionId' = functionId{t = Type.Function [local.t | local <- locals] returnType}
 
     body' <- Checker.scoped do
       let f variables local = Map.insert (Unicode.collate local.name) local.t variables
@@ -125,57 +129,57 @@ checkDeclaration2 = \case
     unless (Type.areCompatible returnType Type.Unit || Syntax.doesReturn body') $
       Checker.report (Error.MissingReturnPath functionId [local.t | local <- locals])
 
-    pure (Syntax.FunctionDeclaration defKeyword functionId' open parameters' close returnInfo' body')
+    pure declaration{functionId = functionId', parameters = parameters', returnInfo = returnInfo', body = body'}
 
 
-checkStatement :: Type -> Syntax.Statement () -> Checker (Syntax.Statement Type)
+checkStatement :: Type -> Syntax.Statement -> Checker Syntax.Statement
 checkStatement expectedType statement = case statement of
-  Syntax.ExpressionStatement{value, semicolon} -> do
+  Syntax.ExpressionStatement{value} -> do
     value' <- checkExpression value
     unless (Syntax.hasSideEffects value) (Checker.report (Error.NoSideEffects statement))
-    pure (Syntax.ExpressionStatement value' semicolon)
+    pure statement{value = value'}
 
-  Syntax.IfStatement{ifKeyword, predicate, trueBranch} -> do
+  Syntax.IfStatement{predicate, trueBranch} -> do
     predicate' <- checkExpression predicate
     let predicateOk = Type.areCompatible predicate'.t Type.Bool
     unless predicateOk (Checker.report (Error.InvalidType predicate Type.Bool predicate'.t))
-    statement' <- Checker.scoped (checkStatement expectedType trueBranch)
-    pure (Syntax.IfStatement ifKeyword predicate' statement')
+    trueBranch' <- Checker.scoped (checkStatement expectedType trueBranch)
+    pure statement{predicate = predicate', trueBranch = trueBranch'}
 
-  Syntax.IfElseStatement{ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} -> do
+  Syntax.IfElseStatement{predicate, trueBranch, falseBranch} -> do
     predicate' <- checkExpression predicate
     let predicateOk = Type.areCompatible predicate'.t Type.Bool
     unless predicateOk (Checker.report (Error.InvalidType predicate Type.Bool predicate'.t))
     trueBranch' <- Checker.scoped (checkStatement expectedType trueBranch)
     falseBranch' <- Checker.scoped (checkStatement expectedType falseBranch)
-    pure (Syntax.IfElseStatement ifKeyword predicate' trueBranch' elseKeyword falseBranch')
+    pure statement{predicate = predicate', trueBranch = trueBranch', falseBranch = falseBranch'}
 
-  Syntax.WhileStatement{whileKeyword, predicate, body} -> do
+  Syntax.WhileStatement{predicate, body} -> do
     predicate' <- checkExpression predicate
     let predicateOk = Type.areCompatible predicate'.t Type.Bool
     unless predicateOk (Checker.report (Error.InvalidType predicate Type.Bool predicate'.t))
-    statement' <- Checker.scoped (checkStatement expectedType body)
-    pure (Syntax.WhileStatement whileKeyword predicate' statement')
+    body' <- Checker.scoped (checkStatement expectedType body)
+    pure statement{predicate = predicate', body = body'}
 
-  Syntax.DoWhileStatement{doKeyword, body, whileKeyword, predicate, semicolon} -> do
-    statement' <- checkStatement expectedType body
+  Syntax.DoWhileStatement{body, predicate} -> do
+    body' <- checkStatement expectedType body
     predicate' <- checkExpression predicate
     let predicateOk = Type.areCompatible predicate'.t Type.Bool
     unless predicateOk (Checker.report (Error.InvalidType predicate Type.Bool predicate'.t))
-    pure (Syntax.DoWhileStatement doKeyword statement' whileKeyword predicate' semicolon)
+    pure statement{body = body', predicate = predicate'}
 
-  Syntax.ReturnStatement{returnKeyword, result = Just result, semicolon} -> do
+  Syntax.ReturnStatement{result = Just result} -> do
     result' <- checkExpression result
     let resultOk = Type.areCompatible result'.t expectedType
     unless resultOk (Checker.report (Error.InvalidReturnType statement expectedType result'.t))
-    pure (Syntax.ReturnStatement returnKeyword (Just result') semicolon)
+    pure statement{result = Just result'}
 
-  Syntax.ReturnStatement{returnKeyword, result = Nothing, semicolon} -> do
+  Syntax.ReturnStatement{result = Nothing} -> do
     let expectedUnit = Type.areCompatible expectedType Type.Unit
     unless expectedUnit (Checker.report (Error.MissingReturnValue statement expectedType))
-    pure (Syntax.ReturnStatement returnKeyword Nothing semicolon)
+    pure statement
 
-  Syntax.BlockStatement{open, elements, close} -> Checker.scoped do
+  Syntax.BlockStatement{elements} -> Checker.scoped do
     for_ elements \case
       Left declaration -> checkDeclaration1 declaration
       Right _ -> pure ()
@@ -184,28 +188,28 @@ checkStatement expectedType statement = case statement of
       Left declaration -> Left <$> checkDeclaration2 declaration
       Right statement -> Right <$> checkStatement expectedType statement
 
-    pure (Syntax.BlockStatement open elements' close)
+    pure statement{elements = elements'}
 
 
-checkExpression :: Syntax.Expression () -> Checker (Syntax.Expression Type)
+checkExpression :: Syntax.Expression -> Checker Syntax.Expression
 checkExpression expression = case expression of
-  Syntax.IntegerExpression{} -> pure (expression $> Type.Int)
+  Syntax.IntegerExpression{} -> pure expression{t = Type.Int}
 
-  Syntax.RationalExpression{} -> pure (expression $> Type.Float)
+  Syntax.RationalExpression{} -> pure expression{t = Type.Float}
 
   Syntax.VariableExpression{variableId} -> do
     variableId' <- checkVariable variableId
-    pure (Syntax.VariableExpression variableId' variableId'.t)
+    pure expression{variableId = variableId', t = variableId'.t}
 
-  Syntax.CallExpression{targetId, open, arguments = Just (first, rest), close} -> do
+  Syntax.CallExpression{targetId, arguments = Just (first, rest)} -> do
     first' <- checkExpression first
     rest' <- for rest \(comma, argument) -> (comma,) <$> checkExpression argument
     targetId' <- checkFunction targetId (first'.t : [argument.t | (_, argument) <- rest'])
-    pure (Syntax.CallExpression targetId' open (Just (first', rest')) close targetId'.t.result)
+    pure expression{targetId = targetId', arguments = Just (first', rest'), t = targetId'.t.result}
 
-  Syntax.CallExpression{targetId, open, arguments = Nothing, close} -> do
+  Syntax.CallExpression{targetId, arguments = Nothing} -> do
     targetId' <- checkFunction targetId []
-    pure (Syntax.CallExpression targetId' open Nothing close targetId'.t.result)
+    pure expression{targetId = targetId', t = targetId'.t.result}
 
   Syntax.UnaryExpression{unary, operand} -> do
     operand' <- checkExpression operand
@@ -219,8 +223,8 @@ checkExpression expression = case expression of
       (Syntax.NotOperator{}, Type.Bool) -> pure Type.Bool
       _ -> Checker.report (Error.InvalidUnary unary operand'.t) $> Type.Error
 
-    let unary' = unary $> Type.Function [operand'.t] t
-    pure (Syntax.UnaryExpression unary' operand' t)
+    let unary' = unary{t = Type.Function [operand'.t] t}
+    pure expression{unary = unary', operand = operand', t}
 
   Syntax.BinaryExpression{left, binary, right} -> do
     left' <- checkExpression left
@@ -253,8 +257,8 @@ checkExpression expression = case expression of
       (Type.Bool, Syntax.OrOperator{}, Type.Bool) -> pure Type.Bool
       _ -> Checker.report (Error.InvalidBinary binary left'.t right'.t) $> Type.Error
 
-    let binary' = binary $> Type.Function [left'.t, right'.t] t
-    pure (Syntax.BinaryExpression left' binary' right' t)
+    let binary' = binary{t = Type.Function [left'.t, right'.t] t}
+    pure expression{left = left', binary = binary', right = right', t}
 
   Syntax.AssignExpression{targetId, assign, value} -> do
     targetId' <- checkVariable targetId
@@ -279,61 +283,61 @@ checkExpression expression = case expression of
       (Type.Float, Syntax.RemainderAssignOperator{}, Type.Float) -> pure Type.Float
       _ -> Checker.report (Error.InvalidAssign assign targetId'.t value'.t) $> Type.Error
 
-    let assign' = assign $> Type.Function [targetId'.t, value'.t] t
-    pure (Syntax.AssignExpression targetId' assign' value' value'.t)
+    let assign' = assign{t = Type.Function [targetId'.t, value'.t] t}
+    pure expression{targetId = targetId', assign = assign', value = value', t = value'.t}
 
-  Syntax.ParenthesizedExpression{open, inner, close} -> do
+  Syntax.ParenthesizedExpression{inner} -> do
     inner' <- checkExpression inner
-    pure (Syntax.ParenthesizedExpression open inner' close inner'.t)
+    pure expression{inner = inner', t = inner'.t}
 
 
-checkType :: Syntax.Identifier () -> Checker (Syntax.Identifier Type)
-checkType typeId@Syntax.Identifier{s, name} = do
+checkType :: Syntax.Identifier -> Checker Syntax.Identifier
+checkType typeId = do
   types <- Checker.getTypes
   let key = Unicode.collate typeId.name
 
   case Map.lookup key types of
-    Just t -> pure (Syntax.Identifier s name t)
+    Just t -> pure typeId{t}
 
     Nothing -> do
       Checker.report (Error.UnknownType typeId)
-      Checker.setTypes (Map.insert key (Type.Unknown name) types)
-      pure (Syntax.Identifier s name (Type.Unknown name))
+      Checker.setTypes (Map.insert key (Type.Unknown typeId.name) types)
+      pure typeId{t = Type.Unknown typeId.name}
 
 
-checkVariable :: Syntax.Identifier () -> Checker (Syntax.Identifier Type)
+checkVariable :: Syntax.Identifier -> Checker Syntax.Identifier
 checkVariable variableId = do
   variables <- Checker.getVariables
   let key = Unicode.collate variableId.name
 
   case Map.lookup key variables of
-    Just t -> pure (variableId $> t)
+    Just t -> pure variableId{t}
 
     Nothing -> do
       Checker.report (Error.UnknownVariable variableId)
       Checker.setVariables (Map.insert key Type.Error variables)
-      pure (variableId $> Type.Error)
+      pure variableId{t = Type.Error}
 
 
-checkFunction :: Syntax.Identifier () -> [Type] -> Checker (Syntax.Identifier Type)
+checkFunction :: Syntax.Identifier -> [Type] -> Checker Syntax.Identifier
 checkFunction targetId parameterTypes = go =<< Checker.getFunctions
   where
     key = Unicode.collate targetId.name
 
     go [] = do
       Checker.updateFunctions \case
-        [] -> [Map.singleton key [(parameterTypes, Type.Error)]]
-        (head : tail) -> Map.insert key [(parameterTypes, Type.Error)] head : tail
+        [] -> [Map.singleton key [(parameterTypes, Type.Error, CallTarget.Error)]]
+        (head : tail) -> Map.insert key [(parameterTypes, Type.Error, CallTarget.Error)] head : tail
 
       Checker.report (Error.UnknownFunction targetId parameterTypes)
-      pure (targetId $> Type.Function parameterTypes Type.Error)
+      pure targetId{t = Type.Function parameterTypes Type.Error}
 
     go (head : tail) =
-      case find (liftEq Type.areCompatible parameterTypes . fst) =<< Map.lookup key head of
+      case find (\info -> liftEq Type.areCompatible parameterTypes info._1) =<< Map.lookup key head of
         Just _ | Type.Error `elem` parameterTypes ->
-          pure (targetId $> Type.Function parameterTypes Type.Error)
+          pure targetId{t = Type.Function parameterTypes Type.Error}
 
-        Just (_, returnType) ->
-          pure (targetId $> Type.Function parameterTypes returnType)
+        Just (_, returnType, _) ->
+          pure targetId{t = Type.Function parameterTypes returnType}
 
         Nothing -> go tail

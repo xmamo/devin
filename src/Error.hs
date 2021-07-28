@@ -18,18 +18,18 @@ import qualified Type
 
 
 data Error where
-  UnknownType :: {typeId :: Syntax.Identifier ()} -> Error
-  UnknownVariable :: {variableId :: Syntax.Identifier ()} -> Error
-  UnknownFunction :: {functionId :: Syntax.Identifier (), parameters :: [Type]} -> Error
-  FunctionRedefinition :: {functionId :: Syntax.Identifier (), parameters :: [Type]} -> Error
-  InvalidUnary :: {unary :: Syntax.UnaryOperator (), operand :: Type} -> Error
-  InvalidBinary :: {binary :: Syntax.BinaryOperator (), left :: Type, right :: Type} -> Error
-  InvalidAssign :: {assign :: Syntax.AssignOperator (), target :: Type, value :: Type} -> Error
-  InvalidType :: {expression :: Syntax.Expression (), expected :: Type, actual :: Type} -> Error
-  NoSideEffects :: {statement :: Syntax.Statement ()} -> Error
-  InvalidReturnType :: {statement :: Syntax.Statement (), expected :: Type, actual :: Type} -> Error
-  MissingReturnValue :: {statement :: Syntax.Statement (), expected :: Type} -> Error
-  MissingReturnPath :: {functionId :: Syntax.Identifier (), parameters :: [Type]} -> Error
+  UnknownType :: {typeId :: Syntax.Identifier} -> Error
+  UnknownVariable :: {variableId :: Syntax.Identifier} -> Error
+  UnknownFunction :: {functionId :: Syntax.Identifier, parameters :: [Type]} -> Error
+  FunctionRedefinition :: {functionId :: Syntax.Identifier, parameters :: [Type]} -> Error
+  InvalidUnary :: {unary :: Syntax.UnaryOperator, operand :: Type} -> Error
+  InvalidBinary :: {binary :: Syntax.BinaryOperator, left :: Type, right :: Type} -> Error
+  InvalidAssign :: {assign :: Syntax.AssignOperator, target :: Type, value :: Type} -> Error
+  InvalidType :: {expression :: Syntax.Expression, expected :: Type, actual :: Type} -> Error
+  NoSideEffects :: {statement :: Syntax.Statement} -> Error
+  InvalidReturnType :: {statement :: Syntax.Statement, expected :: Type, actual :: Type} -> Error
+  MissingReturnValue :: {statement :: Syntax.Statement, expected :: Type} -> Error
+  MissingReturnPath :: {functionId :: Syntax.Identifier, parameters :: [Type]} -> Error
   deriving (Eq, Show, Read)
 
 

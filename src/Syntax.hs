@@ -15,13 +15,14 @@ module Syntax (
 ) where
 
 import Prelude hiding (span)
-import Data.Bifunctor
 import Data.Ord
 
 import Data.Text (Text)
 
+import {-# SOURCE #-} CallTarget (CallTarget)
 import Span (Span (Span))
 import qualified Span
+import Type (Type)
 
 
 class Syntax a where
@@ -37,169 +38,172 @@ class Syntax a where
   end = Span.end . span
 
 
-data Declaration a where
+data Declaration where
   VariableDeclaration :: {
     varKeyword :: Token,
-    variableId :: Identifier a,
-    typeInfo :: Maybe (Token, Identifier a),
+    variableId :: Identifier,
+    typeInfo :: Maybe (Token, Identifier),
     equalSign :: Token,
-    value :: Expression a,
+    value :: Expression,
     semicolon :: Token
-  } -> Declaration a
+  } -> Declaration
 
   FunctionDeclaration :: {
     defKeyword :: Token,
-    functionId :: Identifier a,
+    functionId :: Identifier,
     open :: Token,
-    parameters :: Maybe (Identifier a, Token, Identifier a, [(Token, Identifier a, Token, Identifier a)]),
+    parameters :: Maybe (Identifier, Token, Identifier, [(Token, Identifier, Token, Identifier)]),
     close :: Token,
-    returnInfo :: Maybe (Token, Identifier a),
-    body :: Statement a
-  } -> Declaration a
-
-  deriving (Eq, Functor, Show, Read)
-
-data Statement a where
-  ExpressionStatement :: {
-    value :: Expression a,
-    semicolon :: Token
-  } -> Statement a
-
-  IfStatement :: {
-    ifKeyword :: Token,
-    predicate :: Expression a,
-    trueBranch :: Statement a
-  } -> Statement a
-
-  IfElseStatement :: {
-    ifKeyword :: Token,
-    predicate :: Expression a,
-    trueBranch :: Statement a,
-    elseKeyword :: Token,
-    falseBranch :: Statement a
-  } -> Statement a
-
-  WhileStatement :: {
-    whileKeyword :: Token,
-    predicate :: Expression a,
-    body :: Statement a
-  } -> Statement a
-
-  DoWhileStatement :: {
-    doKeyword :: Token,
-    body :: Statement a,
-    whileKeyword :: Token,
-    predicate :: Expression a,
-    semicolon :: Token
-  } -> Statement a
-
-  ReturnStatement :: {
-    returnKeyword :: Token,
-    result :: Maybe (Expression a),
-    semicolon :: Token
-  } -> Statement a
-
-  BlockStatement :: {
-    open :: Token,
-    elements :: [Either (Declaration a) (Statement a)],
-    close :: Token
-  } -> Statement a
+    returnInfo :: Maybe (Token, Identifier),
+    body :: Statement
+  } -> Declaration
 
   deriving (Eq, Show, Read)
 
-data Expression a where
+
+data Statement where
+  ExpressionStatement :: {
+    value :: Expression,
+    semicolon :: Token
+  } -> Statement
+
+  IfStatement :: {
+    ifKeyword :: Token,
+    predicate :: Expression,
+    trueBranch :: Statement
+  } -> Statement
+
+  IfElseStatement :: {
+    ifKeyword :: Token,
+    predicate :: Expression,
+    trueBranch :: Statement,
+    elseKeyword :: Token,
+    falseBranch :: Statement
+  } -> Statement
+
+  WhileStatement :: {
+    whileKeyword :: Token,
+    predicate :: Expression,
+    body :: Statement
+  } -> Statement
+
+  DoWhileStatement :: {
+    doKeyword :: Token,
+    body :: Statement,
+    whileKeyword :: Token,
+    predicate :: Expression,
+    semicolon :: Token
+  } -> Statement
+
+  ReturnStatement :: {
+    returnKeyword :: Token,
+    result :: Maybe Expression,
+    semicolon :: Token
+  } -> Statement
+
+  BlockStatement :: {
+    open :: Token,
+    elements :: [Either Declaration Statement],
+    close :: Token
+  } -> Statement
+
+  deriving (Eq, Show, Read)
+
+
+data Expression where
   IntegerExpression :: {
     s :: Span,
     integer :: Integer,
-    t :: a
-  } -> Expression a
+    t :: Type
+  } -> Expression
 
   RationalExpression :: {
     s :: Span,
     rational :: Rational,
-    t :: a
-  } -> Expression a
+    t :: Type
+  } -> Expression
 
   VariableExpression :: {
-    variableId :: Identifier a,
-    t :: a
-  } -> Expression a
+    variableId :: Identifier,
+    t :: Type
+  } -> Expression
 
   CallExpression :: {
-    targetId :: Identifier a,
+    targetId :: Identifier,
     open :: Token,
-    arguments :: Maybe (Expression a, [(Token, Expression a)]),
+    arguments :: Maybe (Expression, [(Token, Expression)]),
     close :: Token,
-    t :: a
-  } -> Expression a
+    target :: CallTarget,
+    t :: Type
+  } -> Expression
 
   UnaryExpression :: {
-    unary :: UnaryOperator a,
-    operand :: Expression a,
-    t :: a
-  } -> Expression a
+    unary :: UnaryOperator,
+    operand :: Expression,
+    t :: Type
+  } -> Expression
 
   BinaryExpression :: {
-    left :: Expression a,
-    binary :: BinaryOperator a,
-    right :: Expression a,
-    t :: a
-  } -> Expression a
+    left :: Expression,
+    binary :: BinaryOperator,
+    right :: Expression,
+    t :: Type
+  } -> Expression
 
   AssignExpression :: {
-    targetId :: Identifier a,
-    assign :: AssignOperator a,
-    value :: Expression a,
-    t :: a
-  } -> Expression a
+    targetId :: Identifier,
+    assign :: AssignOperator,
+    value :: Expression,
+    t :: Type
+  } -> Expression
 
   ParenthesizedExpression :: {
     open :: Token,
-    inner :: Expression a,
+    inner :: Expression,
     close :: Token,
-    t :: a
-  } -> Expression a
+    t :: Type
+  } -> Expression
 
-  deriving (Eq, Functor, Show, Read)
-
-
-data UnaryOperator a where
-  PlusOperator :: {s :: Span, t :: a} -> UnaryOperator a
-  MinusOperator :: {s :: Span, t :: a} -> UnaryOperator a
-  NotOperator :: {s :: Span, t :: a} -> UnaryOperator a
-  deriving (Eq, Functor, Show, Read)
+  deriving (Eq, Show, Read)
 
 
-data BinaryOperator a where
-  AddOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  SubtractOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  MultiplyOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  DivideOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  RemainderOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  EqualOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  NotEqualOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  LessOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  LessOrEqualOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  GreaterOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  GreaterOrEqualOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  AndOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  OrOperator :: {s :: Span, t :: a} -> BinaryOperator a
-  deriving (Eq, Functor, Show, Read)
+data UnaryOperator where
+  PlusOperator :: {s :: Span, t :: Type} -> UnaryOperator
+  MinusOperator :: {s :: Span, t :: Type} -> UnaryOperator
+  NotOperator :: {s :: Span, t :: Type} -> UnaryOperator
+  deriving (Eq, Show, Read)
 
 
-data AssignOperator a where
-  AssignOperator :: {s :: Span, t :: a} -> AssignOperator a
-  AddAssignOperator :: {s :: Span, t :: a} -> AssignOperator a
-  SubtractAssignOperator :: {s :: Span, t :: a} -> AssignOperator a
-  MultiplyAssignOperator :: {s :: Span, t :: a} -> AssignOperator a
-  DivideAssignOperator :: {s :: Span, t :: a} -> AssignOperator a
-  RemainderAssignOperator :: {s :: Span, t :: a} -> AssignOperator a
-  deriving (Eq, Functor, Show, Read)
+data BinaryOperator where
+  AddOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  SubtractOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  MultiplyOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  DivideOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  RemainderOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  EqualOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  NotEqualOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  LessOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  LessOrEqualOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  GreaterOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  GreaterOrEqualOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  AndOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  OrOperator :: {s :: Span, t :: Type} -> BinaryOperator
+  deriving (Eq, Show, Read)
 
 
-data Identifier a where
-  Identifier :: {s :: Span, name :: Text, t :: a} -> Identifier a
-  deriving (Eq, Functor, Show, Read)
+data AssignOperator where
+  AssignOperator :: {s :: Span, t :: Type} -> AssignOperator
+  AddAssignOperator :: {s :: Span, t :: Type} -> AssignOperator
+  SubtractAssignOperator :: {s :: Span, t :: Type} -> AssignOperator
+  MultiplyAssignOperator :: {s :: Span, t :: Type} -> AssignOperator
+  DivideAssignOperator :: {s :: Span, t :: Type} -> AssignOperator
+  RemainderAssignOperator :: {s :: Span, t :: Type} -> AssignOperator
+  deriving (Eq, Show, Read)
+
+
+data Identifier where
+  Identifier :: {s :: Span, name :: Text, t :: Type} -> Identifier
+  deriving (Eq, Show, Read)
 
 
 data Token where
@@ -212,7 +216,7 @@ data Comment where
   deriving (Eq, Show, Read)
 
 
-instance Syntax (Declaration a) where
+instance Syntax Declaration where
   start VariableDeclaration{varKeyword} = start varKeyword
   start FunctionDeclaration{defKeyword} = start defKeyword
 
@@ -220,31 +224,7 @@ instance Syntax (Declaration a) where
   end FunctionDeclaration{body} = end body
 
 
-instance Functor Statement where
-  fmap f = \case
-    ExpressionStatement{value, semicolon} ->
-      ExpressionStatement (f <$> value) semicolon
-
-    IfStatement{ifKeyword, predicate, trueBranch} ->
-      IfStatement ifKeyword (f <$> predicate) (f <$> trueBranch)
-
-    IfElseStatement{ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} ->
-      IfElseStatement ifKeyword (f <$> predicate) (f <$> trueBranch) elseKeyword (f <$> falseBranch)
-
-    WhileStatement{whileKeyword, predicate, body} ->
-      WhileStatement whileKeyword (f <$> predicate) (f <$> body)
-
-    DoWhileStatement{doKeyword, body, whileKeyword, predicate, semicolon} ->
-      DoWhileStatement doKeyword (f <$> body) whileKeyword (f <$> predicate) semicolon
-
-    ReturnStatement{returnKeyword, result, semicolon} ->
-      ReturnStatement returnKeyword (fmap f <$> result) semicolon
-
-    BlockStatement{open, elements, close} ->
-      BlockStatement open (bimap (fmap f) (fmap f) <$> elements) close
-
-
-instance Syntax (Statement a) where
+instance Syntax Statement where
   start ExpressionStatement{value} = start value
   start IfStatement{ifKeyword} = start ifKeyword
   start IfElseStatement{ifKeyword} = start ifKeyword
@@ -262,7 +242,7 @@ instance Syntax (Statement a) where
   end BlockStatement{close} = end close
 
 
-instance Syntax (Expression a) where
+instance Syntax Expression where
   span IntegerExpression{s} = s
   span RationalExpression{s} = s
   span VariableExpression{variableId} = span variableId
@@ -283,13 +263,13 @@ instance Syntax (Expression a) where
   end expression = Span.end (span expression)
 
 
-instance Syntax (UnaryOperator a) where
+instance Syntax UnaryOperator where
   span PlusOperator{s} = s
   span MinusOperator{s} = s
   span NotOperator{s} = s
 
 
-instance Syntax (BinaryOperator a) where
+instance Syntax BinaryOperator where
   span AddOperator{s} = s
   span SubtractOperator{s} = s
   span MultiplyOperator{s} = s
@@ -305,7 +285,7 @@ instance Syntax (BinaryOperator a) where
   span OrOperator{s} = s
 
 
-instance Syntax (AssignOperator a) where
+instance Syntax AssignOperator where
   span AssignOperator{s} = s
   span AddAssignOperator{s} = s
   span SubtractAssignOperator{s} = s
@@ -314,7 +294,7 @@ instance Syntax (AssignOperator a) where
   span RemainderAssignOperator{s} = s
 
 
-instance Syntax (Identifier a) where
+instance Syntax Identifier where
   span Identifier{s} = s
 
 
@@ -326,7 +306,7 @@ instance Syntax Comment where
   span Comment{s} = s
 
 
-doesReturn :: Statement a -> Bool
+doesReturn :: Statement -> Bool
 doesReturn ExpressionStatement{} = False
 doesReturn IfStatement{} = False
 doesReturn IfElseStatement{trueBranch, falseBranch} = doesReturn trueBranch && doesReturn falseBranch
@@ -336,7 +316,7 @@ doesReturn ReturnStatement{} = True
 doesReturn BlockStatement{elements} = any (either (const False) doesReturn) elements
 
 
-hasSideEffects :: Expression a -> Bool
+hasSideEffects :: Expression -> Bool
 hasSideEffects IntegerExpression{} = False
 hasSideEffects RationalExpression{} = False
 hasSideEffects VariableExpression{} = False
@@ -347,7 +327,7 @@ hasSideEffects AssignExpression{} = True
 hasSideEffects ParenthesizedExpression{inner} = hasSideEffects inner
 
 
-comparePrecedence :: BinaryOperator a -> BinaryOperator a -> Ordering
+comparePrecedence :: BinaryOperator -> BinaryOperator -> Ordering
 comparePrecedence = comparing precedence
   where
     precedence AddOperator{} = 4

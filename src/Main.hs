@@ -229,7 +229,7 @@ onActivate application = do
   #showAll window
 
 
-highlightDeclaration :: Gtk.IsTextBuffer a => a -> Syntax.Declaration b -> IO ()
+highlightDeclaration :: Gtk.IsTextBuffer a => a -> Syntax.Declaration -> IO ()
 highlightDeclaration textBuffer declaration = case declaration of
   Syntax.VariableDeclaration{varKeyword, variableId, typeInfo, value} -> do
     highlight textBuffer "keyword" (Syntax.span varKeyword)
@@ -253,7 +253,7 @@ highlightDeclaration textBuffer declaration = case declaration of
         highlight textBuffer "type" (Syntax.span typeId)
 
 
-highlightStatement :: Gtk.IsTextBuffer a => a -> Syntax.Statement b -> IO ()
+highlightStatement :: Gtk.IsTextBuffer a => a -> Syntax.Statement -> IO ()
 highlightStatement textBuffer = \case
   Syntax.ExpressionStatement{value} -> highlightExpression textBuffer value
 
@@ -288,7 +288,7 @@ highlightStatement textBuffer = \case
     for_ elements (either (highlightDeclaration textBuffer) (highlightStatement textBuffer))
 
 
-highlightExpression :: Gtk.IsTextBuffer a => a -> Syntax.Expression b -> IO ()
+highlightExpression :: Gtk.IsTextBuffer a => a -> Syntax.Expression -> IO ()
 highlightExpression textBuffer expression = case expression of
   Syntax.IntegerExpression{} ->
     highlight textBuffer "number" (Syntax.span expression)
@@ -324,7 +324,7 @@ highlightExpression textBuffer expression = case expression of
     highlightExpression textBuffer inner
 
 
-highlightDeclarationParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Declaration b -> IO Bool
+highlightDeclarationParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Declaration -> IO Bool
 highlightDeclarationParentheses textBuffer insertTextIter = \case
   Syntax.VariableDeclaration{value} ->
     highlightExpressionParentheses textBuffer insertTextIter value
@@ -336,7 +336,7 @@ highlightDeclarationParentheses textBuffer insertTextIter = \case
     ]
 
 
-highlightStatementParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Statement b -> IO Bool
+highlightStatementParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Statement -> IO Bool
 highlightStatementParentheses textBuffer insertTextIter = \case
   Syntax.ExpressionStatement{value} ->
     highlightExpressionParentheses textBuffer insertTextIter value
@@ -381,7 +381,7 @@ highlightStatementParentheses textBuffer insertTextIter = \case
       Right statement -> highlightStatementParentheses textBuffer insertTextIter statement
 
 
-highlightExpressionParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Expression b -> IO Bool
+highlightExpressionParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Expression -> IO Bool
 highlightExpressionParentheses textBuffer insertTextIter = \case
   Syntax.IntegerExpression{} -> pure False
 
@@ -447,7 +447,7 @@ highlight textBuffer' tagName span = do
   #applyTagByName textBuffer tagName startTextIter endTextIter
 
 
-displayDeclaration :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Declaration Type -> IO (Maybe Gtk.TreeIter)
+displayDeclaration :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Declaration -> IO (Maybe Gtk.TreeIter)
 displayDeclaration textBuffer treeStore treeIter declaration = case declaration of
   Syntax.VariableDeclaration{varKeyword, variableId, typeInfo, equalSign, value, semicolon} -> do
     treeIter' <- display textBuffer treeStore treeIter declaration "VariableDeclaration" Nothing False
@@ -497,7 +497,7 @@ displayDeclaration textBuffer treeStore treeIter declaration = case declaration 
       display textBuffer treeStore treeIter typeId "Identifier" (Just typeId.t) True
 
 
-displayStatement :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement Type -> IO (Maybe Gtk.TreeIter)
+displayStatement :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement -> IO (Maybe Gtk.TreeIter)
 displayStatement textBuffer treeStore treeIter statement = case statement of
   Syntax.ExpressionStatement{value, semicolon} -> do
     treeIter' <- display textBuffer treeStore treeIter statement "ExpressionStatement" Nothing False
@@ -556,7 +556,7 @@ displayStatement textBuffer treeStore treeIter statement = case statement of
     displayElement treeIter (Right statement) = displayStatement textBuffer treeStore treeIter statement
 
 
-displayExpression :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression Type -> IO (Maybe Gtk.TreeIter)
+displayExpression :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression -> IO (Maybe Gtk.TreeIter)
 displayExpression textBuffer treeStore treeIter expression = case expression of
   Syntax.IntegerExpression{} ->
     display textBuffer treeStore treeIter expression "IntegerExpression" (Just expression.t) True
@@ -615,7 +615,7 @@ displayExpression textBuffer treeStore treeIter expression = case expression of
         displayExpression textBuffer treeStore treeIter argument
 
 
-displayUnaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator Type -> IO (Maybe Gtk.TreeIter)
+displayUnaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator -> IO (Maybe Gtk.TreeIter)
 displayUnaryOperator textBuffer treeStore treeIter unary =
   display textBuffer treeStore treeIter unary label (Just unary.t) True
   where
@@ -625,7 +625,7 @@ displayUnaryOperator textBuffer treeStore treeIter unary =
       Syntax.NotOperator{} -> "NotOperator"
 
 
-displayBinaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator Type -> IO (Maybe Gtk.TreeIter)
+displayBinaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator -> IO (Maybe Gtk.TreeIter)
 displayBinaryOperator textBuffer treeStore treeIter binary =
   display textBuffer treeStore treeIter binary label (Just binary.t) True
   where
@@ -645,7 +645,7 @@ displayBinaryOperator textBuffer treeStore treeIter binary =
       Syntax.OrOperator{} -> "OrOperator"
 
 
-displayAssignOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator Type -> IO (Maybe Gtk.TreeIter)
+displayAssignOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator -> IO (Maybe Gtk.TreeIter)
 displayAssignOperator textBuffer treeStore treeIter assign =
   display textBuffer treeStore treeIter assign label (Just assign.t) True
   where

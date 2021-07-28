@@ -20,6 +20,7 @@ import Data.Text (Text)
 
 import Data.Map (Map)
 
+import CallTarget (CallTarget)
 import Error (Error)
 import Environment (Environment)
 import qualified Error
@@ -62,7 +63,7 @@ getVariables :: Checker (Map Text Type)
 getVariables = Checker \environment -> (environment.variables, environment, [])
 
 
-getFunctions :: Checker [Map Text [([Type], Type)]]
+getFunctions :: Checker [Map Text [([Type], Type, CallTarget)]]
 getFunctions = Checker \environment -> (environment.functions, environment, [])
 
 
@@ -74,7 +75,7 @@ setVariables :: Map Text Type -> Checker ()
 setVariables variables = Checker \environment -> ((), environment{variables}, [])
 
 
-setFunctions :: [Map Text [([Type], Type)]] -> Checker ()
+setFunctions :: [Map Text [([Type], Type, CallTarget)]] -> Checker ()
 setFunctions functions = Checker \environment -> ((), environment{functions}, [])
 
 
@@ -86,7 +87,7 @@ updateVariables :: (Map Text Type -> Map Text Type) -> Checker ()
 updateVariables f = setVariables . f =<< getVariables
 
 
-updateFunctions :: ([Map Text [([Type], Type)]] -> [Map Text [([Type], Type)]]) -> Checker ()
+updateFunctions :: ([Map Text [([Type], Type, CallTarget)]] -> [Map Text [([Type], Type, CallTarget)]]) -> Checker ()
 updateFunctions f = setFunctions . f =<< getFunctions
 
 
