@@ -8,7 +8,10 @@ module Unicode (
 
 import System.IO.Unsafe
 
+import qualified Data.ByteString as ByteString
+
 import Data.Text (Text)
+import qualified Data.Text.Encoding as Text
 
 import qualified GI.GLib as GLib
 
@@ -98,4 +101,6 @@ isNewline _ = False
 
 
 collate :: Text -> Text
-collate text = unsafePerformIO (GLib.utf8CollateKey text (-1))
+collate text =
+  let byteLength = ByteString.length (Text.encodeUtf8 text)
+   in unsafePerformIO (GLib.utf8CollateKey text (fromIntegral byteLength))
