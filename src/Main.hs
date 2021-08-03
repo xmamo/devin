@@ -140,6 +140,9 @@ onActivate application = do
 
   -- Set up codeTreeView:
 
+  treeSelection <- #getSelection codeTreeView
+  #setMode treeSelection Gtk.SelectionModeNone
+
   cellRenderer <- new Gtk.CellRendererText [#family := "monospace"]
 
   for_ [0, 1, 2] \column -> do
