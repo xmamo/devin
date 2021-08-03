@@ -12,6 +12,7 @@ import Data.Traversable
 
 import qualified Data.Map as Map
 
+import CallTarget (CallTarget)
 import qualified CallTarget
 import Checker (Checker)
 import qualified Checker
@@ -51,23 +52,21 @@ checkDeclaration1 = \case
       Nothing -> pure Type.Unit
 
     functions <- Checker.getFunctions
-    let key = Unicode.collate functionId.name
 
-    case functions of
-      [] -> Checker.setFunctions
-        [Map.singleton key [(parameterTypes, returnType, CallTarget.UserDefined parameters body)]]
+    let (head : tail) = functions
+        key = Unicode.collate functionId.name
 
-      (head : tail) -> case Map.lookup key head of
-        Just infos | any (\info -> liftEq Type.areCompatible parameterTypes info._1) infos ->
-          Checker.report (Error.FunctionRedefinition functionId parameterTypes)
+    case Map.lookup key head of
+      Just infos | any (\info -> liftEq Type.areCompatible parameterTypes info._1) infos ->
+        Checker.report (Error.FunctionRedefinition functionId parameterTypes)
 
-        Just infos ->
-          let infos' = (parameterTypes, returnType, CallTarget.UserDefined parameters body) : infos
-           in Checker.setFunctions (Map.insert key infos' head : tail)
+      Just infos ->
+        let infos' = (parameterTypes, returnType, CallTarget.UserDefined parameters body) : infos
+          in Checker.setFunctions (Map.insert key infos' head : tail)
 
-        Nothing ->
-          let infos' = [(parameterTypes, returnType, CallTarget.UserDefined parameters body)]
-           in Checker.setFunctions (Map.insert key infos' head : tail)
+      Nothing ->
+        let infos' = [(parameterTypes, returnType, CallTarget.UserDefined parameters body)]
+          in Checker.setFunctions (Map.insert key infos' head : tail)
 
 
 checkDeclaration2 :: Syntax.Declaration -> Checker Syntax.Declaration
@@ -204,12 +203,12 @@ checkExpression expression = case expression of
   Syntax.CallExpression{targetId, arguments = Just (first, rest)} -> do
     first' <- checkExpression first
     rest' <- for rest \(comma, argument) -> (comma,) <$> checkExpression argument
-    targetId' <- checkFunction targetId (first'.t : [argument.t | (_, argument) <- rest'])
-    pure expression{targetId = targetId', arguments = Just (first', rest'), t = targetId'.t.result}
+    (targetId', target') <- checkFunction targetId (first'.t : [argument.t | (_, argument) <- rest'])
+    pure expression{targetId = targetId', arguments = Just (first', rest'), target = target', t = targetId'.t.result}
 
   Syntax.CallExpression{targetId, arguments = Nothing} -> do
-    targetId' <- checkFunction targetId []
-    pure expression{targetId = targetId', t = targetId'.t.result}
+    (targetId', target') <- checkFunction targetId []
+    pure expression{targetId = targetId', target = target', t = targetId'.t.result}
 
   Syntax.UnaryExpression{unary, operand} -> do
     operand' <- checkExpression operand
@@ -319,25 +318,24 @@ checkVariable variableId = do
       pure variableId{t = Type.Error}
 
 
-checkFunction :: Syntax.Identifier -> [Type] -> Checker Syntax.Identifier
+checkFunction :: Syntax.Identifier -> [Type] -> Checker (Syntax.Identifier, CallTarget)
 checkFunction targetId parameterTypes = go =<< Checker.getFunctions
   where
     key = Unicode.collate targetId.name
 
     go [] = do
-      Checker.updateFunctions \case
-        [] -> [Map.singleton key [(parameterTypes, Type.Error, CallTarget.Error)]]
-        (head : tail) -> Map.insert key [(parameterTypes, Type.Error, CallTarget.Error)] head : tail
+      Checker.updateFunctions \(head : tail) ->
+        Map.insert key [(parameterTypes, Type.Error, undefined)] head : tail
 
       Checker.report (Error.UnknownFunction targetId parameterTypes)
-      pure targetId{t = Type.Function parameterTypes Type.Error}
+      pure (targetId{t = Type.Function parameterTypes Type.Error}, undefined)
 
     go (head : tail) =
       case find (\info -> liftEq Type.areCompatible parameterTypes info._1) =<< Map.lookup key head of
         Just _ | Type.Error `elem` parameterTypes ->
-          pure targetId{t = Type.Function parameterTypes Type.Error}
+          pure (targetId{t = Type.Function parameterTypes Type.Error}, undefined)
 
-        Just (_, returnType, _) ->
-          pure targetId{t = Type.Function parameterTypes returnType}
+        Just (_, returnType, target) ->
+          pure (targetId{t = Type.Function parameterTypes returnType}, target)
 
         Nothing -> go tail
