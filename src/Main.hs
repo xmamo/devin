@@ -29,7 +29,6 @@ import qualified Parsers
 import qualified Result
 import Span (Span)
 import qualified Span
-import Syntax (Syntax)
 import qualified Syntax
 import Type (Type)
 import qualified Type
@@ -181,8 +180,7 @@ onActivate application = do
             highlightDeclaration codeTextBuffer declaration
             highlightDeclarationParentheses codeTextBuffer insertTextIter declaration
 
-          for_ comments $
-            highlight codeTextBuffer "comment" . Syntax.span
+          for_ comments (highlight codeTextBuffer "comment")
 
           set logTextBuffer [#text := ""]
 
@@ -198,9 +196,9 @@ onActivate application = do
           #expandAll codeTreeView
 
           log <- for errors \error -> do
-            highlight codeTextBuffer "error" (Error.span error)
+            highlight codeTextBuffer "error" error
 
-            startTextIter <- #getIterAtOffset codeTextBuffer (Error.start error)
+            startTextIter <- #getIterAtOffset codeTextBuffer (Span.start error)
             (line, column) <- Helpers.getLineColumn startTextIter
             let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
             pure (prefix <> Error.description error)
@@ -235,16 +233,16 @@ onActivate application = do
 highlightDeclaration :: Gtk.IsTextBuffer a => a -> Syntax.Declaration -> IO ()
 highlightDeclaration textBuffer declaration = case declaration of
   Syntax.VariableDeclaration{varKeyword, variableId, typeInfo, value} -> do
-    highlight textBuffer "keyword" (Syntax.span varKeyword)
-    highlight textBuffer "identifier" (Syntax.span variableId)
-    maybe (pure ()) (highlight textBuffer "type" . Syntax.span . snd) typeInfo
+    highlight textBuffer "keyword" varKeyword
+    highlight textBuffer "identifier" variableId
+    maybe (pure ()) (highlight textBuffer "type" . snd) typeInfo
     highlightExpression textBuffer value
 
   Syntax.FunctionDeclaration{defKeyword, functionId, parameters, returnInfo, body} -> do
-    highlight textBuffer "keyword" (Syntax.span defKeyword)
-    highlight textBuffer "identifier" (Syntax.span functionId)
+    highlight textBuffer "keyword" defKeyword
+    highlight textBuffer "identifier" functionId
     highlightParameters parameters
-    maybe (pure ()) (highlight textBuffer "type" . Syntax.span . snd) returnInfo
+    maybe (pure ()) (highlight textBuffer "type" . snd) returnInfo
     highlightStatement textBuffer body
 
   where
@@ -252,8 +250,8 @@ highlightDeclaration textBuffer declaration = case declaration of
 
     highlightParameters (Just (id, colon, typeId, rest)) =
       for_ ((undefined, id, colon, typeId) : rest) \(_, id, _, typeId) -> do
-        highlight textBuffer "identifier" (Syntax.span id)
-        highlight textBuffer "type" (Syntax.span typeId)
+        highlight textBuffer "identifier" id
+        highlight textBuffer "type" typeId
 
 
 highlightStatement :: Gtk.IsTextBuffer a => a -> Syntax.Statement -> IO ()
@@ -261,30 +259,30 @@ highlightStatement textBuffer = \case
   Syntax.ExpressionStatement{value} -> highlightExpression textBuffer value
 
   Syntax.IfStatement{ifKeyword, predicate, trueBranch} -> do
-    highlight textBuffer "keyword" (Syntax.span ifKeyword)
+    highlight textBuffer "keyword" ifKeyword
     highlightExpression textBuffer predicate
     highlightStatement textBuffer trueBranch
 
   Syntax.IfElseStatement{ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} -> do
-    highlight textBuffer "keyword" (Syntax.span ifKeyword)
+    highlight textBuffer "keyword" ifKeyword
     highlightExpression textBuffer predicate
     highlightStatement textBuffer trueBranch
-    highlight textBuffer "keyword" (Syntax.span elseKeyword)
+    highlight textBuffer "keyword" elseKeyword
     highlightStatement textBuffer falseBranch
 
   Syntax.WhileStatement{whileKeyword, predicate, body} -> do
-    highlight textBuffer "keyword" (Syntax.span whileKeyword)
+    highlight textBuffer "keyword" whileKeyword
     highlightExpression textBuffer predicate
     highlightStatement textBuffer body
 
   Syntax.DoWhileStatement{doKeyword, body, whileKeyword, predicate} -> do
-    highlight textBuffer "keyword" (Syntax.span doKeyword)
+    highlight textBuffer "keyword" doKeyword
     highlightStatement textBuffer body
-    highlight textBuffer "keyword" (Syntax.span whileKeyword)
+    highlight textBuffer "keyword" whileKeyword
     highlightExpression textBuffer predicate
 
   Syntax.ReturnStatement{returnKeyword, result} -> do
-    highlight textBuffer "keyword" (Syntax.span returnKeyword)
+    highlight textBuffer "keyword" returnKeyword
     maybe (pure ()) (highlightExpression textBuffer) result
 
   Syntax.BlockStatement{elements} ->
@@ -294,33 +292,33 @@ highlightStatement textBuffer = \case
 highlightExpression :: Gtk.IsTextBuffer a => a -> Syntax.Expression -> IO ()
 highlightExpression textBuffer expression = case expression of
   Syntax.IntegerExpression{} ->
-    highlight textBuffer "number" (Syntax.span expression)
+    highlight textBuffer "number" expression
 
   Syntax.RationalExpression{} ->
-    highlight textBuffer "number" (Syntax.span expression)
+    highlight textBuffer "number" expression
 
   Syntax.VariableExpression{variableId} ->
-    highlight textBuffer "identifier" (Syntax.span variableId)
+    highlight textBuffer "identifier" variableId
 
   Syntax.CallExpression{targetId, arguments} -> do
-    highlight textBuffer "identifier" (Syntax.span targetId)
+    highlight textBuffer "identifier" targetId
 
     case arguments of
       Nothing -> pure ()
       Just (first, rest) -> for_ ((undefined, first) : rest) (highlightExpression textBuffer . snd)
 
   Syntax.UnaryExpression{unary, operand} -> do
-    highlight textBuffer "operator" (Syntax.span unary)
+    highlight textBuffer "operator" unary
     highlightExpression textBuffer operand
 
   Syntax.BinaryExpression{left, binary, right} -> do
     highlightExpression textBuffer left
-    highlight textBuffer "operator" (Syntax.span binary)
+    highlight textBuffer "operator" binary
     highlightExpression textBuffer right
 
   Syntax.AssignExpression{targetId, assign, value} -> do
-    highlight textBuffer "identifier" (Syntax.span targetId)
-    highlight textBuffer "operator" (Syntax.span assign)
+    highlight textBuffer "identifier" targetId
+    highlight textBuffer "operator" assign
     highlightExpression textBuffer value
 
   Syntax.ParenthesizedExpression{inner} ->
@@ -421,15 +419,15 @@ highlightExpressionParentheses textBuffer insertTextIter = \case
     ]
 
 
-highlightParentheses :: (Gtk.IsTextBuffer a, Syntax b, Syntax c) => a -> Gtk.TextIter -> b -> c -> IO Bool
+highlightParentheses :: (Gtk.IsTextBuffer a, Span b, Span c) => a -> Gtk.TextIter -> b -> c -> IO Bool
 highlightParentheses textBuffer' insertTextIter open close = do
   let textBuffer = textBuffer' `asA` Gtk.TextBuffer
 
-  openStartTextIter <- #getIterAtOffset textBuffer (Syntax.start open)
-  openEndTextIter <- #getIterAtOffset textBuffer (Syntax.end open)
+  openStartTextIter <- #getIterAtOffset textBuffer (Span.start open)
+  openEndTextIter <- #getIterAtOffset textBuffer (Span.end open)
 
-  closeStartTextIter <- #getIterAtOffset textBuffer (Syntax.start close)
-  closeEndTextIter <- #getIterAtOffset textBuffer (Syntax.end close)
+  closeStartTextIter <- #getIterAtOffset textBuffer (Span.start close)
+  closeEndTextIter <- #getIterAtOffset textBuffer (Span.end close)
 
   applyParenthesisTag <- Helpers.anyM (#equal insertTextIter)
     [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
@@ -442,7 +440,7 @@ highlightParentheses textBuffer' insertTextIter open close = do
     pure False
 
 
-highlight :: Gtk.IsTextBuffer a => a -> Text -> Span -> IO ()
+highlight :: (Gtk.IsTextBuffer a, Span b) => a -> Text -> b -> IO ()
 highlight textBuffer' tagName span = do
   let textBuffer = textBuffer' `asA` Gtk.TextBuffer
   startTextIter <- #getIterAtOffset textBuffer (Span.start span)
@@ -661,7 +659,7 @@ displayAssignOperator textBuffer treeStore treeIter assign =
       Syntax.RemainderAssignOperator{} -> "RemainderAssignOperator"
 
 
-display :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax c) => a -> b -> Maybe Gtk.TreeIter -> c -> Text -> Maybe Type -> Bool -> IO (Maybe Gtk.TreeIter)
+display :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Span c) => a -> b -> Maybe Gtk.TreeIter -> c -> Text -> Maybe Type -> Bool -> IO (Maybe Gtk.TreeIter)
 display textBuffer' treeStore' treeIter syntax label t isLeaf = do
   let textBuffer = textBuffer' `asA` Gtk.TextBuffer
       treeStore = treeStore' `asA` Gtk.TreeStore
@@ -670,8 +668,8 @@ display textBuffer' treeStore' treeIter syntax label t isLeaf = do
   treeIter' <- #append treeStore treeIter
 
   if isLeaf then do
-    startTextIter <- #getIterAtOffset textBuffer (Syntax.start syntax)
-    endTextIter <- #getIterAtOffset textBuffer (Syntax.end syntax)
+    startTextIter <- #getIterAtOffset textBuffer (Span.start syntax)
+    endTextIter <- #getIterAtOffset textBuffer (Span.end syntax)
     slice <- #getSlice textBuffer startTextIter endTextIter True
     #set treeStore treeIter' [0, 1, 2] =<< for [Just label, Just slice, typeId] toGValue
   else

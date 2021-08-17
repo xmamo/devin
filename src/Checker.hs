@@ -23,7 +23,7 @@ import Data.Map (Map)
 import CallTarget (CallTarget)
 import Error (Error)
 import Environment (Environment)
-import qualified Error
+import qualified Span
 import Type (Type)
 
 
@@ -52,7 +52,7 @@ instance Monad Checker where
 run :: Checker a -> Environment -> (a, Environment, [Error])
 run (Checker check) environment =
   let (x, environment', errors) = check environment
-   in (x, environment', sortOn Error.start errors)
+   in (x, environment', sortOn Span.start errors)
 
 
 getTypes :: Checker (Map Text Type)

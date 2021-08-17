@@ -24,7 +24,6 @@ import Control.Monad.Trans.Writer
 
 import Parser (ParserT)
 import qualified Parser
-import Span (Span (Span))
 import qualified Syntax
 import qualified Unicode
 
@@ -333,7 +332,7 @@ comment = do
   many (Parser.satisfy (not . Unicode.isNewline))
   end <- Parser.position
 
-  let comment = Syntax.Comment (Span start end)
+  let comment = Syntax.Comment (start, end)
   lift (tell [comment])
   pure comment
 
@@ -344,20 +343,16 @@ s = token (many (void (some (Parser.satisfy Unicode.isSpace)) <|> void comment))
 
 keyword :: Text -> Parser Syntax.Token
 keyword k = Parser.label ("keyword " <> k) do
-  Syntax.Identifier{s, name} <- identifier
+  Syntax.Identifier{span, name} <- identifier
 
   if Unicode.collate name == Unicode.collate k then
-    pure (Syntax.Token s)
+    pure (Syntax.Token span)
   else
     empty
 
 
 token :: Parser a -> Parser Syntax.Token
-token parser = do
-  start <- Parser.position
-  parser
-  end <- Parser.position
-  pure (Syntax.Token (Span start end))
+token parser = syntax (parser $> Syntax.Token)
 
 
 charToken :: Char -> Parser Syntax.Token
@@ -368,12 +363,12 @@ textToken :: Text -> Parser Syntax.Token
 textToken = token . Parser.text
 
 
-syntax :: Parser (Span -> a) -> Parser a
+syntax :: Integral a => Parser ((a, a) -> b) -> Parser b
 syntax parser = do
   start <- Parser.position
   f <- parser
   end <- Parser.position
-  pure (f (Span start end))
+  pure (f (start, end))
 
 
 newBinary :: Syntax.Expression -> Syntax.BinaryOperator -> Syntax.Expression -> Syntax.Expression

@@ -51,7 +51,7 @@ getInsertTextIter textBuffer' = do
   #getIterAtMark textBuffer insertTextMark
 
 
-getLineColumn :: (Num a, Num b) => Gtk.TextIter -> IO (a, b)
+getLineColumn :: Integral a => Gtk.TextIter -> IO (a, a)
 getLineColumn textIter = do
   textIter' <- #copy textIter
   #setLineOffset textIter' 0

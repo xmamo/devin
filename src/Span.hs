@@ -1,18 +1,12 @@
-module Span (
-  Span (..),
-  start,
-  end
-) where
+module Span (Span (..)) where
 
 
-data Span where
-  Span :: Int -> Int -> Span
-  deriving (Eq, Show, Read)
+class Span a where
+  start :: Integral b => a -> b
+
+  end :: Integral b => a -> b
 
 
-start :: Num a => Span -> a
-start (Span s _) = fromIntegral s
-
-
-end :: Num a => Span -> a
-end (Span _ e) = fromIntegral e
+instance Integral a => Span (a, a) where
+  start = fromIntegral . fst
+  end = fromIntegral . snd

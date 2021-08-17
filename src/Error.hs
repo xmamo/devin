@@ -1,9 +1,6 @@
 module Error (
   Error (..),
-  description,
-  span,
-  start,
-  end
+  description
 ) where
 
 import Prelude hiding (span)
@@ -12,6 +9,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 
 import Span (Span)
+import qualified Span
 import qualified Syntax
 import Type (Type)
 import qualified Type
@@ -103,46 +101,29 @@ description = \case
      in functionId.name <> parameterList <> ": not all code paths return a value"
 
 
-span :: Error -> Span
-span UnknownType{typeId} = Syntax.span typeId
-span UnknownVariable{variableId} = Syntax.span variableId
-span UnknownFunction{functionId} = Syntax.span functionId
-span FunctionRedefinition{functionId} = Syntax.span functionId
-span InvalidUnary{unary} = Syntax.span unary
-span InvalidBinary{binary} = Syntax.span binary
-span InvalidAssign{assign} = Syntax.span assign
-span InvalidType{expression} = Syntax.span expression
-span NoSideEffects{statement} = Syntax.span statement
-span InvalidReturnType{statement} = Syntax.span statement
-span MissingReturnValue{statement} = Syntax.span statement
-span MissingReturnPath{functionId} = Syntax.span functionId
+instance Span Error where
+  start UnknownType{typeId} = Span.start typeId
+  start UnknownVariable{variableId} = Span.start variableId
+  start UnknownFunction{functionId} = Span.start functionId
+  start FunctionRedefinition{functionId} = Span.start functionId
+  start InvalidUnary{unary} = Span.start unary
+  start InvalidBinary{binary} = Span.start binary
+  start InvalidAssign{assign} = Span.start assign
+  start InvalidType{expression} = Span.start expression
+  start NoSideEffects{statement} = Span.start statement
+  start InvalidReturnType{statement} = Span.start statement
+  start MissingReturnValue{statement} = Span.start statement
+  start MissingReturnPath{functionId} = Span.start functionId
 
-
-start :: Num a => Error -> a
-start UnknownType{typeId} = Syntax.start typeId
-start UnknownVariable{variableId} = Syntax.start variableId
-start UnknownFunction{functionId} = Syntax.start functionId
-start FunctionRedefinition{functionId} = Syntax.start functionId
-start InvalidUnary{unary} = Syntax.start unary
-start InvalidBinary{binary} = Syntax.start binary
-start InvalidAssign{assign} = Syntax.start assign
-start InvalidType{expression} = Syntax.start expression
-start NoSideEffects{statement} = Syntax.start statement
-start InvalidReturnType{statement} = Syntax.start statement
-start MissingReturnValue{statement} = Syntax.start statement
-start MissingReturnPath{functionId} = Syntax.start functionId
-
-
-end :: Num a => Error -> a
-end UnknownType{typeId} = Syntax.end typeId
-end UnknownVariable{variableId} = Syntax.end variableId
-end UnknownFunction{functionId} = Syntax.end functionId
-end FunctionRedefinition{functionId} = Syntax.end functionId
-end InvalidUnary{unary} = Syntax.end unary
-end InvalidBinary{binary} = Syntax.end binary
-end InvalidAssign{assign} = Syntax.end assign
-end InvalidType{expression} = Syntax.end expression
-end NoSideEffects{statement} = Syntax.end statement
-end InvalidReturnType{statement} = Syntax.end statement
-end MissingReturnValue{statement} = Syntax.end statement
-end MissingReturnPath{functionId} = Syntax.end functionId
+  end UnknownType{typeId} = Span.end typeId
+  end UnknownVariable{variableId} = Span.end variableId
+  end UnknownFunction{functionId} = Span.end functionId
+  end FunctionRedefinition{functionId} = Span.end functionId
+  end InvalidUnary{unary} = Span.end unary
+  end InvalidBinary{binary} = Span.end binary
+  end InvalidAssign{assign} = Span.end assign
+  end InvalidType{expression} = Span.end expression
+  end NoSideEffects{statement} = Span.end statement
+  end InvalidReturnType{statement} = Span.end statement
+  end MissingReturnValue{statement} = Span.end statement
+  end MissingReturnPath{functionId} = Span.end functionId
