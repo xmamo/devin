@@ -1,4 +1,4 @@
-module Environment (
+module Typer.Environment (
   Environment (..),
   predefined
 ) where

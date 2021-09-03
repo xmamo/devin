@@ -26,10 +26,10 @@ import qualified Data.Text as Text
 
 import Control.Monad.Trans.Class
 
-import Input (Input (Input))
-import qualified Input
-import Result (Result)
-import qualified Result
+import Parser.Input (Input (Input))
+import qualified Parser.Input as Input
+import Parser.Result (Result)
+import qualified Parser.Result as Result
 
 
 type Parser = ParserT Identity
@@ -92,10 +92,12 @@ instance Monad m => Alternative (ParserT m) where
 
       Result.Failure isFatal position2 expectations2 -> case compare position1 position2 of
         LT | null expectations2 && not (null expectations1) -> pure (Result.Failure isFatal position1 expectations1)
-        LT -> pure (Result.Failure isFatal position2 expectations2)
+           | otherwise -> pure (Result.Failure isFatal position2 expectations2)
+
         EQ -> pure (Result.Failure isFatal position1 (expectations1 `union` expectations2))
+
         GT | null expectations1 && not (null expectations2) -> pure (Result.Failure isFatal position2 expectations2)
-        GT -> pure (Result.Failure isFatal position1 expectations1)
+           | otherwise -> pure (Result.Failure isFatal position1 expectations1)
 
 
 instance MonadTrans ParserT where

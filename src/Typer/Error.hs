@@ -1,4 +1,4 @@
-module Error (
+module Typer.Error (
   Error (..),
   description
 ) where

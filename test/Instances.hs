@@ -12,9 +12,9 @@ import Test.QuickCheck hiding (Result)
 import Test.QuickCheck.Checkers
 import Test.QuickCheck.Instances.Text ()
 
-import Input (Input (Input))
-import Result (Result)
-import qualified Result
+import Parser.Input (Input (Input))
+import Parser.Result (Result)
+import qualified Parser.Result as Result
 import Parser (Parser)
 import qualified Parser
 

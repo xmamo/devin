@@ -1,8 +1,8 @@
-module Result (Result (..)) where
+module Parser.Result (Result (..)) where
 
 import Data.Text (Text)
 
-import Input (Input)
+import Parser.Input (Input)
 
 
 data Result a where

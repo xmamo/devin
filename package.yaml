@@ -90,18 +90,18 @@ library:
 
   exposed-modules:
     - CallTarget
-    - Checker
-    - Checkers
-    - Environment
-    - Error
-    - Input
     - Main
     - Parser
+    - Parser.Input
+    - Parser.Result
     - Parsers
-    - Result
     - Span
     - Syntax
     - Type
+    - Typer
+    - Typer.Environment
+    - Typer.Error
+    - Typers
 
 executables:
   devin:

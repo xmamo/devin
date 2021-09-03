@@ -1,4 +1,4 @@
-module Input (
+module Parser.Input (
   Input (..),
   position,
   rest
@@ -17,4 +17,4 @@ position (Input p _) = fromIntegral p
 
 
 rest :: Input -> Text
-rest (Input _ t) = t
+rest (Input _ r) = r

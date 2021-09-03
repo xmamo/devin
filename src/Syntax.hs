@@ -1,4 +1,5 @@
 module Syntax (
+  Node (..),
   Declaration (..),
   Statement (..),
   Expression (..),
@@ -22,6 +23,12 @@ import {-# SOURCE #-} CallTarget (CallTarget)
 import Span (Span)
 import qualified Span
 import Type (Type)
+
+
+class Span a => Node a where
+  label :: a -> Text
+
+  isLeaf :: a -> Bool
 
 
 data Declaration where
@@ -210,6 +217,13 @@ instance Span Declaration where
   end FunctionDeclaration{body} = Span.end body
 
 
+instance Node Declaration where
+  label VariableDeclaration{} = "VariableDeclaration"
+  label FunctionDeclaration{} = "FunctionDeclaration"
+
+  isLeaf _ = False
+
+
 instance Span Statement where
   start ExpressionStatement{value} = Span.start value
   start IfStatement{ifKeyword} = Span.start ifKeyword
@@ -226,6 +240,19 @@ instance Span Statement where
   end DoWhileStatement{body} = Span.end body
   end ReturnStatement{semicolon} = Span.end semicolon
   end BlockStatement{close} = Span.end close
+
+
+instance Node Statement where
+  label ExpressionStatement{} = "ExpressionStatement"
+  label IfStatement{} = "IfStatement"
+  label IfElseStatement{} = "IfElseStatement"
+  label WhileStatement{} = "WhileStatement"
+  label DoWhileStatement{} = "DoWhileStatement"
+  label ReturnStatement{} = "ReturnStatement"
+  label BlockStatement{} = "BlockStatement"
+
+  isLeaf ReturnStatement{result = Nothing} = True
+  isLeaf _ = False
 
 
 instance Span Expression where
@@ -248,6 +275,21 @@ instance Span Expression where
   end ParenthesizedExpression{close} = Span.end close
 
 
+instance Node Expression where
+  label IntegerExpression{} = "IntegerExpression"
+  label RationalExpression{} = "RationalExpression"
+  label VariableExpression{} = "VariableExpression"
+  label CallExpression{} = "CallExpression"
+  label UnaryExpression{} = "UnaryExpression"
+  label BinaryExpression{} = "BinaryExpression"
+  label AssignExpression{} = "AssignExpression"
+  label ParenthesizedExpression{} = "ParenthesizedExpression"
+
+  isLeaf IntegerExpression{} = True
+  isLeaf RationalExpression{} = True
+  isLeaf _ = False
+
+
 instance Span UnaryOperator where
   start PlusOperator{span} = Span.start span
   start MinusOperator{span} = Span.start span
@@ -256,6 +298,14 @@ instance Span UnaryOperator where
   end PlusOperator{span} = Span.start span
   end MinusOperator{span} = Span.start span
   end NotOperator{span} = Span.start span
+
+
+instance Node UnaryOperator where
+  label PlusOperator{} = "PlusOperator"
+  label MinusOperator{} = "MinusOperator"
+  label NotOperator{} = "NotOperator"
+
+  isLeaf _ = True
 
 
 instance Span BinaryOperator where
@@ -288,6 +338,24 @@ instance Span BinaryOperator where
   end OrOperator{span} = Span.end span
 
 
+instance Node BinaryOperator where
+  label AddOperator{} = "AddOperator"
+  label SubtractOperator{} = "SubtractOperator"
+  label MultiplyOperator{} = "MultiplyOperator"
+  label DivideOperator{} = "DivideOperator"
+  label RemainderOperator{} = "RemainderOperator"
+  label EqualOperator{} = "EqualOperator"
+  label NotEqualOperator{} = "NotEqualOperator"
+  label LessOperator{} = "LessOperator"
+  label LessOrEqualOperator{} = "LessOrEqualOperator"
+  label GreaterOperator{} = "GreaterOperator"
+  label GreaterOrEqualOperator{} = "GreaterOrEqualOperator"
+  label AndOperator{} = "AndOperator"
+  label OrOperator{} = "OrOperator"
+
+  isLeaf _ = True
+
+
 instance Span AssignOperator where
   start AssignOperator{span} = Span.start span
   start AddAssignOperator{span} = Span.start span
@@ -304,10 +372,27 @@ instance Span AssignOperator where
   end RemainderAssignOperator{span} = Span.end span
 
 
+instance Node AssignOperator where
+  label AssignOperator{} = "AssignOperator"
+  label AddAssignOperator{} = "AddAssignOperator"
+  label SubtractAssignOperator{} = "SubtractAssignOperator"
+  label MultiplyAssignOperator{} = "MultiplyAssignOperator"
+  label DivideAssignOperator{} = "DivideAssignOperator"
+  label RemainderAssignOperator{} = "RemainderAssignOperator"
+
+  isLeaf _ = True
+
+
 instance Span Identifier where
   start Identifier{span} = Span.start span
 
   end Identifier{span} = Span.end span
+
+
+instance Node Identifier where
+  label Identifier{} = "Identifier"
+
+  isLeaf Identifier{} = True
 
 
 instance Span Token where
@@ -316,10 +401,22 @@ instance Span Token where
   end Token{span} = Span.end span
 
 
+instance Node Token where
+  label Token{} = "Token"
+
+  isLeaf Token{} = True
+
+
 instance Span Comment where
   start Comment{span} = Span.start span
 
   end Comment{span} = Span.end span
+
+
+instance Node Comment where
+  label Comment{} = "Comment"
+
+  isLeaf Comment{} = True
 
 
 doesReturn :: Statement -> Bool

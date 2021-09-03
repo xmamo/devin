@@ -5,7 +5,7 @@ import Test.QuickCheck.Classes
 import Test.Hspec
 import Test.Hspec.Checkers
 
-import Result (Result)
+import Parser.Result (Result)
 
 import Instances ()
 
