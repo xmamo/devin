@@ -2,6 +2,7 @@ module Main (main) where
 
 import Control.Concurrent
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Foldable
 import Data.Maybe
 import Data.Traversable
@@ -230,7 +231,7 @@ onActivate application = do
   #showAll window
 
 
-highlightDeclaration :: Gtk.IsTextBuffer a => a -> Syntax.Declaration -> IO ()
+highlightDeclaration :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration -> m ()
 highlightDeclaration textBuffer declaration = case declaration of
   Syntax.VariableDeclaration{varKeyword, variableId, typeInfo, value} -> do
     highlight textBuffer "keyword" varKeyword
@@ -254,7 +255,7 @@ highlightDeclaration textBuffer declaration = case declaration of
         highlight textBuffer "type" typeId
 
 
-highlightStatement :: Gtk.IsTextBuffer a => a -> Syntax.Statement -> IO ()
+highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m ()
 highlightStatement textBuffer = \case
   Syntax.ExpressionStatement{value} -> highlightExpression textBuffer value
 
@@ -289,7 +290,7 @@ highlightStatement textBuffer = \case
     for_ elements (either (highlightDeclaration textBuffer) (highlightStatement textBuffer))
 
 
-highlightExpression :: Gtk.IsTextBuffer a => a -> Syntax.Expression -> IO ()
+highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
 highlightExpression textBuffer expression = case expression of
   Syntax.IntegerExpression{} ->
     highlight textBuffer "number" expression
@@ -325,7 +326,7 @@ highlightExpression textBuffer expression = case expression of
     highlightExpression textBuffer inner
 
 
-highlightDeclarationParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Declaration -> IO Bool
+highlightDeclarationParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Syntax.Declaration -> m Bool
 highlightDeclarationParentheses textBuffer insertTextIter = \case
   Syntax.VariableDeclaration{value} ->
     highlightExpressionParentheses textBuffer insertTextIter value
@@ -337,7 +338,7 @@ highlightDeclarationParentheses textBuffer insertTextIter = \case
     ]
 
 
-highlightStatementParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Statement -> IO Bool
+highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Syntax.Statement -> m Bool
 highlightStatementParentheses textBuffer insertTextIter = \case
   Syntax.ExpressionStatement{value} ->
     highlightExpressionParentheses textBuffer insertTextIter value
@@ -382,7 +383,7 @@ highlightStatementParentheses textBuffer insertTextIter = \case
       Right statement -> highlightStatementParentheses textBuffer insertTextIter statement
 
 
-highlightExpressionParentheses :: Gtk.IsTextBuffer a => a -> Gtk.TextIter -> Syntax.Expression -> IO Bool
+highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Syntax.Expression -> m Bool
 highlightExpressionParentheses textBuffer insertTextIter = \case
   Syntax.IntegerExpression{} -> pure False
 
@@ -419,7 +420,7 @@ highlightExpressionParentheses textBuffer insertTextIter = \case
     ]
 
 
-highlightParentheses :: (Gtk.IsTextBuffer a, Span b, Span c) => a -> Gtk.TextIter -> b -> c -> IO Bool
+highlightParentheses :: (Gtk.IsTextBuffer a, Span b, Span c, MonadIO m) => a -> Gtk.TextIter -> b -> c -> m Bool
 highlightParentheses textBuffer' insertTextIter open close = do
   let textBuffer = textBuffer' `asA` Gtk.TextBuffer
 
@@ -440,7 +441,7 @@ highlightParentheses textBuffer' insertTextIter open close = do
     pure False
 
 
-highlight :: (Gtk.IsTextBuffer a, Span b) => a -> Text -> b -> IO ()
+highlight :: (Gtk.IsTextBuffer a, Span b, MonadIO m) => a -> Text -> b -> m ()
 highlight textBuffer' tagName span = do
   let textBuffer = textBuffer' `asA` Gtk.TextBuffer
   startTextIter <- #getIterAtOffset textBuffer (Span.start span)
@@ -448,7 +449,7 @@ highlight textBuffer' tagName span = do
   #applyTagByName textBuffer tagName startTextIter endTextIter
 
 
-displayDeclaration :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Declaration -> IO (Maybe Gtk.TreeIter)
+displayDeclaration :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, MonadIO m) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Declaration -> m (Maybe Gtk.TreeIter)
 displayDeclaration textBuffer treeStore treeIter declaration = case declaration of
   Syntax.VariableDeclaration{varKeyword, variableId, typeInfo, equalSign, value, semicolon} -> do
     treeIter' <- display textBuffer treeStore treeIter declaration Nothing
@@ -498,7 +499,7 @@ displayDeclaration textBuffer treeStore treeIter declaration = case declaration 
       display textBuffer treeStore treeIter typeId (Just typeId.t)
 
 
-displayStatement :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement -> IO (Maybe Gtk.TreeIter)
+displayStatement :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, MonadIO m) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement -> m (Maybe Gtk.TreeIter)
 displayStatement textBuffer treeStore treeIter statement = case statement of
   Syntax.ExpressionStatement{value, semicolon} -> do
     treeIter' <- display textBuffer treeStore treeIter statement Nothing
@@ -558,7 +559,7 @@ displayStatement textBuffer treeStore treeIter statement = case statement of
       Right statement -> displayStatement textBuffer treeStore treeIter statement
 
 
-displayExpression :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression -> IO (Maybe Gtk.TreeIter)
+displayExpression :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, MonadIO m) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression -> m (Maybe Gtk.TreeIter)
 displayExpression textBuffer treeStore treeIter expression = case expression of
   Syntax.IntegerExpression{t} ->
     display textBuffer treeStore treeIter expression (Just t)
@@ -617,22 +618,22 @@ displayExpression textBuffer treeStore treeIter expression = case expression of
         displayExpression textBuffer treeStore treeIter argument
 
 
-displayUnaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator -> IO (Maybe Gtk.TreeIter)
+displayUnaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, MonadIO m) => a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator -> m (Maybe Gtk.TreeIter)
 displayUnaryOperator textBuffer treeStore treeIter unary =
   display textBuffer treeStore treeIter unary (Just unary.t)
 
 
-displayBinaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator -> IO (Maybe Gtk.TreeIter)
+displayBinaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, MonadIO m) => a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator -> m (Maybe Gtk.TreeIter)
 displayBinaryOperator textBuffer treeStore treeIter binary =
   display textBuffer treeStore treeIter binary (Just binary.t)
 
 
-displayAssignOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator -> IO (Maybe Gtk.TreeIter)
+displayAssignOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, MonadIO m) => a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator -> m (Maybe Gtk.TreeIter)
 displayAssignOperator textBuffer treeStore treeIter assign =
   display textBuffer treeStore treeIter assign (Just assign.t)
 
 
-display :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax.Node c) => a -> b -> Maybe Gtk.TreeIter -> c -> Maybe Type -> IO (Maybe Gtk.TreeIter)
+display :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax.Node c, MonadIO m) => a -> b -> Maybe Gtk.TreeIter -> c -> Maybe Type -> m (Maybe Gtk.TreeIter)
 display textBuffer' treeStore' treeIter node t = do
   let textBuffer = textBuffer' `asA` Gtk.TextBuffer
       treeStore = treeStore' `asA` Gtk.TreeStore
@@ -645,8 +646,8 @@ display textBuffer' treeStore' treeIter node t = do
     startTextIter <- #getIterAtOffset textBuffer (Span.start node)
     endTextIter <- #getIterAtOffset textBuffer (Span.end node)
     slice <- #getSlice textBuffer startTextIter endTextIter True
-    #set treeStore treeIter' [0, 1, 2] =<< for [label, Just slice, typeId] toGValue
+    #set treeStore treeIter' [0, 1, 2] =<< for [label, Just slice, typeId] (liftIO . toGValue)
   else
-    #set treeStore treeIter' [0, 1, 2] =<< for [label, Nothing, typeId] toGValue
+    #set treeStore treeIter' [0, 1, 2] =<< for [label, Nothing, typeId] (liftIO . toGValue)
 
   pure (Just treeIter')

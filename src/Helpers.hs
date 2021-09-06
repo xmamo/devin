@@ -9,6 +9,7 @@ module Helpers (
   getStyle
 ) where
 
+import Control.Monad.IO.Class
 import Data.Foldable
 
 import Data.Text (Text)
@@ -44,14 +45,14 @@ expectationsText expectations = "Expected " <> go expectations
     go (expectation : expectations) = expectation <> ", " <> go expectations
 
 
-getInsertTextIter :: Gtk.IsTextBuffer a => a -> IO Gtk.TextIter
+getInsertTextIter :: (Gtk.IsTextBuffer a, MonadIO m) => a -> m Gtk.TextIter
 getInsertTextIter textBuffer' = do
   let textBuffer = textBuffer' `asA` Gtk.TextBuffer
   insertTextMark <- #getInsert textBuffer
   #getIterAtMark textBuffer insertTextMark
 
 
-getLineColumn :: Integral a => Gtk.TextIter -> IO (a, a)
+getLineColumn :: (Integral a, MonadIO m) => Gtk.TextIter -> m (a, a)
 getLineColumn textIter = do
   textIter' <- #copy textIter
   #setLineOffset textIter' 0
@@ -70,7 +71,7 @@ getLineColumn textIter = do
   pure (line, column)
 
 
-getStyle :: (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b) => a -> b -> Text -> IO (Maybe GtkSource.Style)
+getStyle :: (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b, MonadIO m) => a -> b -> Text -> m (Maybe GtkSource.Style)
 getStyle language' styleScheme' = go []
   where
     language = language' `asA` GtkSource.Language

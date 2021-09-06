@@ -194,18 +194,15 @@ data AssignOperator where
   deriving (Eq, Show, Read)
 
 
-data Identifier where
-  Identifier :: {span :: (Int, Int), name :: Text, t :: Type} -> Identifier
+data Identifier = Identifier {span :: (Int, Int), name :: Text, t :: Type}
   deriving (Eq, Show, Read)
 
 
-data Token where
-  Token :: {span :: (Int, Int)} -> Token
+newtype Token = Token {span :: (Int, Int)}
   deriving (Eq, Show, Read)
 
 
-data Comment where
-  Comment :: {span :: (Int, Int)} -> Comment
+newtype Comment = Comment {span :: (Int, Int)}
   deriving (Eq, Show, Read)
 
 

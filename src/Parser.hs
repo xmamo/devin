@@ -35,8 +35,7 @@ import qualified Parser.Result as Result
 type Parser = ParserT Identity
 
 
-newtype ParserT m a where
-  ParserT :: {parseT :: Input -> m (Result a)} -> ParserT m a
+newtype ParserT m a = ParserT {parseT :: Input -> m (Result a)}
 
 
 instance (Monad m, Semigroup a) => Semigroup (ParserT m a) where

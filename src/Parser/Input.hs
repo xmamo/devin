@@ -7,8 +7,7 @@ module Parser.Input (
 import Data.Text (Text)
 
 
-data Input where
-  Input :: Int -> Text -> Input
+data Input = Input Int Text
   deriving (Eq, Show, Read)
 
 

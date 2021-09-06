@@ -27,9 +27,8 @@ import qualified Span
 import Type (Type)
 
 
-newtype Typer a where
-  Typer :: (Environment -> (a, Environment, [Error])) -> Typer a
-  deriving (Functor)
+newtype Typer a = Typer (Environment -> (a, Environment, [Error]))
+  deriving Functor
 
 
 instance Applicative Typer where

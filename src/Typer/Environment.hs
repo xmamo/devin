@@ -15,14 +15,11 @@ import qualified Type
 import qualified Unicode
 
 
-data Environment where
-  Environment :: {
-    types :: Map Text Type,
-    variables :: Map Text Type,
-    functions :: [Map Text [([Type], Type, CallTarget)]]
-  } -> Environment
-
-  deriving (Eq, Show, Read)
+data Environment = Environment {
+  types :: Map Text Type,
+  variables :: Map Text Type,
+  functions :: [Map Text [([Type], Type, CallTarget)]]
+} deriving (Eq, Show, Read)
 
 
 predefined :: Environment
