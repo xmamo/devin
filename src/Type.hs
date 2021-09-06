@@ -11,6 +11,7 @@ import qualified Unicode
 
 
 data Type where
+  Undefined :: Type
   Unit :: Type
   Bool :: Type
   Int :: Type
@@ -22,6 +23,7 @@ data Type where
 
 
 instance Eq Type where
+  Undefined == Undefined = True
   Unit == Unit = True
   Bool == Bool = True
   Int == Int = True
@@ -33,6 +35,7 @@ instance Eq Type where
 
 
 label :: Type -> Text
+label Undefined = "?"
 label Unit = "Unit"
 label Bool = "Bool"
 label Int = "Int"

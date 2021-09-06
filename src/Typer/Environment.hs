@@ -8,7 +8,7 @@ import Data.Text (Text)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import CallTarget (CallTarget (BuiltinInt))
+import CallTarget (CallTarget)
 import qualified CallTarget
 import Type (Type)
 import qualified Type
@@ -46,13 +46,13 @@ predefined = Environment types variables functions
 
         Map.fromList [
           (Unicode.collate "int", [
-            ([Type.Int], Type.Int, CallTarget.BuiltinInt),
-            ([Type.Float], Type.Int, CallTarget.BuiltinInt)
+            ([Type.Int], Type.Int, CallTarget.IntToInt),
+            ([Type.Float], Type.Int, CallTarget.FloatToInt)
           ]),
 
           (Unicode.collate "float", [
-            ([Type.Int], Type.Float, CallTarget.BuiltinFloat),
-            ([Type.Float], Type.Float, CallTarget.BuiltinFloat)
+            ([Type.Int], Type.Float, CallTarget.IntToFloat),
+            ([Type.Float], Type.Float, CallTarget.FloatToFloat)
           ])
         ]
       ]

@@ -22,9 +22,11 @@ import qualified Data.Text as Text
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 
+import qualified CallTarget
 import Parser (ParserT)
 import qualified Parser
 import qualified Syntax
+import qualified Type
 import qualified Unicode
 
 
@@ -169,7 +171,7 @@ integerExpression = Parser.label "integer" $ syntax do
   sign <- (Parser.char '+' $> 1) <|> (Parser.char '-' $> -1) <|> pure 1
   digits <- some (Parser.satisfy isDigit)
   let magnitude = foldl' (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
-  pure \span -> Syntax.IntegerExpression span (sign * magnitude) undefined
+  pure \span -> Syntax.IntegerExpression span (sign * magnitude) Type.Undefined
 
 
 rationalExpression :: Parser Syntax.Expression
@@ -178,7 +180,7 @@ rationalExpression = Parser.label "rational" $ syntax do
   digits1 <- some (Parser.satisfy isDigit)
   digits2 <- Parser.char '.' *> some (Parser.satisfy isDigit)
   let mantissa = foldl' (\a d -> 10 * a + toRational (digitToInt d)) 0 (digits1 ++ digits2)
-  pure \span -> Syntax.RationalExpression span (sign * mantissa * (0.1 ^^ length digits2)) undefined
+  pure \span -> Syntax.RationalExpression span (sign * mantissa * (0.1 ^^ length digits2)) Type.Undefined
 
 
 literalExpression :: Parser Syntax.Expression
@@ -188,7 +190,7 @@ literalExpression = rationalExpression <|> integerExpression
 variableExpression :: Parser Syntax.Expression
 variableExpression = do
   variableId <- identifier
-  pure (Syntax.VariableExpression variableId undefined)
+  pure (Syntax.VariableExpression variableId Type.Undefined)
 
 
 callExpression :: Parser Syntax.Expression
@@ -206,7 +208,7 @@ callExpression = do
         Nothing -> pure Nothing
 
     close <- s *> charToken ')'
-    pure (Syntax.CallExpression targetId open arguments close undefined undefined)
+    pure (Syntax.CallExpression targetId open arguments close CallTarget.Undefined Type.Undefined)
 
 
 operandExpression :: Parser Syntax.Expression
@@ -228,7 +230,7 @@ unaryExpression = do
     Syntax.NotOperator{} -> s *> operandExpression
     _ -> Parser.commit (s *> operandExpression)
 
-  pure (Syntax.UnaryExpression unary operand undefined)
+  pure (Syntax.UnaryExpression unary operand Type.Undefined)
 
 
 binaryExpressionOrOperandExpression :: Parser Syntax.Expression
@@ -248,7 +250,7 @@ assignExpression = do
   targetId <- identifier
   assign <- s *> assignOperator
   value <- Parser.commit (s *> expression)
-  pure (Syntax.AssignExpression targetId assign value undefined)
+  pure (Syntax.AssignExpression targetId assign value Type.Undefined)
 
 
 parenthesizedExpression :: Parser Syntax.Expression
@@ -258,7 +260,7 @@ parenthesizedExpression = do
   Parser.commit do
     inner <- s *> expression
     close <- charToken ')'
-    pure (Syntax.ParenthesizedExpression open inner close undefined)
+    pure (Syntax.ParenthesizedExpression open inner close Type.Undefined)
 
 
 expression :: Parser Syntax.Expression
@@ -266,7 +268,7 @@ expression = assignExpression <|> binaryExpressionOrOperandExpression
 
 
 unaryOperator :: Parser Syntax.UnaryOperator
-unaryOperator = fmap ($ undefined) . syntax $ asum
+unaryOperator = fmap ($ Type.Undefined) . syntax $ asum
   [
     Parser.char '+' $> Syntax.PlusOperator,
     Parser.char '-' $> Syntax.MinusOperator,
@@ -275,7 +277,7 @@ unaryOperator = fmap ($ undefined) . syntax $ asum
 
 
 binaryOperator :: Parser Syntax.BinaryOperator
-binaryOperator = fmap ($ undefined) . syntax $ asum
+binaryOperator = fmap ($ Type.Undefined) . syntax $ asum
   [
     Parser.char '+' $> Syntax.AddOperator,
     Parser.char '-' $> Syntax.SubtractOperator,
@@ -294,7 +296,7 @@ binaryOperator = fmap ($ undefined) . syntax $ asum
 
 
 assignOperator :: Parser Syntax.AssignOperator
-assignOperator = fmap ($ undefined) . syntax $ asum
+assignOperator = fmap ($ Type.Undefined) . syntax $ asum
   [
     Parser.char '=' $> Syntax.AssignOperator,
     Parser.text "+=" $> Syntax.AddAssignOperator,
@@ -310,7 +312,7 @@ identifier :: Parser Syntax.Identifier
 identifier = Parser.label "identifier" $ syntax do
   start <- category [lu, ll, lt, lm, lo, nl, pc]
   continue <- many (category [lu, ll, lt, lm, lo, nl, pc, mn, mc, nd])
-  pure \span -> Syntax.Identifier span (Text.pack (start : continue)) undefined
+  pure \span -> Syntax.Identifier span (Text.pack (start : continue)) Type.Undefined
   where
     category categories = Parser.satisfy \c -> Unicode.category c `elem` categories
     lu = Unicode.UppercaseLetter
@@ -376,7 +378,7 @@ newBinary left binary right = case (left, right) of
   (Syntax.BinaryExpression{}, _) -> undefined
 
   (_, right@Syntax.BinaryExpression{}) | Syntax.comparePrecedence binary right.binary >= EQ ->
-    let left' = Syntax.BinaryExpression left binary right.left undefined
-     in Syntax.BinaryExpression left' right.binary right.right undefined
+    let left' = Syntax.BinaryExpression left binary right.left Type.Undefined
+     in Syntax.BinaryExpression left' right.binary right.right Type.Undefined
 
-  _ -> Syntax.BinaryExpression left binary right undefined
+  _ -> Syntax.BinaryExpression left binary right Type.Undefined
