@@ -57,6 +57,9 @@
   - -XOverloadedStrings
   - -XOverloadedLabels
 
+  # Bang patterns and Strict Haskell
+  - -XStrict
+
 # Overrides
 - ignore: {name: Use <$>}
 - ignore: {name: Avoid lambda using `infix`}
