@@ -90,7 +90,7 @@ description = \case
   NoSideEffects{} ->
     "Statement has no side effects"
 
-  InvalidReturnType{expected, actual}->
+  InvalidReturnType{expected, actual} ->
     "Invalid return type: expected " <> Type.label expected <> ", but got " <> Type.label actual
 
   MissingReturnValue{expected} ->
@@ -99,7 +99,6 @@ description = \case
   MissingReturnPath{functionId, parameters} ->
     let parameterList = "(" <> Text.intercalate ", " (Type.label <$> parameters) <> ")"
      in functionId.name <> parameterList <> ": not all code paths return a value"
-
 
 instance Span Error where
   start UnknownType{typeId} = Span.start typeId

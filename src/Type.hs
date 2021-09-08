@@ -6,7 +6,6 @@ module Type (
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-
 import qualified Unicode
 
 
@@ -46,6 +45,6 @@ label Error = "⊥"
 
 
 areCompatible :: Type -> Type -> Bool
-areCompatible Error  _ = True
+areCompatible Error _ = True
 areCompatible _ Error = True
 areCompatible type1 type2 = type1 == type2

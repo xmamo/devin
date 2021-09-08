@@ -91,12 +91,10 @@ instance Monad m => Alternative (ParserT m) where
 
       Result.Failure isFatal position2 expectations2 -> case compare position1 position2 of
         LT | null expectations2 && not (null expectations1) -> pure (Result.Failure isFatal position1 expectations1)
-           | otherwise -> pure (Result.Failure isFatal position2 expectations2)
-
+        LT -> pure (Result.Failure isFatal position2 expectations2)
         EQ -> pure (Result.Failure isFatal position1 (expectations1 `union` expectations2))
-
         GT | null expectations1 && not (null expectations2) -> pure (Result.Failure isFatal position2 expectations2)
-           | otherwise -> pure (Result.Failure isFatal position1 expectations1)
+        GT -> pure (Result.Failure isFatal position1 expectations1)
 
 
 instance MonadTrans ParserT where
@@ -145,7 +143,6 @@ label :: Monad m => Text -> ParserT m a -> ParserT m a
 label l parser = ParserT \input@(Input position _) -> parseT parser input >>= \case
   Result.Success value rest -> pure (Result.Success value rest)
   Result.Failure isFatal _ _ -> pure (Result.Failure isFatal position [l])
-
 
 commit :: Monad m => ParserT m a -> ParserT m a
 commit parser = ParserT $ parseT parser >=> \case

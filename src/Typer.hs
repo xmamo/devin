@@ -21,10 +21,10 @@ import Data.Text (Text)
 import Data.Map (Map)
 
 import CallTarget (CallTarget)
-import Typer.Error (Error)
-import Typer.Environment (Environment)
 import qualified Span
 import Type (Type)
+import Typer.Environment (Environment)
+import Typer.Error (Error)
 
 
 newtype Typer a = Typer (Environment -> (a, Environment, [Error]))

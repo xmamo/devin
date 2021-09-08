@@ -14,12 +14,12 @@ import qualified Data.Map as Map
 
 import CallTarget (CallTarget)
 import qualified CallTarget
-import qualified Typer.Error as Error
 import qualified Syntax
 import Type (Type)
 import qualified Type
 import Typer (Typer)
 import qualified Typer
+import qualified Typer.Error as Error
 import qualified Unicode
 
 
@@ -57,16 +57,16 @@ checkDeclaration1 = \case
         key = Unicode.collate functionId.name
 
     case Map.lookup key head of
-      Just infos | any (\info -> liftEq Type.areCompatible parameterTypes info._1) infos ->
+      Just infos | any (liftEq Type.areCompatible parameterTypes . (._1)) infos ->
         Typer.report (Error.FunctionRedefinition functionId parameterTypes)
 
       Just infos ->
         let infos' = (parameterTypes, returnType, CallTarget.UserDefined parameters body) : infos
-          in Typer.setFunctions (Map.insert key infos' head : tail)
+         in Typer.setFunctions (Map.insert key infos' head : tail)
 
       Nothing ->
         let infos' = [(parameterTypes, returnType, CallTarget.UserDefined parameters body)]
-          in Typer.setFunctions (Map.insert key infos' head : tail)
+         in Typer.setFunctions (Map.insert key infos' head : tail)
 
 
 checkDeclaration2 :: Syntax.Declaration -> Typer Syntax.Declaration
@@ -331,7 +331,7 @@ checkFunction targetId parameterTypes = go =<< Typer.getFunctions
       pure (targetId{t = Type.Function parameterTypes Type.Error}, undefined)
 
     go (head : tail) =
-      case find (\info -> liftEq Type.areCompatible parameterTypes info._1) =<< Map.lookup key head of
+      case find (liftEq Type.areCompatible parameterTypes . (._1)) =<< Map.lookup key head of
         Just _ | Type.Error `elem` parameterTypes ->
           pure (targetId{t = Type.Function parameterTypes Type.Error}, undefined)
 
