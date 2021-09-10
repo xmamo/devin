@@ -10,6 +10,7 @@ import Data.Functor
 import Data.Functor.Classes
 import Data.Traversable
 
+import Data.Map ((!?))
 import qualified Data.Map as Map
 
 import CallTarget (CallTarget)
@@ -56,7 +57,7 @@ checkDeclaration1 = \case
     let (head : tail) = functions
         key = Unicode.collate functionId.name
 
-    case Map.lookup key head of
+    case head !? key of
       Just infos | any (liftEq Type.areCompatible parameterTypes . (._1)) infos ->
         Typer.report (Error.FunctionRedefinition functionId parameterTypes)
 
@@ -295,7 +296,7 @@ checkType typeId = do
   types <- Typer.getTypes
   let key = Unicode.collate typeId.name
 
-  case Map.lookup key types of
+  case types !? key of
     Just t -> pure typeId{t}
 
     Nothing -> do
@@ -309,7 +310,7 @@ checkVariable variableId = do
   variables <- Typer.getVariables
   let key = Unicode.collate variableId.name
 
-  case Map.lookup key variables of
+  case variables !? key of
     Just t -> pure variableId{t}
 
     Nothing -> do
@@ -331,7 +332,7 @@ checkFunction targetId parameterTypes = go =<< Typer.getFunctions
       pure (targetId{t = Type.Function parameterTypes Type.Error}, undefined)
 
     go (head : tail) =
-      case find (liftEq Type.areCompatible parameterTypes . (._1)) =<< Map.lookup key head of
+      case find (liftEq Type.areCompatible parameterTypes . (._1)) =<< head !? key of
         Just _ | Type.Error `elem` parameterTypes ->
           pure (targetId{t = Type.Function parameterTypes Type.Error}, undefined)
 
