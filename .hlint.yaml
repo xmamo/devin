@@ -61,8 +61,6 @@
   - -XStrict
 
 # Overrides
-- ignore: {name: Use <$>}
-- ignore: {name: Avoid lambda using `infix`}
 - suggest: {name: Redundant do}
 - suggest: {name: Use explicit module export list}
 - suggest: {name: Use module export list}
