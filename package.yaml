@@ -65,13 +65,20 @@ default-extensions:
   - Strict
 
 ghc-options:
-  - -O2
-  - -foptimal-applicative-do
-  - -fplugin=RecordDotPreprocessor
+  # Warnings
   - -Wall
   - -Wno-name-shadowing
   - -Wno-type-defaults
   - -Wno-unused-do-bind
+
+  # Optimisation levels
+  - -O2
+
+  # Individual optimisations
+  - -foptimal-applicative-do
+
+  # Plugin options
+  - -fplugin=RecordDotPreprocessor
 
 dependencies:
   - base
