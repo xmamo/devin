@@ -86,15 +86,15 @@ instance Monad m => Alternative (ParserT m) where
 
     Result.Failure True position expectations -> pure (Result.Failure True position expectations)
 
-    Result.Failure False position1 expectations1 -> parseT parser2 input >>= \case
-      Result.Success value rest -> pure (Result.Success value rest)
+    Result.Failure False position1 expectations1 -> parseT parser2 input <&> \case
+      Result.Success value rest -> Result.Success value rest
 
       Result.Failure isFatal position2 expectations2 -> case compare position1 position2 of
-        LT | null expectations2 && not (null expectations1) -> pure (Result.Failure isFatal position1 expectations1)
-        LT -> pure (Result.Failure isFatal position2 expectations2)
-        EQ -> pure (Result.Failure isFatal position1 (expectations1 `union` expectations2))
-        GT | null expectations1 && not (null expectations2) -> pure (Result.Failure isFatal position2 expectations2)
-        GT -> pure (Result.Failure isFatal position1 expectations1)
+        LT | null expectations2 && not (null expectations1) -> Result.Failure isFatal position1 expectations1
+        LT -> Result.Failure isFatal position2 expectations2
+        EQ -> Result.Failure isFatal position1 (expectations1 `union` expectations2)
+        GT | null expectations1 && not (null expectations2) -> Result.Failure isFatal position2 expectations2
+        GT -> Result.Failure isFatal position1 expectations1
 
 
 instance MonadTrans ParserT where
