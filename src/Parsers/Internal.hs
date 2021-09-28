@@ -283,7 +283,7 @@ binaryOperator = fmap ($ Type.Undefined) . syntax $ asum
     Parser.char '-' $> Syntax.SubtractOperator,
     Parser.char '*' $> Syntax.MultiplyOperator,
     Parser.char '/' $> Syntax.DivideOperator,
-    Parser.char '%' $> Syntax.RemainderOperator,
+    Parser.char '%' $> Syntax.ModuloOperator,
     Parser.text "==" $> Syntax.EqualOperator,
     Parser.text "!=" $> Syntax.NotEqualOperator,
     Parser.text "<=" $> Syntax.LessOrEqualOperator,

@@ -32,12 +32,12 @@ newtype Typer a = Typer (Environment -> (a, Environment, [Error]))
 
 
 instance Applicative Typer where
-  pure x = Typer \environment -> (x, environment, [])
+  pure a = Typer \environment -> (a, environment, [])
 
   Typer check1 <*> Typer check2 = Typer \environment ->
     let (f, environment', errors1) = check1 environment
-        (x, environment'', errors2) = check2 environment'
-     in (f x, environment'', errors2 ++ errors1)
+        (a, environment'', errors2) = check2 environment'
+     in (f a, environment'', errors2 ++ errors1)
 
 
 instance Monad Typer where
@@ -50,8 +50,8 @@ instance Monad Typer where
 
 run :: Typer a -> Environment -> (a, Environment, [Error])
 run (Typer check) environment =
-  let (x, environment', errors) = check environment
-   in (x, environment', sortOn Span.start errors)
+  let (a, environment', errors) = check environment
+   in (a, environment', sortOn Span.start errors)
 
 
 getTypes :: Typer (Map Text Type)
@@ -96,5 +96,5 @@ report error = Typer \environment -> ((), environment, [error])
 
 scoped :: Typer a -> Typer a
 scoped (Typer check) = Typer \environment ->
-  let (x, _, errors) = check environment
-   in (x, environment, errors)
+  let (a, _, errors) = check environment
+   in (a, environment, errors)

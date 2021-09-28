@@ -40,6 +40,7 @@
   - -XTypeSynonymInstances
 
   # Syntax
+  - -XApplicativeDo
   - -XLambdaCase
   - -XBlockArguments
 
@@ -55,14 +56,11 @@
 
   # Literals
   - -XOverloadedStrings
-  - -XOverloadedLabels
 
   # Bang patterns and Strict Haskell
   - -XStrict
 
 # Overrides
-- ignore: {name: Use <$>}
-- ignore: {name: Avoid lambda using `infix`}
 - suggest: {name: Redundant do}
 - suggest: {name: Use explicit module export list}
 - suggest: {name: Use module export list}

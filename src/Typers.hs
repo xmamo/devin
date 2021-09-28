@@ -55,7 +55,7 @@ checkDeclaration1 = \case
     functions <- Typer.getFunctions
 
     let (head : tail) = functions
-        key = Unicode.collate functionId.name
+    let key = Unicode.collate functionId.name
 
     case head !? key of
       Just infos | any (liftEq Type.areCompatible parameterTypes . (._1)) infos ->
@@ -105,8 +105,7 @@ checkDeclaration2 declaration = case declaration of
           pure (comma, id{t = typeId'.t}, colon, typeId')
 
         let id' = id{t = typeId'.t}
-            locals = id' : [id | (_, id, _, _) <- rest']
-
+        let locals = id' : [id | (_, id, _, _) <- rest']
         pure (locals, Just (id', colon, typeId', rest'))
 
       Nothing -> pure ([], Nothing)
@@ -134,10 +133,10 @@ checkDeclaration2 declaration = case declaration of
 
 checkStatement :: Type -> Syntax.Statement -> Typer Syntax.Statement
 checkStatement expectedType statement = case statement of
-  Syntax.ExpressionStatement{value} -> do
-    value' <- checkExpression value
-    unless (Syntax.hasSideEffects value) (Typer.report (Error.NoSideEffects statement))
-    pure statement{value = value'}
+  Syntax.ExpressionStatement{expression} -> do
+    expression' <- checkExpression expression
+    unless (Syntax.hasSideEffects expression) (Typer.report (Error.NoSideEffects statement))
+    pure statement{expression = expression'}
 
   Syntax.IfStatement{predicate, trueBranch} -> do
     predicate' <- checkExpression predicate
@@ -241,8 +240,7 @@ checkExpression expression = case expression of
       (Type.Float, Syntax.MultiplyOperator{}, Type.Float) -> pure Type.Float
       (Type.Int, Syntax.DivideOperator{}, Type.Int) -> pure Type.Int
       (Type.Float, Syntax.DivideOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.RemainderOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.RemainderOperator{}, Type.Float) -> pure Type.Float
+      (Type.Int, Syntax.ModuloOperator{}, Type.Int) -> pure Type.Int
       (_, Syntax.EqualOperator{}, _) -> pure Type.Bool
       (_, Syntax.NotEqualOperator{}, _) -> pure Type.Bool
       (Type.Int, Syntax.LessOperator{}, Type.Int) -> pure Type.Bool
@@ -260,11 +258,11 @@ checkExpression expression = case expression of
     let binary' = binary{t = Type.Function [left'.t, right'.t] t}
     pure expression{left = left', binary = binary', right = right', t}
 
-  Syntax.AssignExpression{targetId, assign, value} -> do
-    targetId' <- checkVariable targetId
+  Syntax.AssignExpression{variableId, assign, value} -> do
+    variableId' <- checkVariable variableId
     value' <- checkExpression value
 
-    t <- case (targetId'.t, assign, value'.t) of
+    t <- case (variableId'.t, assign, value'.t) of
       (Type.Error, _, _) -> pure Type.Error
       (_, _, Type.Error) -> pure Type.Error
       (Type.Unit, Syntax.AssignOperator{}, Type.Unit) -> pure Type.Unit
@@ -281,10 +279,10 @@ checkExpression expression = case expression of
       (Type.Float, Syntax.DivideAssignOperator{}, Type.Float) -> pure Type.Float
       (Type.Int, Syntax.RemainderAssignOperator{}, Type.Int) -> pure Type.Int
       (Type.Float, Syntax.RemainderAssignOperator{}, Type.Float) -> pure Type.Float
-      _ -> Typer.report (Error.InvalidAssign assign targetId'.t value'.t) $> Type.Error
+      _ -> Typer.report (Error.InvalidAssign assign variableId'.t value'.t) $> Type.Error
 
-    let assign' = assign{t = Type.Function [targetId'.t, value'.t] t}
-    pure expression{targetId = targetId', assign = assign', value = value', t = value'.t}
+    let assign' = assign{t = Type.Function [variableId'.t, value'.t] t}
+    pure expression{variableId = variableId', assign = assign', value = value', t = value'.t}
 
   Syntax.ParenthesizedExpression{inner} -> do
     inner' <- checkExpression inner

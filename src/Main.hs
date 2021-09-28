@@ -4,7 +4,6 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Foldable
-import Data.Maybe
 import Data.Traversable
 import System.Environment
 import System.Exit
@@ -36,16 +35,21 @@ import qualified Typers
 
 
 main :: IO ()
-main = do
-  args <- getArgs
-  application <- new Gtk.Application []
-  on application #activate (onActivate application)
-  status <- #run application (Just args)
-  exitWith (if status == 0 then ExitSuccess else ExitFailure (fromIntegral status))
+main = Gtk.applicationNew Nothing [] >>= \case
+  Just application -> do
+    args <- getArgs
+    Gio.onApplicationActivate application (onActivate application)
+    status <- Gio.applicationRun application (Just args)
+    exitWith (if status == 0 then ExitSuccess else ExitFailure (fromIntegral status))
+
+  Nothing -> pure ()
 
 
 onActivate :: Gtk.IsApplication a => a -> Gio.ApplicationActivateCallback
 onActivate application = do
+  let noTextTagTable = Nothing :: Maybe Gtk.TextTagTable
+  let noAdjustment = Nothing :: Maybe Gtk.Adjustment
+
   let styles =
         [
           ("bracket", "bracket-match"),
@@ -61,121 +65,113 @@ onActivate application = do
   -- Create defaultLanguage, codeTextBuffer and codeTreeStore, which are needed later:
 
   languageManager <- GtkSource.languageManagerGetDefault
-  defaultLanguage <- #getLanguage languageManager "def"
+  defaultLanguage <- GtkSource.languageManagerGetLanguage languageManager "def"
 
-  codeTextBuffer <- new GtkSource.Buffer
-    [
-      #highlightMatchingBrackets := False,
-      #highlightSyntax := False
-    ]
+  codeTextBuffer <- GtkSource.bufferNew noTextTagTable
+  GtkSource.bufferSetHighlightMatchingBrackets codeTextBuffer False
+  GtkSource.bufferSetHighlightSyntax codeTextBuffer False
 
-  codeTreeStore <- new Gtk.TreeStore []
-  #setColumnTypes codeTreeStore [gtypeString, gtypeString, gtypeString]
+  codeTreeStore <- Gtk.treeStoreNew (replicate 3 gtypeString)
 
   -- Build the UI:
 
-  codeSourceView <- new GtkSource.View
-    [
-      #buffer := codeTextBuffer,
-      #monospace := True,
-      #autoIndent := True,
-      #highlightCurrentLine := True,
-      #showLineNumbers := True,
-      #tabWidth := 4
-    ]
+  codeSourceView <- GtkSource.viewNewWithBuffer codeTextBuffer
+  Gtk.textViewSetMonospace codeSourceView True
+  GtkSource.viewSetAutoIndent codeSourceView True
+  GtkSource.viewSetHighlightCurrentLine codeSourceView True
+  GtkSource.viewSetShowLineNumbers codeSourceView True
+  GtkSource.viewSetTabWidth codeSourceView 4
 
-  codeTreeView <- new Gtk.TreeView
-    [
-      #enableGridLines := Gtk.TreeViewGridLinesVertical,
-      #enableSearch := False,
-      #headersVisible := False,
-      #model := codeTreeStore
-    ]
+  codeTreeView <- Gtk.treeViewNewWithModel codeTreeStore
+  Gtk.treeViewSetGridLines codeTreeView Gtk.TreeViewGridLinesVertical
+  Gtk.treeViewSetEnableSearch codeTreeView False
+  Gtk.treeViewSetHeadersVisible codeTreeView False
 
-  logTextView <- new Gtk.TextView
-    [
-      #editable := False,
-      #monospace := True,
-      #wrapMode := Gtk.WrapModeWord
-    ]
+  logTextView <- Gtk.textViewNew
+  Gtk.textViewSetEditable logTextView False
+  Gtk.textViewSetMonospace logTextView True
+  Gtk.textViewSetWrapMode logTextView Gtk.WrapModeWord
 
-  codeSourceScrolledWindow <- new Gtk.ScrolledWindow [#child := codeSourceView]
-  codeTreeScrolledWindow <- new Gtk.ScrolledWindow [#child := codeTreeView]
-  logScrolledWindow <- new Gtk.ScrolledWindow [#child := logTextView]
+  codeSourceScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  Gtk.containerAdd codeSourceScrolledWindow codeSourceView
 
-  innerPaned <- new Gtk.Paned [#orientation := Gtk.OrientationHorizontal]
-  #pack1 innerPaned codeSourceScrolledWindow True False
-  #pack2 innerPaned codeTreeScrolledWindow True False
+  codeTreeScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  Gtk.containerAdd codeTreeScrolledWindow codeTreeView
 
-  outerPaned <- new Gtk.Paned [#orientation := Gtk.OrientationVertical]
-  #pack1 outerPaned innerPaned True False
-  #pack2 outerPaned logScrolledWindow False False
+  logScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  Gtk.containerAdd logScrolledWindow logTextView
 
-  window <- new Gtk.ApplicationWindow
-    [
-      #application := application,
-      #defaultWidth := 1280,
-      #defaultHeight := 720,
-      #title := "",
-      #child := outerPaned
-    ]
+  paned1 <- Gtk.panedNew Gtk.OrientationHorizontal
+  Gtk.panedPack1 paned1 codeSourceScrolledWindow True False
+  Gtk.panedPack2 paned1 codeTreeScrolledWindow True False
+
+  paned2 <- Gtk.panedNew Gtk.OrientationVertical
+  Gtk.panedPack1 paned2 paned1 True False
+  Gtk.panedPack2 paned2 logScrolledWindow False False
+
+  window <- Gtk.applicationWindowNew application
+  Gtk.windowSetTitle window ""
+  Gtk.windowSetDefaultSize window 1280 720
+  Gtk.containerAdd window paned2
 
   -- Set up codeSourceView:
 
-  styleScheme <- #getStyleScheme codeTextBuffer
-  tagTable <- #getTagTable codeTextBuffer
+  styleScheme <- GtkSource.bufferGetStyleScheme codeTextBuffer
+  tagTable <- Gtk.textBufferGetTagTable codeTextBuffer
 
   for_ styles \(tagName, styleId) -> do
-    tag <- new GtkSource.Tag [#name := tagName]
-    #add tagTable tag
+    tag <- GtkSource.tagNew (Just tagName)
+    Gtk.textTagTableAdd tagTable tag
 
     style <- case (styleScheme, defaultLanguage) of
       (Just styleScheme, Just language) -> Helpers.getStyle language styleScheme styleId
-      (Just styleScheme, Nothing) -> #getStyle styleScheme styleId
+      (Just styleScheme, Nothing) -> GtkSource.styleSchemeGetStyle styleScheme styleId
       (Nothing, _) -> pure Nothing
 
     case style of
-      Just style -> #apply style tag
+      Just style -> GtkSource.styleApply style tag
       Nothing -> pure ()
 
   -- Set up codeTreeView:
 
-  treeSelection <- #getSelection codeTreeView
-  #setMode treeSelection Gtk.SelectionModeNone
+  treeSelection <- Gtk.treeViewGetSelection codeTreeView
+  Gtk.treeSelectionSetMode treeSelection Gtk.SelectionModeNone
 
-  cellRenderer <- new Gtk.CellRendererText [#family := "monospace"]
+  cellRenderer <- Gtk.cellRendererTextNew
+  Gtk.setCellRendererTextFamily cellRenderer "monospace"
 
-  for_ [0, 1, 2] \column -> do
-    treeViewColumn <- new Gtk.TreeViewColumn []
-    #packStart treeViewColumn cellRenderer False
-    #addAttribute treeViewColumn cellRenderer "text" column
-    #appendColumn codeTreeView treeViewColumn
+  for_ [0 .. 2] \column -> do
+    treeViewColumn <- Gtk.treeViewColumnNew
+    Gtk.treeViewColumnPackStart treeViewColumn cellRenderer False
+    Gtk.treeViewColumnAddAttribute treeViewColumn cellRenderer "text" column
+    Gtk.treeViewAppendColumn codeTreeView treeViewColumn
 
   -- Set up logTextView:
 
-  logTextBuffer <- #getBuffer logTextView
+  logTextBuffer <- Gtk.textViewGetBuffer logTextView
 
   -- Register listeners:
 
-  threadIdVar <- newMVar =<< forkIO (pure ())
+  parseThreadIdMVar <- newMVar =<< forkIO (pure ())
   declarationsVar <- newMVar []
 
-  on codeTextBuffer #changed do
-    text <- fromMaybe "" <$> get codeTextBuffer #text
+  Gtk.onTextBufferChanged codeTextBuffer do
+    (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
+    text <- Gtk.textBufferGetText codeTextBuffer startTextIter endTextIter True
 
-    killThread =<< takeMVar threadIdVar
+    killThread =<< takeMVar parseThreadIdMVar
     swapMVar declarationsVar []
 
-    putMVar threadIdVar =<< forkIO case Parser.parse Parsers.declarations (Input 0 text) of
+    putMVar parseThreadIdMVar =<< forkIO case Parser.run Parsers.declarations (Input 0 text) of
       Result.Success (declarations, comments) _ -> do
         swapMVar declarationsVar declarations
 
         Gtk.postGUIASync do
-          (startTextIter, endTextIter) <- #getBounds codeTextBuffer
+          (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
           insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
 
           for_ styles \(tagName, _) ->
-            #removeTagByName codeTextBuffer tagName startTextIter endTextIter
+            Gtk.textBufferRemoveTagByName codeTextBuffer tagName startTextIter endTextIter
 
           for_ declarations \declaration -> do
             highlightDeclaration codeTextBuffer declaration
@@ -184,44 +180,49 @@ onActivate application = do
           for_ comments $
             highlight codeTextBuffer "comment"
 
-          set logTextBuffer [#text := ""]
+          Gtk.textBufferSetText logTextBuffer "" 0
 
         let checker = Typers.checkDeclarations declarations
-            (declarations', _, errors) = Typer.run checker Environment.predefined
+        let (declarations', _, errors) = Typer.run checker Environment.predefined
 
         Gtk.postGUIASync do
-          (startTextIter, endTextIter) <- #getBounds codeTextBuffer
-          #removeTagByName codeTextBuffer "error" startTextIter endTextIter
+          (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
+          Gtk.textBufferRemoveTagByName codeTextBuffer "error" startTextIter endTextIter
 
-          #clear codeTreeStore
+          Gtk.treeStoreClear codeTreeStore
           for_ declarations' (displayDeclaration codeTextBuffer codeTreeStore Nothing)
-          #expandAll codeTreeView
+          Gtk.treeViewExpandAll codeTreeView
 
-          log <- for errors \error -> do
+          logEntries <- for errors \error -> do
             highlight codeTextBuffer "error" error
 
-            startTextIter <- #getIterAtOffset codeTextBuffer (Span.start error)
+            startTextIter <- Gtk.textBufferGetIterAtOffset codeTextBuffer (Span.start error)
             (line, column) <- Helpers.getLineColumn startTextIter
             let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
             pure (prefix <> Error.description error)
 
-          set logTextBuffer [#text := Text.intercalate "\n" log]
+          let log = Text.intercalate "\n" logEntries
+          Gtk.textBufferSetText logTextBuffer log (Helpers.utf8Length log)
 
       Result.Failure _ position expectations -> Gtk.postGUIASync do
-        (startTextIter, endTextIter) <- #getBounds codeTextBuffer
-        #removeTagByName codeTextBuffer "error" startTextIter endTextIter
+        (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
+        Gtk.textBufferRemoveTagByName codeTextBuffer "error" startTextIter endTextIter
 
-        startTextIter <- #getIterAtOffset codeTextBuffer (fromIntegral position)
-        for_ styles \(tagName, _) -> #removeTagByName codeTextBuffer tagName startTextIter endTextIter
-        #applyTagByName codeTextBuffer "error" startTextIter endTextIter
+        startTextIter <- Gtk.textBufferGetIterAtOffset codeTextBuffer (fromIntegral position)
+
+        for_ styles \(tagName, _) ->
+          Gtk.textBufferRemoveTagByName codeTextBuffer tagName startTextIter endTextIter
+
+        Gtk.textBufferApplyTagByName codeTextBuffer "error" startTextIter endTextIter
 
         (line, column) <- Helpers.getLineColumn startTextIter
         let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
-        set logTextBuffer [#text := prefix <> Helpers.expectationsText expectations]
+        let log = prefix <> Helpers.expectationsText expectations
+        Gtk.textBufferSetText logTextBuffer log (Helpers.utf8Length log)
 
-  on codeTextBuffer (PropertyNotify #cursorPosition) . const $ void do
-    (startTextIter, endTextIter) <- #getBounds codeTextBuffer
-    #removeTagByName codeTextBuffer "bracket" startTextIter endTextIter
+  on codeTextBuffer (PropertyNotify Gtk.textBufferCursorPosition) $ const do
+    (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
+    Gtk.textBufferRemoveTagByName codeTextBuffer "bracket" startTextIter endTextIter
 
     declarations <- readMVar declarationsVar
     insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
@@ -229,7 +230,7 @@ onActivate application = do
 
   -- Display the UI:
 
-  #showAll window
+  Gtk.widgetShowAll window
 
 
 highlightDeclaration :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration -> m ()
@@ -249,6 +250,7 @@ highlightDeclaration textBuffer = \case
 
   where
     highlightParameters Nothing = pure ()
+
     highlightParameters (Just (id, colon, typeId, rest)) =
       for_ ((undefined, id, colon, typeId) : rest) \(_, id, _, typeId) -> do
         highlight textBuffer "identifier" id
@@ -257,7 +259,7 @@ highlightDeclaration textBuffer = \case
 
 highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m ()
 highlightStatement textBuffer = \case
-  Syntax.ExpressionStatement{value} -> highlightExpression textBuffer value
+  Syntax.ExpressionStatement{expression} -> highlightExpression textBuffer expression
 
   Syntax.IfStatement{ifKeyword, predicate, trueBranch} -> do
     highlight textBuffer "keyword" ifKeyword
@@ -317,8 +319,8 @@ highlightExpression textBuffer expression = case expression of
     highlight textBuffer "operator" binary
     highlightExpression textBuffer right
 
-  Syntax.AssignExpression{targetId, assign, value} -> do
-    highlight textBuffer "identifier" targetId
+  Syntax.AssignExpression{variableId, assign, value} -> do
+    highlight textBuffer "identifier" variableId
     highlight textBuffer "operator" assign
     highlightExpression textBuffer value
 
@@ -340,8 +342,8 @@ highlightDeclarationParentheses textBuffer insertTextIter = \case
 
 highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Syntax.Statement -> m Bool
 highlightStatementParentheses textBuffer insertTextIter = \case
-  Syntax.ExpressionStatement{value} ->
-    highlightExpressionParentheses textBuffer insertTextIter value
+  Syntax.ExpressionStatement{expression} ->
+    highlightExpressionParentheses textBuffer insertTextIter expression
 
   Syntax.IfStatement{predicate, trueBranch} -> Helpers.orM
     [
@@ -368,8 +370,10 @@ highlightStatementParentheses textBuffer insertTextIter = \case
       highlightExpressionParentheses textBuffer insertTextIter predicate
     ]
 
-  Syntax.ReturnStatement{result} ->
-    maybe (pure False) (highlightExpressionParentheses textBuffer insertTextIter) result
+  Syntax.ReturnStatement{result = Nothing} -> pure False
+
+  Syntax.ReturnStatement{result = Just result} ->
+    highlightExpressionParentheses textBuffer insertTextIter result
 
   Syntax.BlockStatement{open, elements, close} -> Helpers.orM
     [
@@ -421,32 +425,29 @@ highlightExpressionParentheses textBuffer insertTextIter = \case
 
 
 highlightParentheses :: (Gtk.IsTextBuffer a, Span b, Span c, MonadIO m) => a -> Gtk.TextIter -> b -> c -> m Bool
-highlightParentheses textBuffer' insertTextIter open close = do
-  let textBuffer = textBuffer' `asA` Gtk.TextBuffer
+highlightParentheses textBuffer insertTextIter open close = do
+  openStartTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.start open)
+  openEndTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.end open)
 
-  openStartTextIter <- #getIterAtOffset textBuffer (Span.start open)
-  openEndTextIter <- #getIterAtOffset textBuffer (Span.end open)
+  closeStartTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.start close)
+  closeEndTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.end close)
 
-  closeStartTextIter <- #getIterAtOffset textBuffer (Span.start close)
-  closeEndTextIter <- #getIterAtOffset textBuffer (Span.end close)
-
-  applyParenthesisTag <- Helpers.anyM (#equal insertTextIter)
+  applyParenthesisTag <- Helpers.anyM (Gtk.textIterEqual insertTextIter)
     [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
 
   if applyParenthesisTag then do
-    #applyTagByName textBuffer "bracket" openStartTextIter openEndTextIter
-    #applyTagByName textBuffer "bracket" closeStartTextIter closeEndTextIter
+    Gtk.textBufferApplyTagByName textBuffer "bracket" openStartTextIter openEndTextIter
+    Gtk.textBufferApplyTagByName textBuffer "bracket" closeStartTextIter closeEndTextIter
     pure True
   else
     pure False
 
 
 highlight :: (Gtk.IsTextBuffer a, Span b, MonadIO m) => a -> Text -> b -> m ()
-highlight textBuffer' tagName span = do
-  let textBuffer = textBuffer' `asA` Gtk.TextBuffer
-  startTextIter <- #getIterAtOffset textBuffer (Span.start span)
-  endTextIter <- #getIterAtOffset textBuffer (Span.end span)
-  #applyTagByName textBuffer tagName startTextIter endTextIter
+highlight textBuffer tagName span = do
+  startTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.start span)
+  endTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.end span)
+  Gtk.textBufferApplyTagByName textBuffer tagName startTextIter endTextIter
 
 
 displayDeclaration :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Declaration -> IO (Maybe Gtk.TreeIter)
@@ -501,9 +502,9 @@ displayDeclaration textBuffer treeStore treeIter declaration = case declaration 
 
 displayStatement :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement -> IO (Maybe Gtk.TreeIter)
 displayStatement textBuffer treeStore treeIter statement = case statement of
-  Syntax.ExpressionStatement{value, semicolon} -> do
+  Syntax.ExpressionStatement{expression, semicolon} -> do
     treeIter' <- display textBuffer treeStore treeIter statement Nothing
-    displayExpression textBuffer treeStore treeIter' value
+    displayExpression textBuffer treeStore treeIter' expression
     display textBuffer treeStore treeIter' semicolon Nothing
     pure treeIter'
 
@@ -542,7 +543,7 @@ displayStatement textBuffer treeStore treeIter statement = case statement of
   Syntax.ReturnStatement{returnKeyword, result, semicolon} -> do
     treeIter' <- display textBuffer treeStore treeIter statement Nothing
     display textBuffer treeStore treeIter' returnKeyword Nothing
-    maybe (pure ()) (void . displayExpression textBuffer treeStore treeIter') result
+    maybe (pure Nothing) (displayExpression textBuffer treeStore treeIter') result
     display textBuffer treeStore treeIter' semicolon Nothing
     pure treeIter'
 
@@ -593,9 +594,9 @@ displayExpression textBuffer treeStore treeIter expression = case expression of
     displayExpression textBuffer treeStore treeIter' right
     pure treeIter'
 
-  Syntax.AssignExpression{targetId, assign, value, t} -> do
+  Syntax.AssignExpression{variableId, assign, value, t} -> do
     treeIter' <- display textBuffer treeStore treeIter expression (Just t)
-    display textBuffer treeStore treeIter' targetId (Just targetId.t)
+    display textBuffer treeStore treeIter' variableId (Just variableId.t)
     displayAssignOperator textBuffer treeStore treeIter' assign
     displayExpression textBuffer treeStore treeIter' value
     pure treeIter'
@@ -633,20 +634,17 @@ displayAssignOperator textBuffer treeStore treeIter assign =
 
 
 display :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax.Node c) => a -> b -> Maybe Gtk.TreeIter -> c -> Maybe Type -> IO (Maybe Gtk.TreeIter)
-display textBuffer' treeStore' treeIter node t = do
-  let textBuffer = textBuffer' `asA` Gtk.TextBuffer
-      treeStore = treeStore' `asA` Gtk.TreeStore
-      label = Just (Syntax.label node)
-      typeId = Type.label <$> t
-
-  treeIter' <- #append treeStore treeIter
+display textBuffer treeStore treeIter node t = do
+  let label = Just (Syntax.label node)
+  let typeId = Type.label <$> t
+  treeIter' <- Gtk.treeStoreAppend treeStore treeIter
 
   if Syntax.isLeaf node then do
-    startTextIter <- #getIterAtOffset textBuffer (Span.start node)
-    endTextIter <- #getIterAtOffset textBuffer (Span.end node)
-    slice <- #getSlice textBuffer startTextIter endTextIter True
-    #set treeStore treeIter' [0, 1, 2] =<< for [label, Just slice, typeId] toGValue
+    startTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.start node)
+    endTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.end node)
+    slice <- Gtk.textBufferGetSlice textBuffer startTextIter endTextIter True
+    Gtk.treeStoreSet treeStore treeIter' [0, 1, 2] =<< for [label, Just slice, typeId] toGValue
   else
-    #set treeStore treeIter' [0, 1, 2] =<< for [label, Nothing, typeId] toGValue
+    Gtk.treeStoreSet treeStore treeIter' [0, 1, 2] =<< for [label, Nothing, typeId] toGValue
 
   pure (Just treeIter')

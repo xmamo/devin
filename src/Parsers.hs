@@ -61,5 +61,5 @@ comment = run Internal.comment
 
 run :: Applicative m => Internal.Parser a -> Parser m a
 run parser = ParserT \input ->
-  let (result, comments) = runWriter (Parser.parseT parser input)
+  let (result, comments) = runWriter (Parser.runT parser input)
    in pure ((, comments) <$> result)
