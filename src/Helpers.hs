@@ -3,6 +3,7 @@ module Helpers (
   anyM,
   andM,
   orM,
+  utf8Length,
   expectationsText,
   getInsertTextIter,
   getLineColumn,
@@ -12,9 +13,11 @@ module Helpers (
 import Control.Monad.IO.Class
 import Data.Foldable
 
-import Data.Text (Text)
+import qualified Data.ByteString as ByteString
 
-import Data.GI.Base
+import Data.Text (Text)
+import qualified Data.Text.Encoding as Text
+
 import qualified GI.Gtk as Gtk
 import qualified GI.GtkSource as GtkSource
 
@@ -35,6 +38,10 @@ orM :: (Foldable t, Monad m) => t (m Bool) -> m Bool
 orM = anyM id
 
 
+utf8Length :: Integral a => Text -> a
+utf8Length = fromIntegral . ByteString.length . Text.encodeUtf8
+
+
 expectationsText :: [Text] -> Text
 expectationsText [] = "Unexpected input"
 expectationsText expectations = "Expected " <> go expectations
@@ -46,42 +53,39 @@ expectationsText expectations = "Expected " <> go expectations
 
 
 getInsertTextIter :: (Gtk.IsTextBuffer a, MonadIO m) => a -> m Gtk.TextIter
-getInsertTextIter textBuffer' = do
-  let textBuffer = textBuffer' `asA` Gtk.TextBuffer
-  insertTextMark <- #getInsert textBuffer
-  #getIterAtMark textBuffer insertTextMark
+getInsertTextIter textBuffer = do
+  insertTextMark <- Gtk.textBufferGetInsert textBuffer
+  Gtk.textBufferGetIterAtMark textBuffer insertTextMark
 
 
 getLineColumn :: (Integral a, MonadIO m) => Gtk.TextIter -> m (a, a)
 getLineColumn textIter = do
-  textIter' <- #copy textIter
-  #setLineOffset textIter' 0
+  textIter' <- Gtk.textIterCopy textIter
+  Gtk.textIterSetLineOffset textIter' 0
 
   let go column = do
-        result <- #compare textIter' textIter
+        result <- Gtk.textIterCompare textIter' textIter
 
         if result >= 0 then
           pure column
         else do
-          #forwardCursorPosition textIter'
+          Gtk.textIterForwardCursorPosition textIter'
           go (column + 1)
 
-  line <- (1 +) . fromIntegral <$> #getLine textIter
+  line <- (1 +) . fromIntegral <$> Gtk.textIterGetLine textIter
   column <- go 1
   pure (line, column)
 
 
 getStyle :: (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b, MonadIO m) => a -> b -> Text -> m (Maybe GtkSource.Style)
-getStyle language' styleScheme' = go []
+getStyle language styleScheme = go []
   where
-    language = language' `asA` GtkSource.Language
-    styleScheme = styleScheme' `asA` GtkSource.StyleScheme
-
-    go seen styleId = #getStyle styleScheme styleId >>= \case
+    go seen styleId = GtkSource.styleSchemeGetStyle styleScheme styleId >>= \case
       Just style -> pure (Just style)
 
-      Nothing | styleId `notElem` seen -> #getStyleFallback language styleId >>= \case
-        Just fallbackStyleId -> go (styleId : seen) fallbackStyleId
-        Nothing -> pure Nothing
+      Nothing | styleId `notElem` seen ->
+        GtkSource.languageGetStyleFallback language styleId >>= \case
+          Just fallbackStyleId -> go (styleId : seen) fallbackStyleId
+          Nothing -> pure Nothing
 
       Nothing -> pure Nothing

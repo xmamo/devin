@@ -63,7 +63,7 @@ description = \case
         Syntax.SubtractOperator{} -> "-"
         Syntax.MultiplyOperator{} -> "*"
         Syntax.DivideOperator{} -> "/"
-        Syntax.RemainderOperator{} -> "%"
+        Syntax.ModuloOperator{} -> "%"
         Syntax.EqualOperator{} -> "=="
         Syntax.NotEqualOperator{} -> "!="
         Syntax.LessOperator{} -> "<"

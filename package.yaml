@@ -44,6 +44,7 @@ default-extensions:
   - TypeSynonymInstances
 
   # Syntax
+  - ApplicativeDo
   - LambdaCase
   - BlockArguments
 
@@ -59,7 +60,6 @@ default-extensions:
 
   # Literals
   - OverloadedStrings
-  - OverloadedLabels
 
   # Bang patterns and Strict Haskell
   - Strict

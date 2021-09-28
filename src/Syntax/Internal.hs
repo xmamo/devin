@@ -56,7 +56,7 @@ data Declaration where
 
 data Statement where
   ExpressionStatement :: {
-    value :: Expression,
+    expression :: Expression,
     semicolon :: Token
   } -> Statement
 
@@ -144,7 +144,7 @@ data Expression where
   } -> Expression
 
   AssignExpression :: {
-    targetId :: Identifier,
+    variableId :: Identifier,
     assign :: AssignOperator,
     value :: Expression,
     t :: Type
@@ -172,7 +172,7 @@ data BinaryOperator where
   SubtractOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
   MultiplyOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
   DivideOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  RemainderOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
+  ModuloOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
   EqualOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
   NotEqualOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
   LessOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
@@ -232,7 +232,7 @@ instance Node Declaration where
 
 
 instance Span Statement where
-  start ExpressionStatement{value} = Span.start value
+  start ExpressionStatement{expression} = Span.start expression
   start IfStatement{ifKeyword} = Span.start ifKeyword
   start IfElseStatement{ifKeyword} = Span.start ifKeyword
   start WhileStatement{whileKeyword} = Span.start whileKeyword
@@ -269,7 +269,7 @@ instance Span Expression where
   start CallExpression{targetId} = Span.start targetId
   start UnaryExpression{unary} = Span.start unary
   start BinaryExpression{left} = Span.start left
-  start AssignExpression{targetId} = Span.start targetId
+  start AssignExpression{variableId} = Span.start variableId
   start ParenthesizedExpression{open} = Span.start open
 
   end IntegerExpression{span} = Span.end span
@@ -320,7 +320,7 @@ instance Span BinaryOperator where
   start SubtractOperator{span} = Span.start span
   start MultiplyOperator{span} = Span.start span
   start DivideOperator{span} = Span.start span
-  start RemainderOperator{span} = Span.start span
+  start ModuloOperator{span} = Span.start span
   start EqualOperator{span} = Span.start span
   start NotEqualOperator{span} = Span.start span
   start LessOperator{span} = Span.start span
@@ -334,7 +334,7 @@ instance Span BinaryOperator where
   end SubtractOperator{span} = Span.end span
   end MultiplyOperator{span} = Span.end span
   end DivideOperator{span} = Span.end span
-  end RemainderOperator{span} = Span.end span
+  end ModuloOperator{span} = Span.end span
   end EqualOperator{span} = Span.end span
   end NotEqualOperator{span} = Span.end span
   end LessOperator{span} = Span.end span
@@ -350,7 +350,7 @@ instance Node BinaryOperator where
   label SubtractOperator{} = "SubtractOperator"
   label MultiplyOperator{} = "MultiplyOperator"
   label DivideOperator{} = "DivideOperator"
-  label RemainderOperator{} = "RemainderOperator"
+  label ModuloOperator{} = "ModuloOperator"
   label EqualOperator{} = "EqualOperator"
   label NotEqualOperator{} = "NotEqualOperator"
   label LessOperator{} = "LessOperator"
@@ -454,7 +454,7 @@ comparePrecedence = comparing precedence
     precedence SubtractOperator{} = 4
     precedence MultiplyOperator{} = 5
     precedence DivideOperator{} = 5
-    precedence RemainderOperator{} = 5
+    precedence ModuloOperator{} = 5
     precedence EqualOperator{} = 2
     precedence NotEqualOperator{} = 2
     precedence LessOperator{} = 3

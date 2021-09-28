@@ -40,6 +40,7 @@
   - -XTypeSynonymInstances
 
   # Syntax
+  - -XApplicativeDo
   - -XLambdaCase
   - -XBlockArguments
 
@@ -55,7 +56,6 @@
 
   # Literals
   - -XOverloadedStrings
-  - -XOverloadedLabels
 
   # Bang patterns and Strict Haskell
   - -XStrict
