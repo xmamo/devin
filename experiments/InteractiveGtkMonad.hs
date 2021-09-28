@@ -1,8 +1,16 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module InteractiveGtkMonad (
   module InteractiveGtkMonad
 ) where
 
-data InteractiveGtkM s a = InteractiveGtkM (s -> IO (a, s))
+data InteractiveGtkM s a = InteractiveGtkM
+  (InteractiveGtkState s -> IO (a, InteractiveGtkState s))
+
+data InteractiveGtkState s = InteractiveGtkState{
+  -- gtkApplicationState :: ??,
+  userState :: s
+}
 
 instance Functor (InteractiveGtkM s) where
   fmap f (InteractiveGtkM g) = InteractiveGtkM h
@@ -37,14 +45,19 @@ waitForUserToGo :: s -> IO s
 waitForUserToGo = return
 
 getInteractiveGtkM :: InteractiveGtkM s s
-getInteractiveGtkM = InteractiveGtkM (\s-> return (s,s))
+getInteractiveGtkM = InteractiveGtkM (\s-> return (userState s,s))
 
 setInteractiveGtkM :: s -> InteractiveGtkM s ()
 setInteractiveGtkM s = modifyInteractiveGtkM (\_-> s)
 
 modifyInteractiveGtkM :: (s -> s) -> InteractiveGtkM s ()
-modifyInteractiveGtkM f = InteractiveGtkM (\s-> return ((),f s))
+modifyInteractiveGtkM f = InteractiveGtkM
+  (\st-> return ((),st{userState=f $ userState st}))
 
 
 runInteractiveGtkM :: s -> InteractiveGtkM s a -> IO (a,s)
-runInteractiveGtkM x (InteractiveGtkM f) = f x
+runInteractiveGtkM s (InteractiveGtkM f) = do
+  (val,st) <- f InteractiveGtkState{
+    --- set up gtkApplicationState
+    userState=s}
+  return $ (val,userState st)
