@@ -27,7 +27,6 @@ import Type (Type)
 
 class Span a => Node a where
   label :: a -> Text
-
   isLeaf :: a -> Bool
 
 
@@ -45,7 +44,8 @@ data Declaration where
     defKeyword :: Token,
     functionId :: Identifier,
     open :: Token,
-    parameters :: Maybe (Identifier, Token, Identifier, [(Token, Identifier, Token, Identifier)]),
+    parameters :: [(Identifier, Token, Identifier)],
+    commas :: [Token],
     close :: Token,
     returnInfo :: Maybe (Token, Identifier),
     body :: Statement
@@ -124,7 +124,8 @@ data Expression where
   CallExpression :: {
     targetId :: Identifier,
     open :: Token,
-    arguments :: Maybe (Expression, [(Token, Expression)]),
+    arguments :: [Expression],
+    commas :: [Token],
     close :: Token,
     target :: CallTarget,
     t :: Type

@@ -35,15 +35,8 @@ checkDeclaration1 = \case
   Syntax.VariableDeclaration{} -> pure ()
 
   Syntax.FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
-    parameters <- case parameters of
-      Just (id, colon, typeId, rest) ->
-        for ((undefined, id, colon, typeId) : rest) \(_, _, _, typeId) -> do
-          typeId' <- checkType typeId
-          pure id{t = typeId'.t}
-
-      Nothing -> pure []
-
-    let parameterTypes = [parameter.t | parameter <- parameters]
+    let parameterIds = parameters <&> (._1)
+    parameterTypes <- for parameters (\p -> checkType p._3 <&> (.t))
 
     returnType <- case returnInfo of
       Just (_, typeId) -> do
@@ -62,11 +55,11 @@ checkDeclaration1 = \case
         Typer.report (Error.FunctionRedefinition functionId parameterTypes)
 
       Just infos ->
-        let infos' = (parameterTypes, returnType, CallTarget.UserDefined parameters body) : infos
+        let infos' = (parameterTypes, returnType, CallTarget.UserDefined parameterIds body) : infos
          in Typer.setFunctions (Map.insert key infos' head : tail)
 
       Nothing ->
-        let infos' = [(parameterTypes, returnType, CallTarget.UserDefined parameters body)]
+        let infos' = [(parameterTypes, returnType, CallTarget.UserDefined parameterIds body)]
          in Typer.setFunctions (Map.insert key infos' head : tail)
 
 
@@ -96,19 +89,11 @@ checkDeclaration2 declaration = case declaration of
     pure declaration{variableId = variableId', typeInfo = typeInfo', value = value'}
 
   Syntax.FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
-    (locals, parameters') <- case parameters of
-      Just (id, colon, typeId, rest) -> do
-        typeId' <- checkType typeId
+    parameters' <- for parameters \(id, colon, typeId) -> do
+      typeId' <- checkType typeId
+      pure (id{t = typeId'.t}, colon, typeId')
 
-        rest' <- for rest \(comma, id, colon, typeId) -> do
-          typeId' <- checkType typeId
-          pure (comma, id{t = typeId'.t}, colon, typeId')
-
-        let id' = id{t = typeId'.t}
-        let locals = id' : [id | (_, id, _, _) <- rest']
-        pure (locals, Just (id', colon, typeId', rest'))
-
-      Nothing -> pure ([], Nothing)
+    let locals = parameters' <&> (._1)
 
     (returnType, returnInfo') <- case returnInfo of
       Just (arrow, typeId) -> do
@@ -117,7 +102,7 @@ checkDeclaration2 declaration = case declaration of
 
       Nothing -> pure (Type.Unit, Nothing)
 
-    let functionId' = functionId{t = Type.Function [local.t | local <- locals] returnType}
+    let functionId' = functionId{t = Type.Function (locals <&> (.t)) returnType}
 
     body' <- Typer.scoped do
       let f variables local = Map.insert (Unicode.collate local.name) local.t variables
@@ -126,7 +111,7 @@ checkDeclaration2 declaration = case declaration of
       checkStatement returnType body
 
     unless (Type.areCompatible returnType Type.Unit || Syntax.doesReturn body') $
-      Typer.report (Error.MissingReturnPath functionId [local.t | local <- locals])
+      Typer.report (Error.MissingReturnPath functionId (locals <&> (.t)))
 
     pure declaration{functionId = functionId', parameters = parameters', returnInfo = returnInfo', body = body'}
 
@@ -200,15 +185,10 @@ checkExpression expression = case expression of
     variableId' <- checkVariable variableId
     pure expression{variableId = variableId', t = variableId'.t}
 
-  Syntax.CallExpression{targetId, arguments = Just (first, rest)} -> do
-    first' <- checkExpression first
-    rest' <- for rest \(comma, argument) -> (comma,) <$> checkExpression argument
-    (targetId', target') <- checkFunction targetId (first'.t : [argument.t | (_, argument) <- rest'])
-    pure expression{targetId = targetId', arguments = Just (first', rest'), target = target', t = targetId'.t.result}
-
-  Syntax.CallExpression{targetId, arguments = Nothing} -> do
-    (targetId', target') <- checkFunction targetId []
-    pure expression{targetId = targetId', target = target', t = targetId'.t.result}
+  Syntax.CallExpression{targetId, arguments} -> do
+    arguments' <- for arguments checkExpression
+    (targetId', target') <- checkFunction targetId (arguments' <&> (.t))
+    pure expression{targetId = targetId', arguments = arguments', target = target', t = targetId'.t.result}
 
   Syntax.UnaryExpression{unary, operand} -> do
     operand' <- checkExpression operand

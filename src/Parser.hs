@@ -39,7 +39,7 @@ newtype ParserT m a = ParserT {runT :: Input -> m (Result a)}
 
 
 instance (Monad m, Semigroup a) => Semigroup (ParserT m a) where
-  parser1 <> parser2 = (<>) <$> parser1 <*> parser2
+  parser1 <> parser2 = liftA2 (<>) parser1 parser2
 
 
 instance (Monad m, Monoid a) => Monoid (ParserT m a) where
@@ -125,7 +125,7 @@ separatedBy parser separator = separatedBy1 parser separator <|> pure []
 
 
 separatedBy1 :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
-separatedBy1 parser separator = (:) <$> parser <*> many (separator *> parser)
+separatedBy1 parser separator = liftA2 (:) parser (many (separator *> parser))
 
 
 label :: Monad m => Text -> ParserT m a -> ParserT m a

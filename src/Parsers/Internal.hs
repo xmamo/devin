@@ -41,7 +41,7 @@ variableDeclaration :: Parser Syntax.Declaration
 variableDeclaration = do
   varKeyword <- keyword "var"
   variableId <- s *> identifier
-  typeInfo <- optional ((,) <$> (s *> charToken ':') <*> Parser.commit (s *> identifier))
+  typeInfo <- optional (liftA2 (,) (s *> charToken ':') (Parser.commit (s *> identifier)))
 
   Parser.commit do
     equalSign <- s *> charToken '='
@@ -66,8 +66,8 @@ functionDeclaration = do
         typeId <- s *> identifier
         pure (id, colon, typeId)
 
-    parameters <- case first of
-      Just (id, colon, typeId) -> do
+    (parameters, commas) <- case first of
+      Just first -> do
         rest <- many do
           comma <- s *> charToken ','
 
@@ -75,16 +75,16 @@ functionDeclaration = do
             id <- s *> identifier
             colon <- s *> charToken ':'
             typeId <- s *> s *> identifier
-            pure (comma, id, colon, typeId)
+            pure (comma, (id, colon, typeId))
 
-        pure (Just (id, colon, typeId, rest))
+        pure (first : map snd rest, fst <$> rest)
 
-      Nothing -> pure Nothing
+      Nothing -> pure ([], [])
 
     close <- s *> charToken ')'
-    returnInfo <- optional ((,) <$> (s *> textToken "->") <*> Parser.commit (s *> identifier))
+    returnInfo <- optional (liftA2 (,) (s *> textToken "->") (Parser.commit (s *> identifier)))
     body <- s *> statement
-    pure (Syntax.FunctionDeclaration defKeyword functionId open parameters close returnInfo body)
+    pure (Syntax.FunctionDeclaration defKeyword functionId open parameters commas close returnInfo body)
 
 
 declaration :: Parser Syntax.Declaration
@@ -199,16 +199,15 @@ callExpression = do
   open <- s *> charToken '('
 
   Parser.commit do
-    arguments <-
-      optional (s *> expression) >>= \case
-        Just first -> do
-          rest <- many ((,) <$> (s *> charToken ',') <*> Parser.commit (s *> expression))
-          pure (Just (first, rest))
+    (arguments, commas) <- optional (s *> expression) >>= \case
+      Just first -> do
+        rest <- many (liftA2 (,) (s *> charToken ',') (Parser.commit (s *> expression)))
+        pure (first : map snd rest, fst <$> rest)
 
-        Nothing -> pure Nothing
+      Nothing -> pure ([], [])
 
     close <- s *> charToken ')'
-    pure (Syntax.CallExpression targetId open arguments close CallTarget.Undefined Type.Undefined)
+    pure (Syntax.CallExpression targetId open arguments commas close CallTarget.Undefined Type.Undefined)
 
 
 operandExpression :: Parser Syntax.Expression

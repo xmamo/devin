@@ -6,6 +6,7 @@ module Type (
 
 import Data.Text (Text)
 import qualified Data.Text as Text
+
 import qualified Unicode
 
 
