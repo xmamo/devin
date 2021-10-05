@@ -1,6 +1,7 @@
 module Parser (
   Parser,
   ParserT (..),
+  parser,
   run,
   position,
   satisfy,
@@ -47,7 +48,7 @@ instance (Monad m, Monoid a) => Monoid (ParserT m a) where
 
 
 instance Monad m => Applicative (ParserT m) where
-  pure value = ParserT (pure . Result.Success value)
+  pure value = parser (Result.Success value)
 
   parser1 <*> parser2 = ParserT $ runT parser1 >=> \case
     Result.Success f rest -> fmap f <$> runT parser2 rest
@@ -68,7 +69,7 @@ instance Monad m => MonadPlus (ParserT m)
 
 
 instance Monad m => Alternative (ParserT m) where
-  empty = ParserT \(Input position _) -> pure (Result.Failure False position [])
+  empty = parser \(Input position _) -> Result.Failure False position []
 
   parser1 <|> parser2 = ParserT \input -> runT parser1 input >>= \case
     Result.Success value rest -> pure (Result.Success value rest)
@@ -90,28 +91,32 @@ instance MonadTrans ParserT where
   lift ma = ParserT \input -> ma <&> \a -> Result.Success a input
 
 
+parser :: Applicative m => (Input -> Result a) -> ParserT m a
+parser f = ParserT (pure . f)
+
+
 run :: Parser a -> Input -> Result a
 run parser = runIdentity . runT parser
 
 
 position :: Applicative m => Integral a => ParserT m a
-position = ParserT \input@(Input position _) -> pure (Result.Success (fromIntegral position) input)
+position = parser \input -> Result.Success (fromIntegral input.position) input
 
 
 satisfy :: Applicative m => (Char -> Bool) -> ParserT m Char
-satisfy f = ParserT \(Input position rest) -> case Text.uncons rest of
-  Just (head, tail) | f head -> pure (Result.Success head (Input (position + 1) tail))
-  _ -> pure (Result.Failure False position [])
+satisfy f = parser \(Input position rest) -> case Text.uncons rest of
+  Just (head, tail) | f head -> Result.Success head (Input (position + 1) tail)
+  _ -> Result.Failure False position []
 
 
 char :: Applicative m => Char -> ParserT m Char
-char c = ParserT \(Input position rest) -> case Text.stripPrefix (Text.singleton c) rest of
-  Just suffix -> pure (Result.Success c (Input (position + 1) suffix))
-  Nothing -> pure (Result.Failure False position [Text.pack (show c)])
+char c = parser \(Input position rest) -> case Text.stripPrefix (Text.singleton c) rest of
+  Just suffix -> Result.Success c (Input (position + 1) suffix)
+  Nothing -> Result.Failure False position [Text.pack (show c)]
 
 
 text :: Applicative m => Text -> ParserT m Text
-text t = ParserT \(Input position rest) -> pure case Text.stripPrefix t rest of
+text t = parser \(Input position rest) -> case Text.stripPrefix t rest of
   Just suffix -> Result.Success t (Input (position + Text.length t) suffix)
   Nothing -> Result.Failure False position [Text.pack (show t)]
 
@@ -129,9 +134,9 @@ separatedBy1 parser separator = liftA2 (:) parser (many (separator *> parser))
 
 
 label :: Monad m => Text -> ParserT m a -> ParserT m a
-label l parser = ParserT \input@(Input position _) -> runT parser input <&> \case
+label l parser = ParserT \input -> runT parser input <&> \case
   Result.Success value rest -> Result.Success value rest
-  Result.Failure isFatal _ _ -> Result.Failure isFatal position [l]
+  Result.Failure isFatal _ _ -> Result.Failure isFatal input.position [l]
 
 
 commit :: Monad m => ParserT m a -> ParserT m a
@@ -141,8 +146,8 @@ commit parser = ParserT \input -> runT parser input <&> \case
 
 
 eoi :: Applicative m => ParserT m ()
-eoi = ParserT \input@(Input position text) ->
-  pure if Text.null text then
+eoi = parser \input ->
+  if Text.null input.rest then
     Result.Success () input
   else
-    Result.Failure False position ["end of input"]
+    Result.Failure False input.position ["end of input"]
