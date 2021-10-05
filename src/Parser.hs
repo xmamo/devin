@@ -111,9 +111,9 @@ char c = ParserT \(Input position rest) -> case Text.stripPrefix (Text.singleton
 
 
 text :: Applicative m => Text -> ParserT m Text
-text t = ParserT \(Input position rest) -> case Text.stripPrefix t rest of
-  Just suffix -> pure (Result.Success t (Input (position + Text.length t) suffix))
-  Nothing -> pure (Result.Failure False position [Text.pack (show t)])
+text t = ParserT \(Input position rest) -> pure case Text.stripPrefix t rest of
+  Just suffix -> Result.Success t (Input (position + Text.length t) suffix)
+  Nothing -> Result.Failure False position [Text.pack (show t)]
 
 
 either :: Monad m => ParserT m a -> ParserT m b -> ParserT m (Either a b)
@@ -129,20 +129,20 @@ separatedBy1 parser separator = liftA2 (:) parser (many (separator *> parser))
 
 
 label :: Monad m => Text -> ParserT m a -> ParserT m a
-label l parser = ParserT \input@(Input position _) -> runT parser input >>= \case
-  Result.Success value rest -> pure (Result.Success value rest)
-  Result.Failure isFatal _ _ -> pure (Result.Failure isFatal position [l])
+label l parser = ParserT \input@(Input position _) -> runT parser input <&> \case
+  Result.Success value rest -> Result.Success value rest
+  Result.Failure isFatal _ _ -> Result.Failure isFatal position [l]
 
 
 commit :: Monad m => ParserT m a -> ParserT m a
-commit parser = ParserT $ runT parser >=> \case
-  Result.Success value rest -> pure (Result.Success value rest)
-  Result.Failure _ position expectations -> pure (Result.Failure True position expectations)
+commit parser = ParserT \input -> runT parser input <&> \case
+  Result.Success value rest -> Result.Success value rest
+  Result.Failure _ position expectations -> Result.Failure True position expectations
 
 
 eoi :: Applicative m => ParserT m ()
 eoi = ParserT \input@(Input position text) ->
-  if Text.null text then
-    pure (Result.Success () input)
+  pure if Text.null text then
+    Result.Success () input
   else
-    pure (Result.Failure False position ["end of input"])
+    Result.Failure False position ["end of input"]
