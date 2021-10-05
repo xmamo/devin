@@ -346,7 +346,7 @@ keyword :: Text -> Parser Syntax.Token
 keyword k = Parser.label ("keyword " <> k) do
   Syntax.Identifier{span, name} <- identifier
 
-  if Unicode.collate name == Unicode.collate k then
+  if name == k then
     pure (Syntax.Token span)
   else
     empty

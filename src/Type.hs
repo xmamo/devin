@@ -7,8 +7,6 @@ module Type (
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import qualified Unicode
-
 
 data Type where
   Undefined :: Type
@@ -19,19 +17,7 @@ data Type where
   Function :: {parameters :: [Type], result :: Type} -> Type
   Unknown :: {name :: Text} -> Type
   Error :: Type
-  deriving (Show, Read)
-
-
-instance Eq Type where
-  Undefined == Undefined = True
-  Unit == Unit = True
-  Bool == Bool = True
-  Int == Int = True
-  Float == Float = True
-  Function parameters1 result1 == Function parameters2 result2 = parameters1 == parameters2 && result1 == result2
-  Unknown name1 == Unknown name2 = Unicode.collate name1 == Unicode.collate name2
-  Error == Error = True
-  _ == _ = False
+  deriving (Eq, Show, Read)
 
 
 label :: Type -> Text

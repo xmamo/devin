@@ -12,7 +12,6 @@ import CallTarget (CallTarget)
 import qualified CallTarget
 import Type (Type)
 import qualified Type
-import qualified Unicode
 
 
 data Environment = Environment {
@@ -27,17 +26,17 @@ predefined = Environment types variables functions
   where
     types = Map.fromList
       [
-        (Unicode.collate "Unit", Type.Unit),
-        (Unicode.collate "Bool", Type.Bool),
-        (Unicode.collate "Int", Type.Int),
-        (Unicode.collate "Float", Type.Float)
+        ("Unit", Type.Unit),
+        ("Bool", Type.Bool),
+        ("Int", Type.Int),
+        ("Float", Type.Float)
       ]
 
     variables = Map.fromList
       [
-        (Unicode.collate "unit", Type.Unit),
-        (Unicode.collate "true", Type.Bool),
-        (Unicode.collate "false", Type.Bool)
+        ("unit", Type.Unit),
+        ("true", Type.Bool),
+        ("false", Type.Bool)
       ]
 
     functions =
@@ -45,12 +44,12 @@ predefined = Environment types variables functions
         Map.empty,
 
         Map.fromList [
-          (Unicode.collate "int", [
+          ("int", [
             ([Type.Int], Type.Int, CallTarget.IntToInt),
             ([Type.Float], Type.Int, CallTarget.FloatToInt)
           ]),
 
-          (Unicode.collate "float", [
+          ("float", [
             ([Type.Int], Type.Float, CallTarget.IntToFloat),
             ([Type.Float], Type.Float, CallTarget.FloatToFloat)
           ])

@@ -21,7 +21,6 @@ import qualified Type
 import Typer (Typer)
 import qualified Typer
 import qualified Typer.Error as Error
-import qualified Unicode
 
 
 checkDeclarations :: [Syntax.Declaration] -> Typer [Syntax.Declaration]
@@ -48,19 +47,18 @@ checkDeclaration1 = \case
     functions <- Typer.getFunctions
 
     let (head : tail) = functions
-    let key = Unicode.collate functionId.name
 
-    case head !? key of
+    case head !? functionId.name of
       Just infos | any (liftEq Type.areCompatible parameterTypes . (._1)) infos ->
         Typer.report (Error.FunctionRedefinition functionId parameterTypes)
 
       Just infos ->
         let infos' = (parameterTypes, returnType, CallTarget.UserDefined parameterIds body) : infos
-         in Typer.setFunctions (Map.insert key infos' head : tail)
+         in Typer.setFunctions (Map.insert functionId.name infos' head : tail)
 
       Nothing ->
         let infos' = [(parameterTypes, returnType, CallTarget.UserDefined parameterIds body)]
-         in Typer.setFunctions (Map.insert key infos' head : tail)
+         in Typer.setFunctions (Map.insert functionId.name infos' head : tail)
 
 
 checkDeclaration2 :: Syntax.Declaration -> Typer Syntax.Declaration
@@ -79,11 +77,11 @@ checkDeclaration2 declaration = case declaration of
       Just (_, typeId') -> do
         let typeOk = Type.areCompatible value'.t typeId'.t
         unless typeOk (Typer.report (Error.InvalidType value typeId'.t value'.t))
-        Typer.updateVariables (Map.insert (Unicode.collate variableId.name) typeId'.t)
+        Typer.updateVariables (Map.insert variableId.name typeId'.t)
         pure variableId{t = typeId'.t}
 
       Nothing -> do
-        Typer.updateVariables (Map.insert (Unicode.collate variableId.name) value'.t)
+        Typer.updateVariables (Map.insert variableId.name value'.t)
         pure variableId{t = value'.t}
 
     pure declaration{variableId = variableId', typeInfo = typeInfo', value = value'}
@@ -105,7 +103,7 @@ checkDeclaration2 declaration = case declaration of
     let functionId' = functionId{t = Type.Function (locals <&> (.t)) returnType}
 
     body' <- Typer.scoped do
-      let f variables local = Map.insert (Unicode.collate local.name) local.t variables
+      let f variables local = Map.insert local.name local.t variables
       Typer.updateVariables \variables -> foldl' f variables locals
       Typer.updateFunctions (Map.empty :)
       checkStatement returnType body
@@ -272,45 +270,41 @@ checkExpression expression = case expression of
 checkType :: Syntax.Identifier -> Typer Syntax.Identifier
 checkType typeId = do
   types <- Typer.getTypes
-  let key = Unicode.collate typeId.name
 
-  case types !? key of
+  case types !? typeId.name of
     Just t -> pure typeId{t}
 
     Nothing -> do
       Typer.report (Error.UnknownType typeId)
-      Typer.setTypes (Map.insert key (Type.Unknown typeId.name) types)
+      Typer.setTypes (Map.insert typeId.name (Type.Unknown typeId.name) types)
       pure typeId{t = Type.Unknown typeId.name}
 
 
 checkVariable :: Syntax.Identifier -> Typer Syntax.Identifier
 checkVariable variableId = do
   variables <- Typer.getVariables
-  let key = Unicode.collate variableId.name
 
-  case variables !? key of
+  case variables !? variableId.name of
     Just t -> pure variableId{t}
 
     Nothing -> do
       Typer.report (Error.UnknownVariable variableId)
-      Typer.setVariables (Map.insert key Type.Error variables)
+      Typer.setVariables (Map.insert variableId.name Type.Error variables)
       pure variableId{t = Type.Error}
 
 
 checkFunction :: Syntax.Identifier -> [Type] -> Typer (Syntax.Identifier, CallTarget)
 checkFunction targetId parameterTypes = go =<< Typer.getFunctions
   where
-    key = Unicode.collate targetId.name
-
     go [] = do
       Typer.updateFunctions \(head : tail) ->
-        Map.insert key [(parameterTypes, Type.Error, undefined)] head : tail
+        Map.insert targetId.name [(parameterTypes, Type.Error, undefined)] head : tail
 
       Typer.report (Error.UnknownFunction targetId parameterTypes)
       pure (targetId{t = Type.Function parameterTypes Type.Error}, undefined)
 
     go (head : tail) =
-      case find (liftEq Type.areCompatible parameterTypes . (._1)) =<< head !? key of
+      case find (liftEq Type.areCompatible parameterTypes . (._1)) =<< head !? targetId.name of
         Just _ | Type.Error `elem` parameterTypes ->
           pure (targetId{t = Type.Function parameterTypes Type.Error}, undefined)
 

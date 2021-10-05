@@ -2,16 +2,10 @@ module Unicode (
   Category (..),
   category,
   isSpace,
-  isNewline,
-  collate
+  isNewline
 ) where
 
 import System.IO.Unsafe
-
-import qualified Data.ByteString as ByteString
-
-import Data.Text (Text)
-import qualified Data.Text.Encoding as Text
 
 import qualified GI.GLib as GLib
 
@@ -98,9 +92,3 @@ isNewline '\x85' = True
 isNewline '\x2028' = True
 isNewline '\x2029' = True
 isNewline _ = False
-
-
-collate :: Text -> Text
-collate text =
-  let byteLength = ByteString.length (Text.encodeUtf8 text)
-   in unsafePerformIO (GLib.utf8CollateKey text (fromIntegral byteLength))
