@@ -41,13 +41,12 @@ variableDeclaration :: Parser Syntax.Declaration
 variableDeclaration = do
   varKeyword <- keyword "var"
   variableId <- s *> identifier
-  typeInfo <- optional (liftA2 (,) (s *> charToken ':') (Parser.commit (s *> identifier)))
 
   Parser.commit do
     equalSign <- s *> charToken '='
     value <- s *> expression
     semicolon <- s *> charToken ';'
-    pure (Syntax.VariableDeclaration varKeyword variableId typeInfo equalSign value semicolon)
+    pure (Syntax.VariableDeclaration varKeyword variableId equalSign value semicolon)
 
 
 functionDeclaration :: Parser Syntax.Declaration
@@ -89,6 +88,10 @@ functionDeclaration = do
 
 declaration :: Parser Syntax.Declaration
 declaration = variableDeclaration <|> functionDeclaration
+
+
+declarationStatement :: Parser Syntax.Statement
+declarationStatement = Syntax.DeclarationStatement <$> declaration
 
 
 expressionStatement :: Parser Syntax.Statement
@@ -149,7 +152,7 @@ blockStatement = do
   open <- charToken '{'
 
   Parser.commit do
-    elements <- s *> Parser.separatedBy (Parser.either declaration statement) s
+    elements <- s *> Parser.separatedBy statement s
     close <- s *> charToken '}'
     pure (Syntax.BlockStatement open elements close)
 
@@ -157,6 +160,7 @@ blockStatement = do
 statement :: Parser Syntax.Statement
 statement = asum
   [
+    declarationStatement,
     blockStatement,
     ifElseStatementOrIfStatement,
     whileStatement,
@@ -207,7 +211,7 @@ callExpression = do
       Nothing -> pure ([], [])
 
     close <- s *> charToken ')'
-    pure (Syntax.CallExpression targetId open arguments commas close CallTarget.Undefined Type.Undefined)
+    pure (Syntax.CallExpression targetId open arguments commas close 0 CallTarget.Undefined Type.Undefined)
 
 
 operandExpression :: Parser Syntax.Expression
@@ -302,7 +306,7 @@ assignOperator = fmap ($ Type.Undefined) . syntax $ asum
     Parser.text "-=" $> Syntax.SubtractAssignOperator,
     Parser.text "*=" $> Syntax.MultiplyAssignOperator,
     Parser.text "/=" $> Syntax.DivideAssignOperator,
-    Parser.text "%=" $> Syntax.RemainderAssignOperator
+    Parser.text "%=" $> Syntax.ModuloAssignOperator
   ]
 
 

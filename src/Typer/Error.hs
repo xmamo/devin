@@ -82,7 +82,7 @@ description = \case
         Syntax.SubtractAssignOperator{} -> "-="
         Syntax.MultiplyAssignOperator{} -> "*="
         Syntax.DivideAssignOperator{} -> "/="
-        Syntax.RemainderAssignOperator{} -> "%="
+        Syntax.ModuloAssignOperator{} -> "%="
 
   InvalidType{expected, actual} ->
     "Invalid type: expected " <> Type.label expected <> ", but got " <> Type.label actual

@@ -1,6 +1,7 @@
 module Typer (
   Typer (..),
   run,
+  getDepth,
   getTypes,
   getVariables,
   getFunctions,
@@ -11,7 +12,7 @@ module Typer (
   updateFunctions,
   updateVariables,
   report,
-  scoped
+  push
 ) where
 
 import Data.List
@@ -54,6 +55,10 @@ run (Typer check) environment =
    in (a, environment', sortOn Span.start errors)
 
 
+getDepth :: Typer Integer
+getDepth = Typer \environment -> (environment.depth, environment, [])
+
+
 getTypes :: Typer (Map Text Type)
 getTypes = Typer \environment -> (environment.types, environment, [])
 
@@ -94,7 +99,7 @@ report :: Error -> Typer ()
 report error = Typer \environment -> ((), environment, [error])
 
 
-scoped :: Typer a -> Typer a
-scoped (Typer check) = Typer \environment ->
-  let (a, _, errors) = check environment
+push :: Typer a -> Typer a
+push (Typer check) = Typer \environment ->
+  let (a, _, errors) = check environment{depth = environment.depth + 1}
    in (a, environment, errors)

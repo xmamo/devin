@@ -235,11 +235,10 @@ onActivate application = do
 
 highlightDeclaration :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration -> m ()
 highlightDeclaration textBuffer = \case
-  Syntax.VariableDeclaration{varKeyword, variableId, typeInfo, value} -> do
+  Syntax.VariableDeclaration{varKeyword, variableId, right} -> do
     highlight textBuffer "keyword" varKeyword
     highlight textBuffer "identifier" variableId
-    maybe (pure ()) (highlight textBuffer "type" . snd) typeInfo
-    highlightExpression textBuffer value
+    highlightExpression textBuffer right
 
   Syntax.FunctionDeclaration{defKeyword, functionId, parameters, returnInfo, body} -> do
     highlight textBuffer "keyword" defKeyword
@@ -251,7 +250,11 @@ highlightDeclaration textBuffer = \case
 
 highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m ()
 highlightStatement textBuffer = \case
-  Syntax.ExpressionStatement{expression} -> highlightExpression textBuffer expression
+  Syntax.DeclarationStatement{declaration} ->
+    highlightDeclaration textBuffer declaration
+
+  Syntax.ExpressionStatement{expression} ->
+    highlightExpression textBuffer expression
 
   Syntax.IfStatement{ifKeyword, predicate, trueBranch} -> do
     highlight textBuffer "keyword" ifKeyword
@@ -280,8 +283,8 @@ highlightStatement textBuffer = \case
     highlight textBuffer "keyword" returnKeyword
     maybe (pure ()) (highlightExpression textBuffer) result
 
-  Syntax.BlockStatement{elements} ->
-    for_ elements (either (highlightDeclaration textBuffer) (highlightStatement textBuffer))
+  Syntax.BlockStatement{statements} ->
+    for_ statements (highlightStatement textBuffer)
 
 
 highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
@@ -308,10 +311,10 @@ highlightExpression textBuffer expression = case expression of
     highlight textBuffer "operator" binary
     highlightExpression textBuffer right
 
-  Syntax.AssignExpression{variableId, assign, value} -> do
+  Syntax.AssignExpression{variableId, assign, right} -> do
     highlight textBuffer "identifier" variableId
     highlight textBuffer "operator" assign
-    highlightExpression textBuffer value
+    highlightExpression textBuffer right
 
   Syntax.ParenthesizedExpression{inner} ->
     highlightExpression textBuffer inner
@@ -319,8 +322,8 @@ highlightExpression textBuffer expression = case expression of
 
 highlightDeclarationParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Syntax.Declaration -> m Bool
 highlightDeclarationParentheses textBuffer insertTextIter = \case
-  Syntax.VariableDeclaration{value} ->
-    highlightExpressionParentheses textBuffer insertTextIter value
+  Syntax.VariableDeclaration{right} ->
+    highlightExpressionParentheses textBuffer insertTextIter right
 
   Syntax.FunctionDeclaration{open, close, body} -> Helpers.orM
     [
@@ -333,6 +336,9 @@ highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.Tex
 highlightStatementParentheses textBuffer insertTextIter = \case
   Syntax.ExpressionStatement{expression} ->
     highlightExpressionParentheses textBuffer insertTextIter expression
+
+  Syntax.DeclarationStatement{declaration} ->
+    highlightDeclarationParentheses textBuffer insertTextIter declaration
 
   Syntax.IfStatement{predicate, trueBranch} -> Helpers.orM
     [
@@ -364,16 +370,11 @@ highlightStatementParentheses textBuffer insertTextIter = \case
   Syntax.ReturnStatement{result = Just result} ->
     highlightExpressionParentheses textBuffer insertTextIter result
 
-  Syntax.BlockStatement{open, elements, close} -> Helpers.orM
+  Syntax.BlockStatement{open, statements, close} -> Helpers.orM
     [
-      Helpers.anyM highlightElementParentheses elements,
+      Helpers.anyM (highlightStatementParentheses textBuffer insertTextIter) statements,
       highlightParentheses textBuffer insertTextIter open close
     ]
-
-  where
-    highlightElementParentheses = \case
-      Left declaration -> highlightDeclarationParentheses textBuffer insertTextIter declaration
-      Right statement -> highlightStatementParentheses textBuffer insertTextIter statement
 
 
 highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Syntax.Expression -> m Bool
@@ -399,8 +400,8 @@ highlightExpressionParentheses textBuffer insertTextIter = \case
       highlightExpressionParentheses textBuffer insertTextIter right
     ]
 
-  Syntax.AssignExpression{value} ->
-    highlightExpressionParentheses textBuffer insertTextIter value
+  Syntax.AssignExpression{right} ->
+    highlightExpressionParentheses textBuffer insertTextIter right
 
   Syntax.ParenthesizedExpression{open, inner, close} -> Helpers.orM
     [
@@ -437,13 +438,12 @@ highlight textBuffer tagName span = do
 
 displayDeclaration :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Declaration -> IO (Maybe Gtk.TreeIter)
 displayDeclaration textBuffer treeStore treeIter declaration = case declaration of
-  Syntax.VariableDeclaration{varKeyword, variableId, typeInfo, equalSign, value, semicolon} -> do
+  Syntax.VariableDeclaration{varKeyword, variableId, equalSign, right, semicolon} -> do
     treeIter' <- display textBuffer treeStore treeIter Nothing declaration
     display textBuffer treeStore treeIter' Nothing varKeyword
     display textBuffer treeStore treeIter' (Just variableId.t) variableId
-    displayTypeInfo treeIter' typeInfo
     display textBuffer treeStore treeIter' Nothing equalSign
-    displayExpression textBuffer treeStore treeIter' value
+    displayExpression textBuffer treeStore treeIter' right
     display textBuffer treeStore treeIter' Nothing semicolon
     pure treeIter'
 
@@ -459,12 +459,6 @@ displayDeclaration textBuffer treeStore treeIter declaration = case declaration 
     pure treeIter'
 
   where
-    displayTypeInfo treeIter (Just (colon, typeId)) = void do
-      display textBuffer treeStore treeIter Nothing colon
-      display textBuffer treeStore treeIter Nothing typeId
-
-    displayTypeInfo _ Nothing = pure ()
-
     displayParametersAndCommas treeIter parameters [] =
       for_ parameters (displayParameter treeIter)
 
@@ -490,6 +484,11 @@ displayDeclaration textBuffer treeStore treeIter declaration = case declaration 
 
 displayStatement :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement -> IO (Maybe Gtk.TreeIter)
 displayStatement textBuffer treeStore treeIter statement = case statement of
+  Syntax.DeclarationStatement{declaration} -> do
+    treeIter' <- display textBuffer treeStore treeIter Nothing statement
+    displayDeclaration textBuffer treeStore treeIter' declaration
+    pure treeIter'
+
   Syntax.ExpressionStatement{expression, semicolon} -> do
     treeIter' <- display textBuffer treeStore treeIter Nothing statement
     displayExpression textBuffer treeStore treeIter' expression
@@ -535,17 +534,12 @@ displayStatement textBuffer treeStore treeIter statement = case statement of
     display textBuffer treeStore treeIter' Nothing semicolon
     pure treeIter'
 
-  Syntax.BlockStatement{open, elements, close} -> do
+  Syntax.BlockStatement{open, statements, close} -> do
     treeIter' <- display textBuffer treeStore treeIter Nothing statement
     display textBuffer treeStore treeIter' Nothing open
-    for_ elements (displayElement treeIter')
+    for_ statements (displayStatement textBuffer treeStore treeIter')
     display textBuffer treeStore treeIter' Nothing close
     pure treeIter'
-
-  where
-    displayElement treeIter = \case
-      Left declaration -> displayDeclaration textBuffer treeStore treeIter declaration
-      Right statement -> displayStatement textBuffer treeStore treeIter statement
 
 
 displayExpression :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression -> IO (Maybe Gtk.TreeIter)
@@ -582,11 +576,11 @@ displayExpression textBuffer treeStore treeIter expression = case expression of
     displayExpression textBuffer treeStore treeIter' right
     pure treeIter'
 
-  Syntax.AssignExpression{variableId, assign, value, t} -> do
+  Syntax.AssignExpression{variableId, assign, right, t} -> do
     treeIter' <- display textBuffer treeStore treeIter (Just t) expression
     display textBuffer treeStore treeIter' (Just variableId.t) variableId
     displayAssignOperator textBuffer treeStore treeIter' assign
-    displayExpression textBuffer treeStore treeIter' value
+    displayExpression textBuffer treeStore treeIter' right
     pure treeIter'
 
   Syntax.ParenthesizedExpression{open, inner, close, t} -> do

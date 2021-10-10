@@ -15,6 +15,7 @@ import qualified Type
 
 
 data Environment = Environment {
+  depth :: Integer,
   types :: Map Text Type,
   variables :: Map Text Type,
   functions :: [Map Text [([Type], Type, CallTarget)]]
@@ -22,7 +23,7 @@ data Environment = Environment {
 
 
 predefined :: Environment
-predefined = Environment types variables functions
+predefined = Environment 0 types variables functions
   where
     types = Map.fromList
       [

@@ -9,14 +9,10 @@ module Syntax.Internal (
   Identifier (..),
   Token (..),
   Comment (..),
-  CallTarget (..),
-  doesReturn,
-  hasSideEffects,
-  comparePrecedence
+  CallTarget (..)
 ) where
 
 import Prelude hiding (span)
-import Data.Ord
 
 import Data.Text (Text)
 
@@ -34,9 +30,8 @@ data Declaration where
   VariableDeclaration :: {
     varKeyword :: Token,
     variableId :: Identifier,
-    typeInfo :: Maybe (Token, Identifier),
     equalSign :: Token,
-    value :: Expression,
+    right :: Expression,
     semicolon :: Token
   } -> Declaration
 
@@ -55,6 +50,10 @@ data Declaration where
 
 
 data Statement where
+  DeclarationStatement :: {
+    declaration :: Declaration
+  } -> Statement
+
   ExpressionStatement :: {
     expression :: Expression,
     semicolon :: Token
@@ -96,7 +95,7 @@ data Statement where
 
   BlockStatement :: {
     open :: Token,
-    elements :: [Either Declaration Statement],
+    statements :: [Statement],
     close :: Token
   } -> Statement
 
@@ -127,6 +126,7 @@ data Expression where
     arguments :: [Expression],
     commas :: [Token],
     close :: Token,
+    depth :: Integer,
     target :: CallTarget,
     t :: Type
   } -> Expression
@@ -147,7 +147,7 @@ data Expression where
   AssignExpression :: {
     variableId :: Identifier,
     assign :: AssignOperator,
-    value :: Expression,
+    right :: Expression,
     t :: Type
   } -> Expression
 
@@ -191,7 +191,7 @@ data AssignOperator where
   SubtractAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
   MultiplyAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
   DivideAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
-  RemainderAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
+  ModuloAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
   deriving (Eq, Show, Read)
 
 
@@ -213,7 +213,7 @@ data CallTarget where
   FloatToInt :: CallTarget
   IntToFloat :: CallTarget
   FloatToFloat :: CallTarget
-  UserDefined :: {parameters :: [Identifier], body :: Statement} -> CallTarget
+  UserDefined :: {depth :: Integer, parameters :: [Identifier], body :: Statement} -> CallTarget
   deriving (Eq, Show, Read)
 
 
@@ -233,6 +233,7 @@ instance Node Declaration where
 
 
 instance Span Statement where
+  start DeclarationStatement{declaration} = Span.start declaration
   start ExpressionStatement{expression} = Span.start expression
   start IfStatement{ifKeyword} = Span.start ifKeyword
   start IfElseStatement{ifKeyword} = Span.start ifKeyword
@@ -241,6 +242,7 @@ instance Span Statement where
   start ReturnStatement{returnKeyword} = Span.start returnKeyword
   start BlockStatement{open} = Span.start open
 
+  end DeclarationStatement{declaration} = Span.end declaration
   end ExpressionStatement{semicolon} = Span.end semicolon
   end IfStatement{trueBranch} = Span.end trueBranch
   end IfElseStatement{falseBranch} = Span.end falseBranch
@@ -251,6 +253,7 @@ instance Span Statement where
 
 
 instance Node Statement where
+  label DeclarationStatement{} = "DeclarationStatement"
   label ExpressionStatement{} = "ExpressionStatement"
   label IfStatement{} = "IfStatement"
   label IfElseStatement{} = "IfElseStatement"
@@ -279,7 +282,7 @@ instance Span Expression where
   end CallExpression{close} = Span.end close
   end UnaryExpression{operand} = Span.end operand
   end BinaryExpression{right} = Span.end right
-  end AssignExpression{value} = Span.end value
+  end AssignExpression{right} = Span.end right
   end ParenthesizedExpression{close} = Span.end close
 
 
@@ -370,14 +373,14 @@ instance Span AssignOperator where
   start SubtractAssignOperator{span} = Span.start span
   start MultiplyAssignOperator{span} = Span.start span
   start DivideAssignOperator{span} = Span.start span
-  start RemainderAssignOperator{span} = Span.start span
+  start ModuloAssignOperator{span} = Span.start span
 
   end AssignOperator{span} = Span.end span
   end AddAssignOperator{span} = Span.end span
   end SubtractAssignOperator{span} = Span.end span
   end MultiplyAssignOperator{span} = Span.end span
   end DivideAssignOperator{span} = Span.end span
-  end RemainderAssignOperator{span} = Span.end span
+  end ModuloAssignOperator{span} = Span.end span
 
 
 instance Node AssignOperator where
@@ -386,7 +389,7 @@ instance Node AssignOperator where
   label SubtractAssignOperator{} = "SubtractAssignOperator"
   label MultiplyAssignOperator{} = "MultiplyAssignOperator"
   label DivideAssignOperator{} = "DivideAssignOperator"
-  label RemainderAssignOperator{} = "RemainderAssignOperator"
+  label ModuloAssignOperator{} = "ModuloAssignOperator"
 
   isLeaf _ = True
 
@@ -425,42 +428,3 @@ instance Node Comment where
   label Comment{} = "Comment"
 
   isLeaf Comment{} = True
-
-
-doesReturn :: Statement -> Bool
-doesReturn ExpressionStatement{} = False
-doesReturn IfStatement{} = False
-doesReturn IfElseStatement{trueBranch, falseBranch} = doesReturn trueBranch && doesReturn falseBranch
-doesReturn WhileStatement{} = False
-doesReturn DoWhileStatement{body} = doesReturn body
-doesReturn ReturnStatement{} = True
-doesReturn BlockStatement{elements} = any (either (const False) doesReturn) elements
-
-
-hasSideEffects :: Expression -> Bool
-hasSideEffects IntegerExpression{} = False
-hasSideEffects RationalExpression{} = False
-hasSideEffects VariableExpression{} = False
-hasSideEffects CallExpression{} = True
-hasSideEffects UnaryExpression{operand} = hasSideEffects operand
-hasSideEffects BinaryExpression{left, right} = hasSideEffects left || hasSideEffects right
-hasSideEffects AssignExpression{} = True
-hasSideEffects ParenthesizedExpression{inner} = hasSideEffects inner
-
-
-comparePrecedence :: BinaryOperator -> BinaryOperator -> Ordering
-comparePrecedence = comparing precedence
-  where
-    precedence AddOperator{} = 4
-    precedence SubtractOperator{} = 4
-    precedence MultiplyOperator{} = 5
-    precedence DivideOperator{} = 5
-    precedence ModuloOperator{} = 5
-    precedence EqualOperator{} = 2
-    precedence NotEqualOperator{} = 2
-    precedence LessOperator{} = 3
-    precedence LessOrEqualOperator{} = 3
-    precedence GreaterOperator{} = 3
-    precedence GreaterOrEqualOperator{} = 3
-    precedence AndOperator{} = 1
-    precedence OrOperator{} = 1
