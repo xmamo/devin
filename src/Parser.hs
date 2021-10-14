@@ -80,10 +80,8 @@ instance Monad m => Alternative (ParserT m) where
       Result.Success value rest -> Result.Success value rest
 
       Result.Failure isFatal2 position2 expectations2 -> case compare position1 position2 of
-        LT | null expectations2 && not (null expectations1) -> Result.Failure isFatal2 position1 expectations1
         LT -> Result.Failure isFatal2 position2 expectations2
         EQ -> Result.Failure isFatal2 position1 (expectations1 `union` expectations2)
-        GT | null expectations1 && not (null expectations2) -> Result.Failure isFatal2 position2 expectations2
         GT -> Result.Failure isFatal2 position1 expectations1
 
 
