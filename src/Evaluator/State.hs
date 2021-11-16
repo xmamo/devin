@@ -1,10 +1,25 @@
-module Evaluator.State (State) where
+module Evaluator.State(
+  State,
+  predefined
+) where
 
 import Data.Text (Text)
 
 import Data.Map (Map)
+import Data.Map qualified as Map
 
-import Evaluator.Variable (Variable)
+import Value
 
 
-type State = [Map Text Variable]
+type State = [(Integer, Map Text Value)]
+
+
+predefined :: State
+predefined =
+  [
+    (0, Map.fromList [
+      ("true", Bool True),
+      ("false", Bool False),
+      ("unit", Unit)
+    ])
+  ]

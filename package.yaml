@@ -45,8 +45,6 @@ default-extensions:
 
   # Syntax
   - ApplicativeDo
-  - LambdaCase
-  - BlockArguments
 
   # Types
   - TypeFamilies
@@ -61,9 +59,6 @@ default-extensions:
   # Literals
   - OverloadedStrings
 
-  # Bang patterns and Strict Haskell
-  - Strict
-
 ghc-options:
   # Warnings
   - -Wall
@@ -77,23 +72,7 @@ ghc-options:
   # Individual optimisations
   - -foptimal-applicative-do
 
-  # Plugin options
-  - -fplugin=RecordDotPreprocessor
-
-dependencies:
-  - base
-  - bytestring
-  - text
-  - containers
-  - transformers
-  - haskell-gi-base
-  - gi-glib
-  - gi-gio
-  - gi-gtk
-  - gi-gtk-hs
-  - gi-gtksource
-  - record-hasfield
-  - record-dot-preprocessor
+dependencies: base
 
 library:
   source-dirs: src
@@ -101,23 +80,38 @@ library:
   exposed-modules:
     - CallTarget
     - Evaluator
-    - Evaluator.Configuration
     - Evaluator.State
-    - Evaluator.Value
-    - Evaluator.Variable
+    - Evaluator.Configuration
     - Evaluators
     - Main
     - Parser
     - Parser.Input
     - Parser.Result
     - Parsers
-    - Span
+    - Range
     - Syntax
     - Type
     - Typer
     - Typer.Environment
     - Typer.Error
     - Typers
+    - Value
+
+  dependencies:
+    - extra
+    - text
+    - containers
+    - transformers
+    - haskell-gi-base
+    - gi-glib
+    - gi-gio
+    - gi-gtk
+    - gi-gtk-hs
+    - gi-gtksource
+    - record-hasfield
+    - record-dot-preprocessor
+  
+  ghc-options: -fplugin=RecordDotPreprocessor
 
 executables:
   devin:

@@ -41,8 +41,6 @@
 
   # Syntax
   - -XApplicativeDo
-  - -XLambdaCase
-  - -XBlockArguments
 
   # Types
   - -XTypeFamilies
@@ -57,17 +55,15 @@
   # Literals
   - -XOverloadedStrings
 
-  # Bang patterns and Strict Haskell
-  - -XStrict
-
 # Overrides
 - suggest: {name: Redundant do}
-- suggest: {name: Use explicit module export list}
-- suggest: {name: Use module export list}
-- warn: {name: Use String}
-- warn: {name: Use &&&}
-- warn: {name: Use Just}
-- group: {name: dollar, enabled: true}
+- warn: {name: Use explicit module export list}
+- warn: {name: Use module export list}
+- ignore: {name: Use const}
+- ignore: {name: Use curry}
+- ignore: {name: Use uncurry}
+- group: {name: generalise-for-conciseness, enabled: true}
+- group: {name: extra, enabled: true}
 - group: {name: teaching, enabled: true}
 
 # Custom hints

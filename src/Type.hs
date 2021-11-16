@@ -1,6 +1,6 @@
 module Type (
   Type (..),
-  label,
+  pretty,
   areCompatible
 ) where
 
@@ -14,21 +14,21 @@ data Type where
   Bool :: Type
   Int :: Type
   Float :: Type
-  Function :: {parameters :: [Type], result :: Type} -> Type
+  Function :: {parameterTypes :: [Type], returnType :: Type} -> Type
   Unknown :: {name :: Text} -> Type
   Error :: Type
   deriving (Eq, Show, Read)
 
 
-label :: Type -> Text
-label Undefined = "?"
-label Unit = "Unit"
-label Bool = "Bool"
-label Int = "Int"
-label Float = "Float"
-label Function{parameters, result} = "(" <> Text.intercalate ", " (label <$> parameters) <> ") → " <> label result
-label Unknown{name} = name
-label Error = "⊥"
+pretty :: Type -> Text
+pretty Undefined = "?"
+pretty Unit = "Unit"
+pretty Bool = "Bool"
+pretty Int = "Int"
+pretty Float = "Float"
+pretty Function{parameterTypes, returnType} = "(" <> Text.intercalate ", " (pretty <$> parameterTypes) <> ") → " <> pretty returnType
+pretty Unknown{name} = name
+pretty Error = "⊥"
 
 
 areCompatible :: Type -> Type -> Bool

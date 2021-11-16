@@ -1,3 +1,3 @@
-module CallTarget (Internal.CallTarget (..)) where
+module CallTarget (CallTarget (..)) where
 
-import qualified Syntax.Internal as Internal
+import Syntax.Internal

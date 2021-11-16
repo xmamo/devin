@@ -1,11 +1,11 @@
 module Main (main) where
 
-import qualified GI.GLib as GLib
+import System.Environment
 
 import qualified "devin" Main as Devin
 
 
 main :: IO ()
 main = do
-  GLib.setenv "LC_ALL" "C" True
+  setEnv "LC_ALL" "C"
   Devin.main

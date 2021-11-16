@@ -1,5 +1,5 @@
 module Typers (
-  checkDeclarations,
+  checkDevin,
   checkStatement,
   checkVariable
 ) where
@@ -11,296 +11,287 @@ import Data.Functor.Classes
 import Data.Traversable
 
 import Data.Map ((!?))
-import qualified Data.Map as Map
 
 import CallTarget (CallTarget)
 import qualified CallTarget
-import qualified Syntax
-import Type (Type)
-import qualified Type
-import Typer (Typer)
-import qualified Typer
-import qualified Typer.Error as Error
+import Range
+import Syntax
+import Type
+import Typer
+import Typer.Error
 
 
-checkDeclarations :: [Syntax.Declaration] -> Typer [Syntax.Declaration]
-checkDeclarations declarations = do
-  for_ declarations checkDeclaration1
-  for declarations checkDeclaration2
+checkDevin :: Devin -> Typer Devin
+checkDevin devin = do
+  declarations' <- for devin.declarations checkDeclaration1
+  declarations'' <- for declarations' checkDeclaration2
+  pure devin{declarations = declarations''}
 
 
-checkDeclaration1 :: Syntax.Declaration -> Typer ()
-checkDeclaration1 = \case
-  Syntax.VariableDeclaration{} -> pure ()
+checkDeclaration1 :: Declaration -> Typer Declaration
+checkDeclaration1 declaration = case declaration of
+  VariableDeclaration{} -> pure declaration
 
-  Syntax.FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
-    let parameterIds = parameters <&> (._1)
-    parameterTypes <- for parameters \parameter -> checkType parameter._3 <&> (.t)
+  FunctionDeclaration{functionId, parameters, returnInfo} -> do
+    depth <- getDepth
 
-    returnType <- case returnInfo of
-      Just (_, typeId) -> do
-        typeId' <- checkType typeId
-        pure typeId'.t
-
-      Nothing -> pure Type.Unit
-
-    functions <- Typer.getFunctions
-    let (head : tail) = functions
-
-    case head !? functionId.name of
-      Just infos | any (liftEq Type.areCompatible parameterTypes . (._1)) infos ->
-        Typer.report (Error.FunctionRedefinition functionId parameterTypes)
-
-      Just infos -> do
-        depth <- Typer.getDepth
-        let infos' = (parameterTypes, returnType, CallTarget.UserDefined depth parameterIds body) : infos
-        Typer.setFunctions (Map.insert functionId.name infos' head : tail)
-
-      Nothing -> do
-        depth <- Typer.getDepth
-        let infos' = [(parameterTypes, returnType, CallTarget.UserDefined depth parameterIds body)]
-        Typer.setFunctions (Map.insert functionId.name infos' head : tail)
-
-
-checkDeclaration2 :: Syntax.Declaration -> Typer Syntax.Declaration
-checkDeclaration2 declaration = case declaration of
-  Syntax.VariableDeclaration{variableId, right} -> do
-    right' <- checkExpression right
-    Typer.updateVariables (Map.insert variableId.name right'.t)
-    pure declaration{variableId = variableId{t = right'.t}, right = right'}
-
-  Syntax.FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
-    parameters' <- for parameters \(id, colon, typeId) -> do
+    parameters' <- for parameters $ \(id, colon, typeId) -> do
       typeId' <- checkType typeId
       pure (id{t = typeId'.t}, colon, typeId')
 
-    let locals = parameters' <&> (._1)
-
-    (returnType, returnInfo') <- case returnInfo of
+    returnInfo' <- case returnInfo of
       Just (arrow, typeId) -> do
         typeId' <- checkType typeId
-        pure (typeId'.t, Just (arrow, typeId'))
+        pure (Just (arrow, typeId'))
 
-      Nothing -> pure (Type.Unit, Nothing)
+      Nothing -> pure Nothing
 
-    let functionId' = functionId{t = Type.Function (locals <&> (.t)) returnType}
+    let parameterNames = parameters' <&> (._1.name)
+    let parameterTypes = parameters' <&> (._3.t)
+    let returnType = maybe Unit (._2.t) returnInfo'
+    let functionId' = functionId{t = Function parameterTypes returnType}
+    let callTarget = CallTarget.UserDefined parameterNames depth (start declaration)
+    defineFunction functionId' callTarget
 
-    body' <- Typer.push do
-      let f variables local = Map.insert local.name local.t variables
-      Typer.updateVariables \variables -> foldl' f variables locals
-      Typer.updateFunctions (Map.empty :)
+    pure declaration{functionId = functionId', parameters = parameters', returnInfo = returnInfo'}
+
+
+checkDeclaration2 :: Declaration -> Typer Declaration
+checkDeclaration2 declaration = case declaration of
+  VariableDeclaration{variableId, right} -> do
+    right' <- checkExpression right
+    let variableId' = variableId{t = right'.t}
+    defineVariable variableId'
+    pure declaration{variableId = variableId', right = right'}
+
+  FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
+    let parameterIds = parameters <&> (._1)
+    let parameterTypes = parameters <&> (._3.t)
+    let returnType = maybe Unit ((.t) . snd) returnInfo
+
+    body' <- push $ do
+      for_ parameterIds defineVariable
       checkStatement returnType body
 
-    unless (Type.areCompatible returnType Type.Unit || Syntax.doesReturn body') $
-      Typer.report (Error.MissingReturnPath functionId (locals <&> (.t)))
+    unless (areCompatible returnType Unit || doesReturn body') $
+      report (MissingReturnPath functionId parameterTypes)
 
-    pure declaration{functionId = functionId', parameters = parameters', returnInfo = returnInfo', body = body'}
+    pure declaration{body = body'}
 
 
-checkStatement :: Type -> Syntax.Statement -> Typer Syntax.Statement
+checkStatement :: Type -> Statement -> Typer Statement
 checkStatement expectedType statement = case statement of
-  Syntax.ExpressionStatement{expression} -> do
-    expression' <- checkExpression expression
-    unless (Syntax.hasSideEffects expression) (Typer.report (Error.NoSideEffects statement))
-    pure statement{expression = expression'}
+  ExpressionStatement{value} -> do
+    value' <- checkExpression value
+    pure statement{value = value'}
 
-  Syntax.DeclarationStatement{declaration} -> do
+  DeclarationStatement{declaration} -> do
     checkDeclaration1 declaration
     declaration' <- checkDeclaration2 declaration
     pure statement{declaration = declaration'}
 
-  Syntax.IfStatement{predicate, trueBranch} -> do
+  IfStatement{predicate, trueBranch} -> do
     predicate' <- checkExpression predicate
-    let predicateOk = Type.areCompatible predicate'.t Type.Bool
-    unless predicateOk (Typer.report (Error.InvalidType predicate Type.Bool predicate'.t))
-    trueBranch' <- Typer.push (checkStatement expectedType trueBranch)
+    let predicateOk = areCompatible predicate'.t Bool
+    unless predicateOk (report (InvalidType predicate Bool predicate'.t))
+    trueBranch' <- push (checkStatement expectedType trueBranch)
     pure statement{predicate = predicate', trueBranch = trueBranch'}
 
-  Syntax.IfElseStatement{predicate, trueBranch, falseBranch} -> do
+  IfElseStatement{predicate, trueBranch, falseBranch} -> do
     predicate' <- checkExpression predicate
-    let predicateOk = Type.areCompatible predicate'.t Type.Bool
-    unless predicateOk (Typer.report (Error.InvalidType predicate Type.Bool predicate'.t))
-    trueBranch' <- Typer.push (checkStatement expectedType trueBranch)
-    falseBranch' <- Typer.push (checkStatement expectedType falseBranch)
+    let predicateOk = areCompatible predicate'.t Bool
+    unless predicateOk (report (InvalidType predicate Bool predicate'.t))
+    trueBranch' <- push (checkStatement expectedType trueBranch)
+    falseBranch' <- push (checkStatement expectedType falseBranch)
     pure statement{predicate = predicate', trueBranch = trueBranch', falseBranch = falseBranch'}
 
-  Syntax.WhileStatement{predicate, body} -> do
+  WhileStatement{predicate, body} -> do
     predicate' <- checkExpression predicate
-    let predicateOk = Type.areCompatible predicate'.t Type.Bool
-    unless predicateOk (Typer.report (Error.InvalidType predicate Type.Bool predicate'.t))
-    body' <- Typer.push (checkStatement expectedType body)
+    let predicateOk = areCompatible predicate'.t Bool
+    unless predicateOk (report (InvalidType predicate Bool predicate'.t))
+    body' <- push (checkStatement expectedType body)
     pure statement{predicate = predicate', body = body'}
 
-  Syntax.DoWhileStatement{body, predicate} -> do
-    body' <- Typer.push (checkStatement expectedType body)
+  DoWhileStatement{body, predicate} -> do
+    body' <- push (checkStatement expectedType body)
     predicate' <- checkExpression predicate
-    let predicateOk = Type.areCompatible predicate'.t Type.Bool
-    unless predicateOk (Typer.report (Error.InvalidType predicate Type.Bool predicate'.t))
+    let predicateOk = areCompatible predicate'.t Bool
+    unless predicateOk (report (InvalidType predicate Bool predicate'.t))
     pure statement{body = body', predicate = predicate'}
 
-  Syntax.ReturnStatement{result = Just result} -> do
+  ReturnStatement{result = Just result} -> do
     result' <- checkExpression result
-    let resultOk = Type.areCompatible result'.t expectedType
-    unless resultOk (Typer.report (Error.InvalidReturnType statement expectedType result'.t))
+    let resultOk = areCompatible result'.t expectedType
+    unless resultOk (report (InvalidReturnType statement expectedType result'.t))
     pure statement{result = Just result'}
 
-  Syntax.ReturnStatement{result = Nothing} -> do
-    let expectedUnit = Type.areCompatible expectedType Type.Unit
-    unless expectedUnit (Typer.report (Error.MissingReturnValue statement expectedType))
+  ReturnStatement{result = Nothing} -> do
+    let expectedUnit = areCompatible expectedType Unit
+    unless expectedUnit (report (MissingReturnValue statement expectedType))
     pure statement
 
-  Syntax.BlockStatement{statements} -> Typer.push do
-    for_ statements \case
-      Syntax.DeclarationStatement{declaration} -> checkDeclaration1 declaration
-      _ -> pure ()
+  BlockStatement{statements} -> push $ do
+    statements' <- for statements $ \statement -> case statement of
+      DeclarationStatement{declaration} -> do
+        declaration' <- checkDeclaration1 declaration
+        pure statement{declaration = declaration'}
 
-    statements' <- for statements \statement -> case statement of
-      Syntax.DeclarationStatement{declaration} -> do
+      _ -> pure statement
+
+    statements'' <- for statements' $ \statement -> case statement of
+      DeclarationStatement{declaration} -> do
         declaration' <- checkDeclaration2 declaration
         pure statement{declaration = declaration'}
 
+      _ -> pure statement
+
+    statements''' <- for statements'' $ \statement -> case statement of
+      DeclarationStatement{} -> pure statement
       _ -> checkStatement expectedType statement
 
-    pure statement{statements = statements'}
+    pure statement{statements = statements'''}
 
 
-checkExpression :: Syntax.Expression -> Typer Syntax.Expression
+checkExpression :: Expression -> Typer Expression
 checkExpression expression = case expression of
-  Syntax.IntegerExpression{} -> pure expression{t = Type.Int}
+  IntegerExpression{} -> pure expression{t = Int}
 
-  Syntax.RationalExpression{} -> pure expression{t = Type.Float}
+  RationalExpression{} -> pure expression{t = Float}
 
-  Syntax.VariableExpression{variableId} -> do
+  VariableExpression{variableId} -> do
     variableId' <- checkVariable variableId
     pure expression{variableId = variableId', t = variableId'.t}
 
-  Syntax.CallExpression{targetId, arguments} -> do
+  CallExpression{targetId, arguments} -> do
     arguments' <- for arguments checkExpression
     (targetId', target') <- checkFunction targetId (arguments' <&> (.t))
-    depth <- Typer.getDepth
-    pure expression{targetId = targetId', arguments = arguments', depth, target = target', t = targetId'.t.result}
+    depth <- getDepth
+    pure expression{targetId = targetId', arguments = arguments', depth, target = target', t = targetId'.t.returnType}
 
-  Syntax.UnaryExpression{unary, operand} -> do
+  UnaryExpression{unary, operand} -> do
     operand' <- checkExpression operand
 
     t <- case (unary, operand'.t) of
-      (_, Type.Error) -> pure Type.Error
-      (Syntax.PlusOperator{}, Type.Int) -> pure Type.Int
-      (Syntax.PlusOperator{}, Type.Float) -> pure Type.Float
-      (Syntax.MinusOperator{}, Type.Int) -> pure Type.Int
-      (Syntax.MinusOperator{}, Type.Float) -> pure Type.Float
-      (Syntax.NotOperator{}, Type.Bool) -> pure Type.Bool
-      _ -> Typer.report (Error.InvalidUnary unary operand'.t) $> Type.Error
+      (_, Error) -> pure Error
+      (PlusOperator{}, Int) -> pure Int
+      (PlusOperator{}, Float) -> pure Float
+      (MinusOperator{}, Int) -> pure Int
+      (MinusOperator{}, Float) -> pure Float
+      (NotOperator{}, Bool) -> pure Bool
+      _ -> report (InvalidUnary unary operand'.t) $> Error
 
-    let unary' = unary{t = Type.Function [operand'.t] t}
+    let unary' = unary{t = Function [operand'.t] t}
     pure expression{unary = unary', operand = operand', t}
 
-  Syntax.BinaryExpression{left, binary, right} -> do
+  BinaryExpression{left, binary, right} -> do
     left' <- checkExpression left
     right' <- checkExpression right
 
     t <- case (left'.t, binary, right'.t) of
-      (Type.Error, _, _) -> pure Type.Error
-      (_, _, Type.Error) -> pure Type.Error
-      (Type.Int, Syntax.AddOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.AddOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.SubtractOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.SubtractOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.MultiplyOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.MultiplyOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.DivideOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.DivideOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.ModuloOperator{}, Type.Int) -> pure Type.Int
-      (_, Syntax.EqualOperator{}, _) -> pure Type.Bool
-      (_, Syntax.NotEqualOperator{}, _) -> pure Type.Bool
-      (Type.Int, Syntax.LessOperator{}, Type.Int) -> pure Type.Bool
-      (Type.Float, Syntax.LessOperator{}, Type.Float) -> pure Type.Bool
-      (Type.Int, Syntax.LessOrEqualOperator{}, Type.Int) -> pure Type.Bool
-      (Type.Float, Syntax.LessOrEqualOperator{}, Type.Float) -> pure Type.Bool
-      (Type.Int, Syntax.GreaterOperator{}, Type.Int) -> pure Type.Bool
-      (Type.Float, Syntax.GreaterOperator{}, Type.Float) -> pure Type.Bool
-      (Type.Int, Syntax.GreaterOrEqualOperator{}, Type.Int) -> pure Type.Bool
-      (Type.Float, Syntax.GreaterOrEqualOperator{}, Type.Float) -> pure Type.Bool
-      (Type.Bool, Syntax.AndOperator{}, Type.Bool) -> pure Type.Bool
-      (Type.Bool, Syntax.OrOperator{}, Type.Bool) -> pure Type.Bool
-      _ -> Typer.report (Error.InvalidBinary binary left'.t right'.t) $> Type.Error
+      (Error, _, _) -> pure Error
+      (_, _, Error) -> pure Error
+      (Int, AddOperator{}, Int) -> pure Int
+      (Float, AddOperator{}, Float) -> pure Float
+      (Int, SubtractOperator{}, Int) -> pure Int
+      (Float, SubtractOperator{}, Float) -> pure Float
+      (Int, MultiplyOperator{}, Int) -> pure Int
+      (Float, MultiplyOperator{}, Float) -> pure Float
+      (Int, DivideOperator{}, Int) -> pure Int
+      (Float, DivideOperator{}, Float) -> pure Float
+      (Int, ModuloOperator{}, Int) -> pure Int
+      (_, EqualOperator{}, _) -> pure Bool
+      (_, NotEqualOperator{}, _) -> pure Bool
+      (Int, LessOperator{}, Int) -> pure Bool
+      (Float, LessOperator{}, Float) -> pure Bool
+      (Int, LessOrEqualOperator{}, Int) -> pure Bool
+      (Float, LessOrEqualOperator{}, Float) -> pure Bool
+      (Int, GreaterOperator{}, Int) -> pure Bool
+      (Float, GreaterOperator{}, Float) -> pure Bool
+      (Int, GreaterOrEqualOperator{}, Int) -> pure Bool
+      (Float, GreaterOrEqualOperator{}, Float) -> pure Bool
+      (Bool, AndOperator{}, Bool) -> pure Bool
+      (Bool, OrOperator{}, Bool) -> pure Bool
+      _ -> report (InvalidBinary binary left'.t right'.t) $> Error
 
-    let binary' = binary{t = Type.Function [left'.t, right'.t] t}
+    let binary' = binary{t = Function [left'.t, right'.t] t}
     pure expression{left = left', binary = binary', right = right', t}
 
-  Syntax.AssignExpression{variableId, assign, right} -> do
+  AssignExpression{variableId, assign, right} -> do
     variableId' <- checkVariable variableId
     right' <- checkExpression right
 
     t <- case (variableId'.t, assign, right'.t) of
-      (Type.Error, _, _) -> pure Type.Error
-      (_, _, Type.Error) -> pure Type.Error
-      (Type.Unit, Syntax.AssignOperator{}, Type.Unit) -> pure Type.Unit
-      (Type.Bool, Syntax.AssignOperator{}, Type.Bool) -> pure Type.Bool
-      (Type.Int, Syntax.AssignOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.AssignOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.AddAssignOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.AddAssignOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.SubtractAssignOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.SubtractAssignOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.MultiplyAssignOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.MultiplyAssignOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.DivideAssignOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.DivideAssignOperator{}, Type.Float) -> pure Type.Float
-      (Type.Int, Syntax.ModuloAssignOperator{}, Type.Int) -> pure Type.Int
-      (Type.Float, Syntax.ModuloAssignOperator{}, Type.Float) -> pure Type.Float
-      _ -> Typer.report (Error.InvalidAssign assign variableId'.t right'.t) $> Type.Error
+      (Error, _, _) -> pure Error
+      (_, _, Error) -> pure Error
+      (Unit, AssignOperator{}, Unit) -> pure Unit
+      (Bool, AssignOperator{}, Bool) -> pure Bool
+      (Int, AssignOperator{}, Int) -> pure Int
+      (Float, AssignOperator{}, Float) -> pure Float
+      (Int, AddAssignOperator{}, Int) -> pure Int
+      (Float, AddAssignOperator{}, Float) -> pure Float
+      (Int, SubtractAssignOperator{}, Int) -> pure Int
+      (Float, SubtractAssignOperator{}, Float) -> pure Float
+      (Int, MultiplyAssignOperator{}, Int) -> pure Int
+      (Float, MultiplyAssignOperator{}, Float) -> pure Float
+      (Int, DivideAssignOperator{}, Int) -> pure Int
+      (Float, DivideAssignOperator{}, Float) -> pure Float
+      (Int, ModuloAssignOperator{}, Int) -> pure Int
+      (Float, ModuloAssignOperator{}, Float) -> pure Float
+      _ -> report (InvalidAssign assign variableId'.t right'.t) $> Error
 
-    let assign' = assign{t = Type.Function [variableId'.t, right'.t] t}
+    let assign' = assign{t = Function [variableId'.t, right'.t] t}
     pure expression{variableId = variableId', assign = assign', right = right', t = right'.t}
 
-  Syntax.ParenthesizedExpression{inner} -> do
+  ParenthesizedExpression{inner} -> do
     inner' <- checkExpression inner
     pure expression{inner = inner', t = inner'.t}
 
 
-checkType :: Syntax.Identifier -> Typer Syntax.Identifier
+checkType :: Identifier -> Typer Identifier
 checkType typeId = do
-  types <- Typer.getTypes
+  types <- getTypes
 
   case types !? typeId.name of
     Just t -> pure typeId{t}
 
     Nothing -> do
-      Typer.report (Error.UnknownType typeId)
-      Typer.setTypes (Map.insert typeId.name (Type.Unknown typeId.name) types)
-      pure typeId{t = Type.Unknown typeId.name}
+      report (UnknownType typeId)
+      let typeId' = typeId{t = Unknown typeId.name}
+      defineType typeId'
+      pure typeId'
 
 
-checkVariable :: Syntax.Identifier -> Typer Syntax.Identifier
+checkVariable :: Identifier -> Typer Identifier
 checkVariable variableId = do
-  variables <- Typer.getVariables
+  variables <- getVariables
 
   case variables !? variableId.name of
     Just t -> pure variableId{t}
 
     Nothing -> do
-      Typer.report (Error.UnknownVariable variableId)
-      Typer.setVariables (Map.insert variableId.name Type.Error variables)
-      pure variableId{t = Type.Error}
+      report (UnknownVariable variableId)
+      let variableId' = variableId{t = Error}
+      defineVariable variableId'
+      pure variableId'
 
 
-checkFunction :: Syntax.Identifier -> [Type] -> Typer (Syntax.Identifier, CallTarget)
-checkFunction targetId parameterTypes = go =<< Typer.getFunctions
+checkFunction :: Identifier -> [Type] -> Typer (Identifier, CallTarget)
+checkFunction targetId parameterTypes = go =<< getFunctions
   where
     go [] = do
-      Typer.updateFunctions \(head : tail) ->
-        Map.insert targetId.name [(parameterTypes, Type.Error, CallTarget.Undefined)] head : tail
+      report (UnknownFunction targetId parameterTypes)
+      let targetId' = targetId{t = Function parameterTypes Error}
+      defineFunction targetId' CallTarget.Undefined
+      pure (targetId', CallTarget.Undefined)
 
-      Typer.report (Error.UnknownFunction targetId parameterTypes)
-      pure (targetId{t = Type.Function parameterTypes Type.Error}, CallTarget.Undefined)
+    go (current : parents) = do
+      let info = current !? targetId.name
 
-    go (head : tail) =
-      case find (liftEq Type.areCompatible parameterTypes . (._1)) =<< head !? targetId.name of
-        Just _ | Type.Error `elem` parameterTypes ->
-          pure (targetId{t = Type.Function parameterTypes Type.Error}, CallTarget.Undefined)
+      case find (\i -> liftEq areCompatible parameterTypes i._1) =<< info of
+        Just _ | Error `elem` parameterTypes ->
+          pure (targetId{t = Function parameterTypes Error}, CallTarget.Undefined)
 
         Just (_, returnType, target) ->
-          pure (targetId{t = Type.Function parameterTypes returnType}, target)
+          pure (targetId{t = Function parameterTypes returnType}, target)
 
-        Nothing -> go tail
+        Nothing -> go parents

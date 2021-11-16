@@ -1,45 +1,48 @@
 module Evaluator.Internal (
+  Evaluator (..),
   Configuration (..),
-  EvaluatorT (..)
 ) where
-
-import Data.Functor
 
 import Control.Monad.Trans.Class
 
-import Evaluator.State (State)
+import Evaluator.State
+import Syntax
 
 
-newtype EvaluatorT m a = EvaluatorT {runT :: Configuration m -> State -> m (a, State)}
+newtype Evaluator m a =
+  Evaluator {runEvaluator :: Configuration m -> State -> m (a, State)}
   deriving Functor
 
 
 data Configuration m = Configuration {
-  beforeStatement :: EvaluatorT m (),
-  afterStatement :: EvaluatorT m (),
-  beforePredicate :: EvaluatorT m (),
-  afterPredicate :: EvaluatorT m ()
+  root :: Devin,
+  beforeStatement :: Statement -> Evaluator m (),
+  afterStatement :: Statement -> Evaluator m (),
+  beforeExpression :: Expression -> Evaluator m (),
+  afterExpression :: Expression -> Evaluator m ()
 }
 
 
-instance Monad m => Applicative (EvaluatorT m) where
-  pure a = EvaluatorT \_ state -> pure (a, state)
+instance Monad m => Applicative (Evaluator m) where
+  pure x = Evaluator $ \_ state -> pure (x, state)
 
-  evaluator1 <*> evaluator2 = EvaluatorT \configuration state -> do
-    (f, state') <- runT evaluator1 configuration state
-    (x, state'') <- runT evaluator2 configuration state'
+  evaluator1 <*> evaluator2 = Evaluator $ \configuration state -> do
+    (f, state') <- runEvaluator evaluator1 configuration state
+    (x, state'') <- runEvaluator evaluator2 configuration state'
     pure (f x, state'')
 
 
-instance Monad m => Monad (EvaluatorT m) where
-  evaluator >>= f = EvaluatorT \configuration state -> do
-    (x, state') <- runT evaluator configuration state
-    runT (f x) configuration state'
+instance Monad m => Monad (Evaluator m) where
+  evaluator >>= f = Evaluator $ \configuration state -> do
+    (x, state') <- runEvaluator evaluator configuration state
+    runEvaluator (f x) configuration state'
 
 
-instance MonadFail m => MonadFail (EvaluatorT m) where
-  fail string = EvaluatorT \_ _ -> fail string
+instance MonadFail m => MonadFail (Evaluator m) where
+  fail message = Evaluator $ \_ _ -> fail message
 
 
-instance MonadTrans EvaluatorT where
-  lift ma = EvaluatorT \_ input -> ma <&> (, input)
+instance MonadTrans Evaluator where
+  lift mx = Evaluator $ \_ state -> do
+    x <- mx
+    pure (x, state)

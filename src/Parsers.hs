@@ -1,6 +1,6 @@
 module Parsers (
   Parser,
-  declarations,
+  devin,
   declaration,
   statement,
   expression,
@@ -11,55 +11,56 @@ module Parsers (
   comment
 ) where
 
+import Data.Functor
+
 import Control.Monad.Trans.Writer
 
-import Parser (ParserT (ParserT))
-import qualified Parser
-import qualified Syntax
+import Parser hiding (Parser, run)
+import Syntax hiding (declaration)
 
 import qualified Parsers.Internal as Internal
 
 
-type Parser m a = ParserT m (a, [Syntax.Comment])
+type Parser m a = ParserT m (a, [Comment])
 
 
-declarations :: Applicative m => Parser m [Syntax.Declaration]
-declarations = run Internal.declarations
+devin :: Applicative m => Parser m Devin
+devin = run Internal.devin
 
 
-declaration :: Applicative m => Parser m Syntax.Declaration
+declaration :: Applicative m => Parser m Declaration
 declaration = run Internal.declaration
 
 
-statement :: Applicative m => Parser m Syntax.Statement
+statement :: Applicative m => Parser m Statement
 statement = run Internal.statement
 
 
-expression :: Applicative m => Parser m Syntax.Expression
+expression :: Applicative m => Parser m Expression
 expression = run Internal.expression
 
 
-unaryOperator :: Applicative m => Parser m Syntax.UnaryOperator
+unaryOperator :: Applicative m => Parser m UnaryOperator
 unaryOperator = run Internal.unaryOperator
 
 
-binaryOperator :: Applicative m => Parser m Syntax.BinaryOperator
+binaryOperator :: Applicative m => Parser m BinaryOperator
 binaryOperator = run Internal.binaryOperator
 
 
-assignOperator :: Applicative m => Parser m Syntax.AssignOperator
+assignOperator :: Applicative m => Parser m AssignOperator
 assignOperator = run Internal.assignOperator
 
 
-identifier :: Applicative m => Parser m Syntax.Identifier
+identifier :: Applicative m => Parser m Identifier
 identifier = run Internal.identifier
 
 
-comment :: Applicative m => Parser m Syntax.Comment
+comment :: Applicative m => Parser m Comment
 comment = run Internal.comment
 
 
 run :: Applicative m => Internal.Parser a -> Parser m a
-run parser = ParserT \input ->
-  let (result, comments) = runWriter (Parser.runT parser input)
-   in pure ((, comments) <$> result)
+run parser = ParserT $ \input -> do
+  let (result, comments) = runWriter (runT parser input)
+  pure (result <&> (, comments))

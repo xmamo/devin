@@ -1,206 +1,230 @@
 module Evaluators (
+  evaluateDevin,
   evaluateDeclaration,
   evaluateStatement,
   evaluateExpression
 ) where
 
 import Control.Monad
+import Data.Foldable
 import Data.Maybe
 import Data.Traversable
 
+import Control.Monad.Extra
+
 import qualified CallTarget
-import Evaluator (EvaluatorT)
-import qualified Evaluator
-import Evaluator.Value (Value)
-import qualified Evaluator.Value as Value
-import Evaluator.Variable (Variable)
-import qualified Evaluator.Variable as Variable
-import qualified Syntax
+import Evaluator
+import Range
+import Syntax
+import Value
 
 
-evaluateDeclaration :: MonadFail m => Syntax.Declaration -> EvaluatorT m ()
-evaluateDeclaration = \case
-  Syntax.VariableDeclaration{variableId, right} -> do
+evaluateDevin :: Monad m => Devin -> Evaluator m ()
+evaluateDevin devin = void $ push 1 $ do
+  for_ devin.declarations evaluateDeclaration
+  push 1 (evaluateStatement (fromJust (findDeclaration f devin)).body)
+  where
+    f FunctionDeclaration{functionId} | functionId.name == "main" = True
+    f _ = False
+
+
+evaluateDeclaration :: Monad m => Declaration -> Evaluator m ()
+evaluateDeclaration declaration = case declaration of
+  VariableDeclaration{variableId, right} -> do
+    configuration <- getConfiguration
+    configuration.beforeExpression right
     value <- evaluateExpression right
-    Evaluator.setVariable variableId.name (Variable.ByValue value)
+    configuration.afterExpression right
+    defineVariable variableId.name value
 
-  Syntax.FunctionDeclaration{} -> pure ()
+  FunctionDeclaration{} -> pure ()
 
 
-evaluateStatement :: MonadFail m => Syntax.Statement -> EvaluatorT m (Maybe Value)
+evaluateStatement :: Monad m => Statement -> Evaluator m (Maybe Value)
 evaluateStatement statement = case statement of
-  Syntax.DeclarationStatement{declaration} -> do
+  DeclarationStatement{declaration} -> do
     evaluateDeclaration declaration
     pure Nothing
 
-  Syntax.ExpressionStatement{expression} -> do
-    configuration <- Evaluator.getConfiguration
-    configuration.beforeStatement
-    evaluateExpression expression
-    configuration.afterStatement
+  ExpressionStatement{value} -> do
+    configuration <- getConfiguration
+    configuration.beforeStatement statement
+    evaluateExpression value
+    configuration.afterStatement statement
     pure Nothing
 
-  Syntax.IfStatement{predicate, trueBranch} -> do
-    configuration <- Evaluator.getConfiguration
-    configuration.beforePredicate
-    Value.Bool predicateValue <- evaluateExpression predicate
-    configuration.afterPredicate
-    when predicateValue (void (Evaluator.push (evaluateStatement trueBranch)))
-    pure Nothing
+  IfStatement{predicate, trueBranch} -> do
+    configuration <- getConfiguration
+    configuration.beforeExpression predicate
+    predicateValue <- evaluateExpression predicate
+    configuration.afterExpression predicate
 
-  Syntax.IfElseStatement{predicate, trueBranch, falseBranch} -> do
-    configuration <- Evaluator.getConfiguration
-    configuration.beforePredicate
-    Value.Bool predicateValue <- evaluateExpression predicate
-    configuration.afterPredicate
+    case predicateValue of
+      Bool True -> push 1 (evaluateStatement trueBranch)
+      Bool False -> pure Nothing
+      _ -> undefined
 
-    if predicateValue then
-      Evaluator.push (evaluateStatement trueBranch)
-    else
-      Evaluator.push (evaluateStatement falseBranch)
+  IfElseStatement{predicate, trueBranch, falseBranch} -> do
+    configuration <- getConfiguration
+    configuration.beforeExpression predicate
+    predicateValue <- evaluateExpression predicate
+    configuration.afterExpression predicate
 
-  Syntax.WhileStatement{predicate, body} -> do
-    configuration <- Evaluator.getConfiguration
-    configuration.beforePredicate
-    Value.Bool predicateValue <- evaluateExpression predicate
-    configuration.afterPredicate
-    when predicateValue (void (Evaluator.push (evaluateStatement body *> evaluateStatement statement)))
-    pure Nothing
+    case predicateValue of
+      Bool True -> push 1 (evaluateStatement trueBranch)
+      Bool False -> push 1 (evaluateStatement falseBranch)
+      _ -> undefined
 
-  Syntax.DoWhileStatement{body, predicate} -> do
-    configuration <- Evaluator.getConfiguration
-    evaluateStatement body
-    configuration.beforePredicate
-    Value.Bool predicateValue <- evaluateExpression predicate
-    configuration.afterPredicate
-    when predicateValue (void (Evaluator.push (evaluateStatement statement)))
-    pure Nothing
+  WhileStatement{predicate, body} -> do
+    configuration <- getConfiguration
+    configuration.beforeExpression predicate
+    predicateValue <- evaluateExpression predicate
+    configuration.afterExpression predicate
 
-  Syntax.ReturnStatement{result = Just result} -> do
-    configuration <- Evaluator.getConfiguration
-    configuration.beforeStatement
+    case predicateValue of
+      Bool True -> do
+        push 1 (evaluateStatement body)
+        evaluateStatement statement
+
+      Bool False -> pure Nothing
+
+      _ -> undefined
+
+  DoWhileStatement{body, predicate} -> do
+    value <- push 1 (evaluateStatement body)
+
+    case value of
+      Just value -> pure (Just value)
+
+      Nothing -> do
+        configuration <- getConfiguration
+        configuration.beforeExpression predicate
+        predicateValue <- evaluateExpression predicate
+        configuration.afterExpression predicate
+
+        case predicateValue of
+          Bool True -> evaluateStatement statement
+          Bool False -> pure Nothing
+          _ -> undefined
+
+  ReturnStatement{result = Just result} -> do
+    configuration <- getConfiguration
+    configuration.beforeStatement statement
     value <- evaluateExpression result
-    configuration.afterStatement
+    configuration.afterStatement statement
     pure (Just value)
 
-  Syntax.ReturnStatement{result = Nothing} -> do
-    configuration <- Evaluator.getConfiguration
-    configuration.beforeStatement
-    configuration.afterStatement
-    pure (Just Value.Unit)
+  ReturnStatement{result = Nothing} -> do
+    configuration <- getConfiguration
+    configuration.beforeStatement statement
+    configuration.afterStatement statement
+    pure (Just Unit)
 
-  Syntax.BlockStatement{statements} -> Evaluator.push (go statements)
-    where
-      go [] = pure Nothing
-
-      go (statement : statements) = evaluateStatement statement >>= \case
-        Just value -> pure (Just value)
-        Nothing -> go statements
+  BlockStatement{statements} ->
+    push 1 (firstJustM evaluateStatement statements)
 
 
-evaluateExpression :: MonadFail m => Syntax.Expression -> EvaluatorT m Value
-evaluateExpression = \case
-  Syntax.IntegerExpression{integer} -> pure (Value.Int (fromInteger integer))
+evaluateExpression :: Monad m => Expression -> Evaluator m Value
+evaluateExpression expression = case expression of
+  IntegerExpression{integer} -> pure (Int (fromInteger integer))
 
-  Syntax.RationalExpression{rational} -> pure (Value.Float (fromRational rational))
+  RationalExpression{rational} -> pure (Float (fromRational rational))
 
-  Syntax.VariableExpression{variableId} ->
-    getValue =<< Evaluator.getVariable variableId.name
+  VariableExpression{variableId} -> getVariable variableId.name
 
-  Syntax.CallExpression{arguments, depth, target} -> do
+  CallExpression{arguments, depth, target} -> do
     values <- for arguments evaluateExpression
 
     case (target, values) of
-      (CallTarget.IntToInt, value : _) -> pure value
+      (CallTarget.IntToInt, Int x : _) -> pure (Int x)
 
-      (CallTarget.FloatToInt, Value.Float value : _) -> pure (Value.Int (round value))
+      (CallTarget.FloatToInt, Float x : _) -> pure (Int (round x))
 
-      (CallTarget.IntToFloat, Value.Int value : _) -> pure (Value.Float (fromIntegral value))
+      (CallTarget.IntToFloat, Int x : _) -> pure (Float (fromIntegral x))
 
-      (CallTarget.FloatToFloat, value : _) -> pure value
+      (CallTarget.FloatToFloat, Float x : _) -> pure (Float x)
 
-      (CallTarget.UserDefined depth' parameters body, _) ->
-        Evaluator.pop (depth - depth') $ Evaluator.push do
-          zipWithM_ (\p v -> Evaluator.setVariable p.name (Variable.ByValue v)) parameters values
-          fromJust <$> evaluateStatement body
+      (CallTarget.UserDefined parameters depth' position, _) ->
+        push (depth - depth' + 1) $ do
+          root <- getRoot
+
+          case findDeclaration (\d -> start d == position) root of
+            Just FunctionDeclaration{body} -> do
+              zipWithM_ defineVariable parameters values
+              value <- evaluateStatement body
+              pure (fromMaybe Unit value)
+
+            _ -> undefined
 
       _ -> undefined
 
-  Syntax.UnaryExpression{unary, operand} -> do
+  UnaryExpression{unary, operand} -> do
     operandValue <- evaluateExpression operand
 
-    pure case (unary, operandValue) of
-      (Syntax.PlusOperator{}, _) -> operandValue
-      (Syntax.MinusOperator{}, Value.Int value) -> Value.Int (- value)
-      (Syntax.MinusOperator{}, Value.Float value) -> Value.Float (- value)
-      (Syntax.NotOperator{}, Value.Bool value) -> Value.Bool (not value)
+    case (unary, operandValue) of
+      (PlusOperator{}, Int x) -> pure (Int x)
+      (PlusOperator{}, Float x) -> pure (Float x)
+      (MinusOperator{}, Int x) -> pure (Int (negate x))
+      (MinusOperator{}, Float x) -> pure (Float (negate x))
+      (NotOperator{}, Bool x) -> pure (Bool (not x))
       _ -> undefined
 
-  Syntax.BinaryExpression{left, binary, right} -> do
+  BinaryExpression{left, binary, right} -> do
     leftValue <- evaluateExpression left
     rightValue <- evaluateExpression right
 
-    pure case (leftValue, binary, rightValue) of
-      (Value.Int left, Syntax.AddOperator{}, Value.Int right) -> Value.Int (left + right)
-      (Value.Float left, Syntax.AddOperator{}, Value.Float right) -> Value.Float (left + right)
-      (Value.Int left, Syntax.SubtractOperator{}, Value.Int right) -> Value.Int (left - right)
-      (Value.Float left, Syntax.SubtractOperator{}, Value.Float right) -> Value.Float (left - right)
-      (Value.Int left, Syntax.MultiplyOperator{}, Value.Int right) -> Value.Int (left * right)
-      (Value.Float left, Syntax.MultiplyOperator{}, Value.Float right) -> Value.Float (left * right)
-      (Value.Int left, Syntax.DivideOperator{}, Value.Int right) -> Value.Int (left `div` right)
-      (Value.Float left, Syntax.DivideOperator{}, Value.Float right) -> Value.Float (left / right)
-      (Value.Int left, Syntax.ModuloOperator{}, Value.Int right) -> Value.Int (left `mod` right)
-      (Value.Unit, Syntax.EqualOperator{}, Value.Unit) -> Value.Bool True
-      (Value.Int left, Syntax.EqualOperator{}, Value.Int right) -> Value.Bool (left == right)
-      (Value.Float left, Syntax.EqualOperator{}, Value.Float right) -> Value.Bool (left == right)
-      (_, Syntax.EqualOperator{}, _) -> Value.Bool False
-      (Value.Unit, Syntax.NotEqualOperator{}, Value.Unit) -> Value.Bool False
-      (Value.Int left, Syntax.NotEqualOperator{}, Value.Int right) -> Value.Bool (left /= right)
-      (Value.Float left, Syntax.NotEqualOperator{}, Value.Float right) -> Value.Bool (left /= right)
-      (_, Syntax.NotEqualOperator{}, _) -> Value.Bool True
-      (Value.Int left, Syntax.LessOperator{}, Value.Int right) -> Value.Bool (left < right)
-      (Value.Float left, Syntax.LessOperator{}, Value.Float right) -> Value.Bool (left < right)
-      (Value.Int left, Syntax.LessOrEqualOperator{}, Value.Int right) -> Value.Bool (left <= right)
-      (Value.Float left, Syntax.LessOrEqualOperator{}, Value.Float right) -> Value.Bool (left <= right)
-      (Value.Int left, Syntax.GreaterOperator{}, Value.Int right) -> Value.Bool (left > right)
-      (Value.Float left, Syntax.GreaterOperator{}, Value.Float right) -> Value.Bool (left > right)
-      (Value.Int left, Syntax.GreaterOrEqualOperator{}, Value.Int right) -> Value.Bool (left >= right)
-      (Value.Float left, Syntax.GreaterOrEqualOperator{}, Value.Float right) -> Value.Bool (left >= right)
-      (Value.Bool left, Syntax.AndOperator{}, Value.Bool right) -> Value.Bool (left && right)
-      (Value.Bool left, Syntax.OrOperator{}, Value.Bool right) -> Value.Bool (left || right)
+    case (leftValue, binary, rightValue) of
+      (Int x, AddOperator{}, Int y) -> pure (Int (x + y))
+      (Float x, AddOperator{}, Float y) -> pure (Float (x + y))
+      (Int x, SubtractOperator{}, Int y) -> pure (Int (x - y))
+      (Float x, SubtractOperator{}, Float y) -> pure (Float (x - y))
+      (Int x, MultiplyOperator{}, Int y) -> pure (Int (x * y))
+      (Float x, MultiplyOperator{}, Float y) -> pure (Float (x * y))
+      (Int x, DivideOperator{}, Int y) -> pure (Int (x `div` y))
+      (Float x, DivideOperator{}, Float y) -> pure (Float (x / y))
+      (Int x, ModuloOperator{}, Int y) -> pure (Int (x `mod` y))
+      (Unit, EqualOperator{}, Unit) -> pure (Bool True)
+      (Int x, EqualOperator{}, Int y) -> pure (Bool (x == y))
+      (Float x, EqualOperator{}, Float y) -> pure (Bool (x == y))
+      (_, EqualOperator{}, _) -> pure (Bool False)
+      (Unit, NotEqualOperator{}, Unit) -> pure (Bool False)
+      (Int x, NotEqualOperator{}, Int y) -> pure (Bool (x /= y))
+      (Float x, NotEqualOperator{}, Float y) -> pure (Bool (x /= y))
+      (_, NotEqualOperator{}, _) -> pure (Bool True)
+      (Int x, LessOperator{}, Int y) -> pure (Bool (x < y))
+      (Float x, LessOperator{}, Float y) -> pure (Bool (x < y))
+      (Int x, LessOrEqualOperator{}, Int y) -> pure (Bool (x <= y))
+      (Float x, LessOrEqualOperator{}, Float y) -> pure (Bool (x <= y))
+      (Int x, GreaterOperator{}, Int y) -> pure (Bool (x > y))
+      (Float x, GreaterOperator{}, Float y) -> pure (Bool (x > y))
+      (Int x, GreaterOrEqualOperator{}, Int y) -> pure (Bool (x >= y))
+      (Float x, GreaterOrEqualOperator{}, Float y) -> pure (Bool (x >= y))
+      (Bool x, AndOperator{}, Bool y) -> pure (Bool (x && y))
+      (Bool x, OrOperator{}, Bool y) -> pure (Bool (x || y))
       _ -> undefined
 
-  Syntax.AssignExpression{variableId, assign, right} -> do
-    value <- evaluateExpression right
-    variable <- Evaluator.getVariable variableId.name
+  AssignExpression{variableId, assign, right} -> do
+    rightValue <- evaluateExpression right
 
-    value' <- case assign of
-      Syntax.AssignOperator{} -> pure value
+    value <- case assign of
+      AssignOperator{} -> pure rightValue
 
       _ -> do
-        variableValue <- getValue variable
+        leftValue <- getVariable variableId.name
 
-        pure case (value, assign, variableValue) of
-          (Value.Int left, Syntax.AddAssignOperator{}, Value.Int right) -> Value.Int (left + right)
-          (Value.Float left, Syntax.AddAssignOperator{}, Value.Float right) -> Value.Float (left + right)
-          (Value.Int left, Syntax.SubtractAssignOperator{}, Value.Int right) -> Value.Int (left - right)
-          (Value.Float left, Syntax.SubtractAssignOperator{}, Value.Float right) -> Value.Float (left - right)
-          (Value.Int left, Syntax.MultiplyAssignOperator{}, Value.Int right) -> Value.Int (left * right)
-          (Value.Float left, Syntax.MultiplyAssignOperator{}, Value.Float right) -> Value.Float (left * right)
-          (Value.Int left, Syntax.DivideAssignOperator{}, Value.Int right) -> Value.Int (left `div` right)
-          (Value.Float left, Syntax.DivideAssignOperator{}, Value.Float right) -> Value.Float (left / right)
-          (Value.Int left, Syntax.ModuloAssignOperator{}, Value.Int right) -> Value.Int (left `mod` right)
+        case (leftValue, assign, rightValue) of
+          (Int x, AddAssignOperator{}, Int y) -> pure (Int (x + y))
+          (Float x, AddAssignOperator{}, Float y) -> pure (Float (x + y))
+          (Int x, SubtractAssignOperator{}, Int y) -> pure (Int (x - y))
+          (Float x, SubtractAssignOperator{}, Float y) -> pure (Float (x - y))
+          (Int x, MultiplyAssignOperator{}, Int y) -> pure (Int (x * y))
+          (Float x, MultiplyAssignOperator{}, Float y) -> pure (Float (x * y))
+          (Int x, DivideAssignOperator{}, Int y) -> pure (Int (x `div` y))
+          (Float x, DivideAssignOperator{}, Float y) -> pure (Float (x / y))
+          (Int x, ModuloAssignOperator{}, Int y) -> pure (Int (x `mod` y))
           _ -> undefined
 
-    case variable of
-      Variable.ByValue _ -> Evaluator.setVariable variableId.name (Variable.ByValue value')
-      Variable.ByReference name -> Evaluator.setVariable name (Variable.ByValue value')
+    setVariable variableId.name value
+    pure value
 
-    pure value'
-
-  Syntax.ParenthesizedExpression{inner} -> evaluateExpression inner
-
-
-getValue :: Monad m => Variable -> EvaluatorT m Value
-getValue (Variable.ByValue value) = pure value
-getValue (Variable.ByReference name) = getValue =<< Evaluator.getVariable name
+  ParenthesizedExpression{inner} -> evaluateExpression inner

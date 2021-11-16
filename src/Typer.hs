@@ -1,31 +1,31 @@
 module Typer (
   Typer (..),
-  run,
+  runTyper,
   getDepth,
   getTypes,
   getVariables,
   getFunctions,
-  setTypes,
-  setVariables,
-  setFunctions,
-  updateTypes,
-  updateFunctions,
-  updateVariables,
-  report,
-  push
+  defineType,
+  defineVariable,
+  defineFunction,
+  push,
+  report
 ) where
 
+import Data.Functor.Classes
 import Data.List
 
 import Data.Text (Text)
 
-import Data.Map (Map)
+import Data.Map (Map, (!?))
+import qualified Data.Map as Map
 
 import CallTarget (CallTarget)
-import qualified Span
-import Type (Type)
-import Typer.Environment (Environment)
-import Typer.Error (Error)
+import Range
+import Syntax
+import Type
+import Typer.Environment
+import Typer.Error
 
 
 newtype Typer a = Typer (Environment -> (a, Environment, [Error]))
@@ -33,73 +33,86 @@ newtype Typer a = Typer (Environment -> (a, Environment, [Error]))
 
 
 instance Applicative Typer where
-  pure a = Typer \environment -> (a, environment, [])
+  pure x = Typer $ \environment -> (x, environment, [])
 
-  Typer check1 <*> Typer check2 = Typer \environment ->
+  Typer check1 <*> Typer check2 = Typer $ \environment -> do
     let (f, environment', errors1) = check1 environment
-        (a, environment'', errors2) = check2 environment'
-     in (f a, environment'', errors2 ++ errors1)
+    let (x, environment'', errors2) = check2 environment'
+    (f x, environment'', errors2 ++ errors1)
 
 
 instance Monad Typer where
-  Typer check1 >>= f = Typer \environment ->
+  Typer check1 >>= f = Typer $ \environment -> do
     let (x1, environment', errors1) = check1 environment
-        Typer check2 = f x1
-        (x2, environment'', errors2) = check2 environment'
-     in (x2, environment'', errors2 ++ errors1)
+    let Typer check2 = f x1
+    let (x2, environment'', errors2) = check2 environment'
+    (x2, environment'', errors2 ++ errors1)
 
 
-run :: Typer a -> Environment -> (a, Environment, [Error])
-run (Typer check) environment =
+runTyper :: Typer a -> Environment -> (a, Environment, [Error])
+runTyper (Typer check) environment = do
   let (a, environment', errors) = check environment
-   in (a, environment', sortOn Span.start errors)
+  (a, environment', sortOn start errors)
 
 
 getDepth :: Typer Integer
-getDepth = Typer \environment -> (environment.depth, environment, [])
+getDepth = Typer $ \environment ->
+  (environment.depth, environment, [])
 
 
 getTypes :: Typer (Map Text Type)
-getTypes = Typer \environment -> (environment.types, environment, [])
+getTypes = Typer $ \environment ->
+  (environment.types, environment, [])
 
 
 getVariables :: Typer (Map Text Type)
-getVariables = Typer \environment -> (environment.variables, environment, [])
+getVariables = Typer $ \environment ->
+  (environment.variables, environment, [])
 
 
 getFunctions :: Typer [Map Text [([Type], Type, CallTarget)]]
-getFunctions = Typer \environment -> (environment.functions, environment, [])
+getFunctions = Typer $ \environment ->
+  (environment.functions, environment, [])
 
 
-setTypes :: Map Text Type -> Typer ()
-setTypes types = Typer \environment -> ((), environment{types}, [])
+defineType :: Identifier -> Typer ()
+defineType typeId = Typer $ \environment -> do
+  let types' = Map.insert typeId.name typeId.t environment.types
+  ((), environment{types = types'}, [])
 
 
-setVariables :: Map Text Type -> Typer ()
-setVariables variables = Typer \environment -> ((), environment{variables}, [])
+defineVariable :: Identifier -> Typer ()
+defineVariable variableId = Typer $ \environment -> do
+  let variables' = Map.insert variableId.name variableId.t environment.variables
+  ((), environment{variables = variables'}, [])
 
 
-setFunctions :: [Map Text [([Type], Type, CallTarget)]] -> Typer ()
-setFunctions functions = Typer \environment -> ((), environment{functions}, [])
+defineFunction :: Identifier -> CallTarget -> Typer Bool
+defineFunction functionId callTarget = Typer $ \environment -> do
+  let parameterTypes = functionId.t.parameterTypes
+  let returnType = functionId.t.returnType
+  let current : parents = environment.functions
 
+  case current !? functionId.name of
+    Just infos | any (\i -> liftEq areCompatible parameterTypes i._1) infos ->
+      (False, environment, [FunctionRedefinition functionId parameterTypes])
 
-updateTypes :: (Map Text Type -> Map Text Type) -> Typer ()
-updateTypes f = setTypes . f =<< getTypes
+    Just infos -> do
+      let infos' = (parameterTypes, returnType, callTarget) : infos
+      let functions' = Map.insert functionId.name infos' current : parents
+      (True, environment{functions = functions'}, [])
 
-
-updateVariables :: (Map Text Type -> Map Text Type) -> Typer ()
-updateVariables f = setVariables . f =<< getVariables
-
-
-updateFunctions :: ([Map Text [([Type], Type, CallTarget)]] -> [Map Text [([Type], Type, CallTarget)]]) -> Typer ()
-updateFunctions f = setFunctions . f =<< getFunctions
-
-
-report :: Error -> Typer ()
-report error = Typer \environment -> ((), environment, [error])
+    Nothing -> do
+      let infos' = [(parameterTypes, returnType, callTarget)]
+      let functions' = Map.insert functionId.name infos' current : parents
+      (True, environment{functions = functions'}, [])
 
 
 push :: Typer a -> Typer a
-push (Typer check) = Typer \environment ->
+push (Typer check) = Typer $ \environment -> do
   let (a, _, errors) = check environment{depth = environment.depth + 1}
-   in (a, environment, errors)
+  (a, environment, errors)
+
+
+report :: Error -> Typer ()
+report error = Typer $ \environment -> ((), environment, [error])

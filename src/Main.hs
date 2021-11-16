@@ -1,15 +1,21 @@
 module Main (main) where
 
 import Control.Concurrent
-import Control.Monad
-import Control.Monad.IO.Class
 import Data.Foldable
 import Data.Traversable
 import System.Environment
 import System.Exit
+import Control.Monad.IO.Class
+
+import Control.Monad.Extra
+import Data.List.Extra
+
+import Control.Monad.Trans.Class
 
 import Data.Text (Text)
 import qualified Data.Text as Text
+
+import qualified Data.Map as Map
 
 import Data.GI.Base
 import Data.GI.Base.GType
@@ -18,40 +24,43 @@ import qualified GI.Gtk as Gtk
 import qualified Data.GI.Gtk.Threading as Gtk
 import qualified GI.GtkSource as GtkSource
 
-import qualified Helpers
+import Evaluator
+import Evaluators
+import Evaluator.Configuration
+import Helpers
 import qualified Parser
-import Parser.Input (Input (Input))
-import qualified Parser.Result as Result
+import Parser.Input
+import Parser.Result
 import qualified Parsers
-import Span (Span)
-import qualified Span
-import qualified Syntax
+import Range
+import Syntax
 import Type (Type)
 import qualified Type
-import qualified Typer
+import Typer
 import qualified Typer.Environment as Environment
 import qualified Typer.Error as Error
-import qualified Typers
+import Typers
+import Evaluator.State (State)
+import qualified Evaluator.State as State
+import qualified Value
 
 
 main :: IO ()
-main = Gtk.applicationNew Nothing [] >>= \case
-  Just application -> do
-    args <- getArgs
-    Gio.onApplicationActivate application (onActivate application)
-    status <- Gio.applicationRun application (Just args)
-    exitWith (if status == 0 then ExitSuccess else ExitFailure (fromIntegral status))
-
-  Nothing -> pure ()
+main = whenJustM (Gtk.applicationNew Nothing []) $ \application -> do
+  args <- getArgs
+  Gio.onApplicationActivate application (onActivate application)
+  status <- Gio.applicationRun application (Just args)
+  exitWith (if status == 0 then ExitSuccess else ExitFailure (fromIntegral status))
 
 
 onActivate :: Gtk.IsApplication a => a -> Gio.ApplicationActivateCallback
 onActivate application = do
-  let noTextTagTable = Nothing :: Maybe Gtk.TextTagTable
+  let noTable = Nothing :: Maybe Gtk.TextTagTable
   let noAdjustment = Nothing :: Maybe Gtk.Adjustment
 
   let styles =
         [
+          ("highlightNode", "search-match"),
           ("bracket", "bracket-match"),
           ("keyword", "def:keyword"),
           ("identifier", "def:identifier"),
@@ -62,20 +71,34 @@ onActivate application = do
           ("error", "def:error")
         ]
 
-  -- Create defaultLanguage, codeTextBuffer and codeTreeStore, which are needed later:
+  -- Create defaultLanguage, codeBuffer, codeTreeStore, stateListStore and
+  -- cellRenderer, which are needed later:
 
   languageManager <- GtkSource.languageManagerGetDefault
   defaultLanguage <- GtkSource.languageManagerGetLanguage languageManager "def"
 
-  codeTextBuffer <- GtkSource.bufferNew noTextTagTable
-  GtkSource.bufferSetHighlightMatchingBrackets codeTextBuffer False
-  GtkSource.bufferSetHighlightSyntax codeTextBuffer False
+  codeBuffer <- GtkSource.bufferNew noTable
+  GtkSource.bufferSetHighlightMatchingBrackets codeBuffer False
+  GtkSource.bufferSetHighlightSyntax codeBuffer False
 
-  codeTreeStore <- Gtk.treeStoreNew (replicate 3 gtypeString)
+  codeTreeStore <- Gtk.treeStoreNew [gtypeString, gtypeString, gtypeString]
+  stateListStore <- Gtk.listStoreNew [gtypeString, gtypeString]
+
+  cellRenderer <- Gtk.cellRendererTextNew
+  Gtk.setCellRendererTextFamily cellRenderer "monospace"
 
   -- Build the UI:
 
-  codeSourceView <- GtkSource.viewNewWithBuffer codeTextBuffer
+  playButton <- Gtk.buttonNewFromIconName (Just "media-playback-start") 1
+  stepOverButton <- Gtk.buttonNewFromIconName (Just "go-next") 1
+  stepIntoButton <- Gtk.buttonNewFromIconName (Just "go-down") 1
+
+  actionBar <- Gtk.actionBarNew
+  Gtk.actionBarPackStart actionBar playButton
+  Gtk.actionBarPackStart actionBar stepOverButton
+  Gtk.actionBarPackStart actionBar stepIntoButton
+
+  codeSourceView <- GtkSource.viewNewWithBuffer codeBuffer
   Gtk.textViewSetMonospace codeSourceView True
   GtkSource.viewSetAutoIndent codeSourceView True
   GtkSource.viewSetHighlightCurrentLine codeSourceView True
@@ -86,6 +109,11 @@ onActivate application = do
   Gtk.treeViewSetGridLines codeTreeView Gtk.TreeViewGridLinesVertical
   Gtk.treeViewSetEnableSearch codeTreeView False
   Gtk.treeViewSetHeadersVisible codeTreeView False
+
+  stateTreeView <- Gtk.treeViewNewWithModel stateListStore
+  Gtk.treeViewSetGridLines stateTreeView Gtk.TreeViewGridLinesVertical
+  Gtk.treeViewSetEnableSearch stateTreeView False
+  Gtk.treeViewSetHeadersVisible stateTreeView False
 
   logTextView <- Gtk.textViewNew
   Gtk.textViewSetEditable logTextView False
@@ -109,528 +137,621 @@ onActivate application = do
   Gtk.panedPack1 paned2 paned1 True False
   Gtk.panedPack2 paned2 logScrolledWindow False False
 
+  box <- Gtk.boxNew Gtk.OrientationVertical 0
+  Gtk.boxPackStart box actionBar False False 0
+  Gtk.boxPackStart box paned2 True True 0
+
   window <- Gtk.applicationWindowNew application
   Gtk.windowSetTitle window ""
   Gtk.windowSetDefaultSize window 1280 720
-  Gtk.containerAdd window paned2
+  Gtk.containerAdd window box
 
   -- Set up codeSourceView:
 
-  styleScheme <- GtkSource.bufferGetStyleScheme codeTextBuffer
-  tagTable <- Gtk.textBufferGetTagTable codeTextBuffer
+  scheme <- GtkSource.bufferGetStyleScheme codeBuffer
+  tagTable <- Gtk.textBufferGetTagTable codeBuffer
 
-  for_ styles \(tagName, styleId) -> do
+  for_ styles $ \(tagName, styleId) -> do
     tag <- GtkSource.tagNew (Just tagName)
     Gtk.textTagTableAdd tagTable tag
 
-    style <- case (styleScheme, defaultLanguage) of
-      (Just styleScheme, Just language) -> Helpers.getStyle language styleScheme styleId
-      (Just styleScheme, Nothing) -> GtkSource.styleSchemeGetStyle styleScheme styleId
+    style <- case (scheme, defaultLanguage) of
+      (Just scheme, Just language) -> getStyle language scheme styleId
+      (Just scheme, Nothing) -> GtkSource.styleSchemeGetStyle scheme styleId
       (Nothing, _) -> pure Nothing
 
-    case style of
-      Just style -> GtkSource.styleApply style tag
-      Nothing -> pure ()
+    whenJust style $ \style -> GtkSource.styleApply style tag
 
   -- Set up codeTreeView:
 
-  treeSelection <- Gtk.treeViewGetSelection codeTreeView
-  Gtk.treeSelectionSetMode treeSelection Gtk.SelectionModeNone
+  codeSelection <- Gtk.treeViewGetSelection codeTreeView
+  Gtk.treeSelectionSetMode codeSelection Gtk.SelectionModeNone
 
-  cellRenderer <- Gtk.cellRendererTextNew
-  Gtk.setCellRendererTextFamily cellRenderer "monospace"
+  for_ [0 .. 2] $ \column -> do
+    treeColumn <- Gtk.treeViewColumnNew
+    Gtk.treeViewColumnPackStart treeColumn cellRenderer False
+    Gtk.treeViewColumnAddAttribute treeColumn cellRenderer "text" column
+    Gtk.treeViewAppendColumn codeTreeView treeColumn
 
-  for_ [0 .. 2] \column -> do
-    treeViewColumn <- Gtk.treeViewColumnNew
-    Gtk.treeViewColumnPackStart treeViewColumn cellRenderer False
-    Gtk.treeViewColumnAddAttribute treeViewColumn cellRenderer "text" column
-    Gtk.treeViewAppendColumn codeTreeView treeViewColumn
+  -- Set up stateTreeView:
+
+  stateSelection <- Gtk.treeViewGetSelection stateTreeView
+  Gtk.treeSelectionSetMode stateSelection Gtk.SelectionModeNone
+
+  for_ [0 .. 1] $ \column -> do
+    treeColumn <- Gtk.treeViewColumnNew
+    Gtk.treeViewColumnPackStart treeColumn cellRenderer False
+    Gtk.treeViewColumnAddAttribute treeColumn cellRenderer "text" column
+    Gtk.treeViewAppendColumn stateTreeView treeColumn
 
   -- Set up logTextView:
 
-  logTextBuffer <- Gtk.textViewGetBuffer logTextView
+  logBuffer <- Gtk.textViewGetBuffer logTextView
 
   -- Register listeners:
 
-  parseThreadIdMVar <- newMVar =<< forkIO (pure ())
-  declarationsVar <- newMVar []
+  parseThreadIdVar <- newMVar =<< forkIO (pure ())
+  devinVar <- newEmptyMVar
+  devinVar' <- newEmptyMVar
+  sem <- newQSem 0
 
-  Gtk.onTextBufferChanged codeTextBuffer do
-    (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
-    text <- Gtk.textBufferGetText codeTextBuffer startTextIter endTextIter True
+  Gtk.onButtonClicked playButton $ void $ do
+    let before :: (Range a, Node a) => a -> Evaluator IO ()
+        before range = Evaluator $ \_ state -> do
+          Gtk.postGUIASync $ do
+            (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+            Gtk.textBufferRemoveTagByName codeBuffer "highlightNode" startIter endIter
+            highlightNode codeBuffer "highlightNode" range
 
-    killThread =<< takeMVar parseThreadIdMVar
-    swapMVar declarationsVar []
+            Gtk.listStoreClear stateListStore
+            displayState stateListStore state
 
-    putMVar parseThreadIdMVar =<< forkIO case Parser.run Parsers.declarations (Input 0 text) of
-      Result.Success (declarations, comments) _ -> do
-        swapMVar declarationsVar declarations
+          waitQSem sem
+          pure ((), state)
 
-        Gtk.postGUIASync do
-          (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
-          insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
+    let after :: a -> Evaluator IO ()
+        after _ = lift (pure ())
 
-          for_ styles \(tagName, _) ->
-            Gtk.textBufferRemoveTagByName codeTextBuffer tagName startTextIter endTextIter
+    Gtk.widgetSetSensitive playButton False
+    devin' <- readMVar devinVar'
+    Gtk.containerRemove codeTreeScrolledWindow codeTreeView
+    Gtk.containerAdd codeTreeScrolledWindow stateTreeView
+    Gtk.widgetShow stateTreeView
+    let configuration = Configuration devin' before after before after
 
-          for_ declarations \declaration -> do
-            highlightDeclaration codeTextBuffer declaration
-            highlightDeclarationParentheses codeTextBuffer insertTextIter declaration
+    forkIO $ do
+      runEvaluator (evaluateDevin devin') configuration State.predefined
 
-          for_ comments $
-            highlight codeTextBuffer "comment"
+      Gtk.postGUIASync $ do
+        Gtk.containerRemove codeTreeScrolledWindow stateTreeView
+        Gtk.containerAdd codeTreeScrolledWindow codeTreeView
+        Gtk.widgetShow codeTreeView
 
-          Gtk.textBufferSetText logTextBuffer "" 0
+  Gtk.onButtonClicked stepOverButton (signalQSem sem)
 
-        let checker = Typers.checkDeclarations declarations
-        let (declarations', _, errors) = Typer.run checker Environment.predefined
+  Gtk.onButtonClicked stepIntoButton (signalQSem sem)
 
-        Gtk.postGUIASync do
-          (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
-          Gtk.textBufferRemoveTagByName codeTextBuffer "error" startTextIter endTextIter
+  Gtk.onTextBufferChanged codeBuffer $ do
+    (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+    text <- Gtk.textBufferGetText codeBuffer startIter endIter True
 
-          Gtk.treeStoreClear codeTreeStore
-          for_ declarations' (displayDeclaration codeTextBuffer codeTreeStore Nothing)
-          Gtk.treeViewExpandAll codeTreeView
+    let action = case Parser.run Parsers.devin (Input 0 text) of
+          Success (devin, comments) _ -> do
+            putMVar devinVar devin
 
-          logEntries <- for errors \error -> do
-            highlight codeTextBuffer "error" error
+            Gtk.postGUIASync $ do
+              (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+              insertMark <- Gtk.textBufferGetInsert codeBuffer
+              insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
 
-            startTextIter <- Gtk.textBufferGetIterAtOffset codeTextBuffer (Span.start error)
-            (line, column) <- Helpers.getLineColumn startTextIter
-            let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
-            pure (prefix <> Error.description error)
+              for_ styles $ \(tagName, _) ->
+                Gtk.textBufferRemoveTagByName codeBuffer tagName startIter endIter
 
-          let log = Text.intercalate "\n" logEntries
-          Gtk.textBufferSetText logTextBuffer log (Helpers.utf8Length log)
+              highlightDevin codeBuffer devin
+              highlightDevinParentheses codeBuffer insertIter devin
+              for_ comments (highlightNode codeBuffer "comment")
 
-      Result.Failure _ position expectations -> Gtk.postGUIASync do
-        (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
-        Gtk.textBufferRemoveTagByName codeTextBuffer "error" startTextIter endTextIter
+              Gtk.textBufferSetText logBuffer "" 0
 
-        startTextIter <- Gtk.textBufferGetIterAtOffset codeTextBuffer (fromIntegral position)
+            let (devin', _, errors) = runTyper (checkDevin devin) Environment.predefined
+            tryTakeMVar devinVar'
+            putMVar devinVar' devin'
 
-        for_ styles \(tagName, _) ->
-          Gtk.textBufferRemoveTagByName codeTextBuffer tagName startTextIter endTextIter
+            Gtk.postGUIASync $ do
+              (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+              Gtk.textBufferRemoveTagByName codeBuffer "error" startIter endIter
 
-        Gtk.textBufferApplyTagByName codeTextBuffer "error" startTextIter endTextIter
+              Gtk.treeStoreClear codeTreeStore
+              displayDevin codeBuffer codeTreeStore Nothing devin'
+              Gtk.treeViewExpandAll codeTreeView
 
-        (line, column) <- Helpers.getLineColumn startTextIter
-        let prefix = Text.pack ("[" ++ show line ++ ":" ++ show column ++ "] ")
-        let log = prefix <> Helpers.expectationsText expectations
-        Gtk.textBufferSetText logTextBuffer log (Helpers.utf8Length log)
+              logEntries <- for errors $ \error -> do
+                highlightNode codeBuffer "error" error
 
-  on codeTextBuffer (PropertyNotify Gtk.textBufferCursorPosition) $ const do
-    (startTextIter, endTextIter) <- Gtk.textBufferGetBounds codeTextBuffer
-    Gtk.textBufferRemoveTagByName codeTextBuffer "bracket" startTextIter endTextIter
+                startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
+                (line, column) <- getLineColumn startIter
+                let prefix = "[" <> Text.pack (show line) <> ":" <> Text.pack (show column) <> "] "
+                pure (prefix <> Error.description error)
 
-    declarations <- readMVar declarationsVar
-    insertTextIter <- Helpers.getInsertTextIter codeTextBuffer
-    for_ declarations (highlightDeclarationParentheses codeTextBuffer insertTextIter)
+              let log = Text.intercalate "\n" logEntries
+              Gtk.textBufferSetText logBuffer log (-1)
+
+          Failure _ position expectations -> Gtk.postGUIASync $ do
+            (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+            Gtk.textBufferRemoveTagByName codeBuffer "error" startIter endIter
+
+            startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (fromIntegral position)
+
+            for_ styles $ \(tagName, _) ->
+              Gtk.textBufferRemoveTagByName codeBuffer tagName startIter endIter
+
+            Gtk.textBufferApplyTagByName codeBuffer "error" startIter endIter
+
+            (line, column) <- getLineColumn startIter
+            let prefix = "[" <> Text.pack (show line) <> ":" <> Text.pack (show column) <> "] "
+            let log = prefix <> expectationsText expectations
+            Gtk.textBufferSetText logBuffer log (-1)
+
+    killThread =<< takeMVar parseThreadIdVar
+    tryTakeMVar devinVar
+    putMVar parseThreadIdVar =<< forkIO action
+
+  on codeBuffer (PropertyNotify Gtk.textBufferCursorPosition) $ \_ -> void $ do
+    (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+    Gtk.textBufferRemoveTagByName codeBuffer "bracket" startIter endIter
+
+    whenJustM (tryReadMVar devinVar) $ \devin -> void $ do
+      insertMark <- Gtk.textBufferGetInsert codeBuffer
+      insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
+      highlightDevinParentheses codeBuffer insertIter devin
 
   -- Display the UI:
 
   Gtk.widgetShowAll window
 
 
-highlightDeclaration :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Declaration -> m ()
-highlightDeclaration textBuffer = \case
-  Syntax.VariableDeclaration{varKeyword, variableId, right} -> do
-    highlight textBuffer "keyword" varKeyword
-    highlight textBuffer "identifier" variableId
-    highlightExpression textBuffer right
-
-  Syntax.FunctionDeclaration{defKeyword, functionId, parameters, returnInfo, body} -> do
-    highlight textBuffer "keyword" defKeyword
-    highlight textBuffer "identifier" functionId
-    for_ parameters \(id, _, typeId) -> highlight textBuffer "identifier" id *> highlight textBuffer "type" typeId
-    maybe (pure ()) (highlight textBuffer "type" . snd) returnInfo
-    highlightStatement textBuffer body
+highlightDevin :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Devin -> m ()
+highlightDevin buffer Devin{declarations} =
+  for_ declarations (highlightDeclaration buffer)
 
 
-highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Statement -> m ()
-highlightStatement textBuffer = \case
-  Syntax.DeclarationStatement{declaration} ->
-    highlightDeclaration textBuffer declaration
+highlightDeclaration :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Declaration -> m ()
+highlightDeclaration buffer declaration = case declaration of
+  VariableDeclaration{varKeyword, variableId, right} -> do
+    highlightNode buffer "keyword" varKeyword
+    highlightNode buffer "identifier" variableId
+    highlightExpression buffer right
 
-  Syntax.ExpressionStatement{expression} ->
-    highlightExpression textBuffer expression
+  FunctionDeclaration{defKeyword, functionId, parameters, returnInfo, body} -> do
+    highlightNode buffer "keyword" defKeyword
+    highlightNode buffer "identifier" functionId
 
-  Syntax.IfStatement{ifKeyword, predicate, trueBranch} -> do
-    highlight textBuffer "keyword" ifKeyword
-    highlightExpression textBuffer predicate
-    highlightStatement textBuffer trueBranch
+    for_ parameters $ \(id, _, typeId) -> do
+      highlightNode buffer "identifier" id
+      highlightNode buffer "type" typeId
 
-  Syntax.IfElseStatement{ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} -> do
-    highlight textBuffer "keyword" ifKeyword
-    highlightExpression textBuffer predicate
-    highlightStatement textBuffer trueBranch
-    highlight textBuffer "keyword" elseKeyword
-    highlightStatement textBuffer falseBranch
-
-  Syntax.WhileStatement{whileKeyword, predicate, body} -> do
-    highlight textBuffer "keyword" whileKeyword
-    highlightExpression textBuffer predicate
-    highlightStatement textBuffer body
-
-  Syntax.DoWhileStatement{doKeyword, body, whileKeyword, predicate} -> do
-    highlight textBuffer "keyword" doKeyword
-    highlightStatement textBuffer body
-    highlight textBuffer "keyword" whileKeyword
-    highlightExpression textBuffer predicate
-
-  Syntax.ReturnStatement{returnKeyword, result} -> do
-    highlight textBuffer "keyword" returnKeyword
-    maybe (pure ()) (highlightExpression textBuffer) result
-
-  Syntax.BlockStatement{statements} ->
-    for_ statements (highlightStatement textBuffer)
+    whenJust returnInfo (highlightNode buffer "type" . snd)
+    highlightStatement buffer body
 
 
-highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Syntax.Expression -> m ()
-highlightExpression textBuffer expression = case expression of
-  Syntax.IntegerExpression{} ->
-    highlight textBuffer "number" expression
+highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Statement -> m ()
+highlightStatement buffer statement = case statement of
+  DeclarationStatement{declaration} ->
+    highlightDeclaration buffer declaration
 
-  Syntax.RationalExpression{} ->
-    highlight textBuffer "number" expression
+  ExpressionStatement{value} ->
+    highlightExpression buffer value
 
-  Syntax.VariableExpression{variableId} ->
-    highlight textBuffer "identifier" variableId
+  IfStatement{ifKeyword, predicate, trueBranch} -> do
+    highlightNode buffer "keyword" ifKeyword
+    highlightExpression buffer predicate
+    highlightStatement buffer trueBranch
 
-  Syntax.CallExpression{targetId, arguments} -> do
-    highlight textBuffer "identifier" targetId
-    for_ arguments (highlightExpression textBuffer)
+  IfElseStatement{ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} -> do
+    highlightNode buffer "keyword" ifKeyword
+    highlightExpression buffer predicate
+    highlightStatement buffer trueBranch
+    highlightNode buffer "keyword" elseKeyword
+    highlightStatement buffer falseBranch
 
-  Syntax.UnaryExpression{unary, operand} -> do
-    highlight textBuffer "operator" unary
-    highlightExpression textBuffer operand
+  WhileStatement{whileKeyword, predicate, body} -> do
+    highlightNode buffer "keyword" whileKeyword
+    highlightExpression buffer predicate
+    highlightStatement buffer body
 
-  Syntax.BinaryExpression{left, binary, right} -> do
-    highlightExpression textBuffer left
-    highlight textBuffer "operator" binary
-    highlightExpression textBuffer right
+  DoWhileStatement{doKeyword, body, whileKeyword, predicate} -> do
+    highlightNode buffer "keyword" doKeyword
+    highlightStatement buffer body
+    highlightNode buffer "keyword" whileKeyword
+    highlightExpression buffer predicate
 
-  Syntax.AssignExpression{variableId, assign, right} -> do
-    highlight textBuffer "identifier" variableId
-    highlight textBuffer "operator" assign
-    highlightExpression textBuffer right
+  ReturnStatement{returnKeyword, result} -> do
+    highlightNode buffer "keyword" returnKeyword
+    whenJust result (highlightExpression buffer)
 
-  Syntax.ParenthesizedExpression{inner} ->
-    highlightExpression textBuffer inner
+  BlockStatement{statements} ->
+    for_ statements (highlightStatement buffer)
 
 
-highlightDeclarationParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Syntax.Declaration -> m Bool
-highlightDeclarationParentheses textBuffer insertTextIter = \case
-  Syntax.VariableDeclaration{right} ->
-    highlightExpressionParentheses textBuffer insertTextIter right
+highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Expression -> m ()
+highlightExpression buffer expression = case expression of
+  IntegerExpression{} ->
+    highlightNode buffer "number" expression
 
-  Syntax.FunctionDeclaration{open, close, body} -> Helpers.orM
+  RationalExpression{} ->
+    highlightNode buffer "number" expression
+
+  VariableExpression{variableId} ->
+    highlightNode buffer "identifier" variableId
+
+  CallExpression{targetId, arguments} -> do
+    highlightNode buffer "identifier" targetId
+    for_ arguments (highlightExpression buffer)
+
+  UnaryExpression{unary, operand} -> do
+    highlightNode buffer "operator" unary
+    highlightExpression buffer operand
+
+  BinaryExpression{left, binary, right} -> do
+    highlightExpression buffer left
+    highlightNode buffer "operator" binary
+    highlightExpression buffer right
+
+  AssignExpression{variableId, assign, right} -> do
+    highlightNode buffer "identifier" variableId
+    highlightNode buffer "operator" assign
+    highlightExpression buffer right
+
+  ParenthesizedExpression{inner} ->
+    highlightExpression buffer inner
+
+
+highlightDevinParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Devin -> m Bool
+highlightDevinParentheses buffer insertIter Devin{declarations} =
+  anyM (highlightDeclarationParentheses buffer insertIter) declarations
+
+
+highlightDeclarationParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Declaration -> m Bool
+highlightDeclarationParentheses buffer insertIter declaration = case declaration of
+  VariableDeclaration{right} ->
+    highlightExpressionParentheses buffer insertIter right
+
+  FunctionDeclaration{open, close, body} -> orM
     [
-      highlightParentheses textBuffer insertTextIter open close,
-      highlightStatementParentheses textBuffer insertTextIter body
+      highlightParentheses buffer insertIter open close,
+      highlightStatementParentheses buffer insertIter body
     ]
 
 
-highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Syntax.Statement -> m Bool
-highlightStatementParentheses textBuffer insertTextIter = \case
-  Syntax.ExpressionStatement{expression} ->
-    highlightExpressionParentheses textBuffer insertTextIter expression
+highlightStatementParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Statement -> m Bool
+highlightStatementParentheses buffer insertIter statement = case statement of
+  ExpressionStatement{value} ->
+    highlightExpressionParentheses buffer insertIter value
 
-  Syntax.DeclarationStatement{declaration} ->
-    highlightDeclarationParentheses textBuffer insertTextIter declaration
+  DeclarationStatement{declaration} ->
+    highlightDeclarationParentheses buffer insertIter declaration
 
-  Syntax.IfStatement{predicate, trueBranch} -> Helpers.orM
+  IfStatement{predicate, trueBranch} -> orM
     [
-      highlightExpressionParentheses textBuffer insertTextIter predicate,
-      highlightStatementParentheses textBuffer insertTextIter trueBranch
+      highlightExpressionParentheses buffer insertIter predicate,
+      highlightStatementParentheses buffer insertIter trueBranch
     ]
 
-  Syntax.IfElseStatement{predicate, trueBranch, falseBranch} -> Helpers.orM
+  IfElseStatement{predicate, trueBranch, falseBranch} -> orM
     [
-      highlightExpressionParentheses textBuffer insertTextIter predicate,
-      highlightStatementParentheses textBuffer insertTextIter trueBranch,
-      highlightStatementParentheses textBuffer insertTextIter falseBranch
+      highlightExpressionParentheses buffer insertIter predicate,
+      highlightStatementParentheses buffer insertIter trueBranch,
+      highlightStatementParentheses buffer insertIter falseBranch
     ]
 
-  Syntax.WhileStatement{predicate, body} -> Helpers.orM
+  WhileStatement{predicate, body} -> orM
     [
-      highlightExpressionParentheses textBuffer insertTextIter predicate,
-      highlightStatementParentheses textBuffer insertTextIter body
+      highlightExpressionParentheses buffer insertIter predicate,
+      highlightStatementParentheses buffer insertIter body
     ]
 
-  Syntax.DoWhileStatement{body, predicate} -> Helpers.orM
+  DoWhileStatement{body, predicate} -> orM
     [
-      highlightStatementParentheses textBuffer insertTextIter body,
-      highlightExpressionParentheses textBuffer insertTextIter predicate
+      highlightStatementParentheses buffer insertIter body,
+      highlightExpressionParentheses buffer insertIter predicate
     ]
 
-  Syntax.ReturnStatement{result = Nothing} -> pure False
+  ReturnStatement{result = Nothing} -> pure False
 
-  Syntax.ReturnStatement{result = Just result} ->
-    highlightExpressionParentheses textBuffer insertTextIter result
+  ReturnStatement{result = Just result} ->
+    highlightExpressionParentheses buffer insertIter result
 
-  Syntax.BlockStatement{open, statements, close} -> Helpers.orM
+  BlockStatement{open, statements, close} -> orM
     [
-      Helpers.anyM (highlightStatementParentheses textBuffer insertTextIter) statements,
-      highlightParentheses textBuffer insertTextIter open close
-    ]
-
-
-highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Syntax.Expression -> m Bool
-highlightExpressionParentheses textBuffer insertTextIter = \case
-  Syntax.IntegerExpression{} -> pure False
-
-  Syntax.RationalExpression{} -> pure False
-
-  Syntax.VariableExpression{} -> pure False
-
-  Syntax.CallExpression{open, arguments, close} -> Helpers.orM
-    [
-      Helpers.anyM (highlightExpressionParentheses textBuffer insertTextIter) arguments,
-      highlightParentheses textBuffer insertTextIter open close
-    ]
-
-  Syntax.UnaryExpression{operand} ->
-    highlightExpressionParentheses textBuffer insertTextIter operand
-
-  Syntax.BinaryExpression{left, right} -> Helpers.orM
-    [
-      highlightExpressionParentheses textBuffer insertTextIter left,
-      highlightExpressionParentheses textBuffer insertTextIter right
-    ]
-
-  Syntax.AssignExpression{right} ->
-    highlightExpressionParentheses textBuffer insertTextIter right
-
-  Syntax.ParenthesizedExpression{open, inner, close} -> Helpers.orM
-    [
-      highlightExpressionParentheses textBuffer insertTextIter inner,
-      highlightParentheses textBuffer insertTextIter open close
+      anyM (highlightStatementParentheses buffer insertIter) statements,
+      highlightParentheses buffer insertIter open close
     ]
 
 
-highlightParentheses :: (Gtk.IsTextBuffer a, Span b, Span c, MonadIO m) => a -> Gtk.TextIter -> b -> c -> m Bool
-highlightParentheses textBuffer insertTextIter open close = do
-  openStartTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.start open)
-  openEndTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.end open)
+highlightExpressionParentheses :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Gtk.TextIter -> Expression -> m Bool
+highlightExpressionParentheses buffer insertIter expression = case expression of
+  IntegerExpression{} -> pure False
 
-  closeStartTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.start close)
-  closeEndTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.end close)
+  RationalExpression{} -> pure False
 
-  applyParenthesisTag <- Helpers.anyM (Gtk.textIterEqual insertTextIter)
-    [openStartTextIter, openEndTextIter, closeEndTextIter, closeStartTextIter]
+  VariableExpression{} -> pure False
+
+  CallExpression{open, arguments, close} -> orM
+    [
+      anyM (highlightExpressionParentheses buffer insertIter) arguments,
+      highlightParentheses buffer insertIter open close
+    ]
+
+  UnaryExpression{operand} ->
+    highlightExpressionParentheses buffer insertIter operand
+
+  BinaryExpression{left, right} -> orM
+    [
+      highlightExpressionParentheses buffer insertIter left,
+      highlightExpressionParentheses buffer insertIter right
+    ]
+
+  AssignExpression{right} ->
+    highlightExpressionParentheses buffer insertIter right
+
+  ParenthesizedExpression{open, inner, close} -> orM
+    [
+      highlightExpressionParentheses buffer insertIter inner,
+      highlightParentheses buffer insertIter open close
+    ]
+
+
+highlightParentheses :: (Gtk.IsTextBuffer a, Range b, Range c, MonadIO m) => a -> Gtk.TextIter -> b -> c -> m Bool
+highlightParentheses buffer insertIter open close = do
+  openStartIter <- Gtk.textBufferGetIterAtOffset buffer (start open)
+  openEndIter <- Gtk.textBufferGetIterAtOffset buffer (end open)
+  closeEndIter <- Gtk.textBufferGetIterAtOffset buffer (end close)
+  closeStartIter <- Gtk.textBufferGetIterAtOffset buffer (start close)
+
+  applyParenthesisTag <- anyM (Gtk.textIterEqual insertIter)
+    [openStartIter, openEndIter, closeEndIter, closeStartIter]
 
   if applyParenthesisTag then do
-    Gtk.textBufferApplyTagByName textBuffer "bracket" openStartTextIter openEndTextIter
-    Gtk.textBufferApplyTagByName textBuffer "bracket" closeStartTextIter closeEndTextIter
+    Gtk.textBufferApplyTagByName buffer "bracket" openStartIter openEndIter
+    Gtk.textBufferApplyTagByName buffer "bracket" closeStartIter closeEndIter
     pure True
   else
     pure False
 
 
-highlight :: (Gtk.IsTextBuffer a, Span b, MonadIO m) => a -> Text -> b -> m ()
-highlight textBuffer tagName span = do
-  startTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.start span)
-  endTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.end span)
-  Gtk.textBufferApplyTagByName textBuffer tagName startTextIter endTextIter
+highlightNode :: (Gtk.IsTextBuffer a, Range b, MonadIO m) => a -> Text -> b -> m ()
+highlightNode buffer tagName range = do
+  startIter <- Gtk.textBufferGetIterAtOffset buffer (start range)
+  endIter <- Gtk.textBufferGetIterAtOffset buffer (end range)
+  Gtk.textBufferApplyTagByName buffer tagName startIter endIter
 
 
-displayDeclaration :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Declaration -> IO (Maybe Gtk.TreeIter)
-displayDeclaration textBuffer treeStore treeIter declaration = case declaration of
-  Syntax.VariableDeclaration{varKeyword, variableId, equalSign, right, semicolon} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing declaration
-    display textBuffer treeStore treeIter' Nothing varKeyword
-    display textBuffer treeStore treeIter' (Just variableId.t) variableId
-    display textBuffer treeStore treeIter' Nothing equalSign
-    displayExpression textBuffer treeStore treeIter' right
-    display textBuffer treeStore treeIter' Nothing semicolon
-    pure treeIter'
+displayDevin :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Devin -> IO (Maybe Gtk.TreeIter)
+displayDevin buffer treeStore iter devin = do
+  iter' <- displayNode buffer treeStore iter Nothing devin
+  for_ devin.declarations (displayDeclaration buffer treeStore iter')
+  pure iter'
 
-  Syntax.FunctionDeclaration{defKeyword, functionId, open, parameters, commas, close, returnInfo, body} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing declaration
-    display textBuffer treeStore treeIter' Nothing defKeyword
-    display textBuffer treeStore treeIter' (Just functionId.t) functionId
-    display textBuffer treeStore treeIter' Nothing open
-    displayParametersAndCommas treeIter' parameters commas
-    display textBuffer treeStore treeIter' Nothing close
-    displayReturnInfo treeIter' returnInfo
-    displayStatement textBuffer treeStore treeIter' body
-    pure treeIter'
+
+displayDeclaration :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Declaration -> IO (Maybe Gtk.TreeIter)
+displayDeclaration buffer treeStore iter declaration = case declaration of
+  VariableDeclaration{varKeyword, variableId, equalSign, right, semicolon} -> do
+    iter' <- displayNode buffer treeStore iter Nothing declaration
+    displayNode buffer treeStore iter' Nothing varKeyword
+    displayNode buffer treeStore iter' (Just variableId.t) variableId
+    displayNode buffer treeStore iter' Nothing equalSign
+    displayExpression buffer treeStore iter' right
+    displayNode buffer treeStore iter' Nothing semicolon
+    pure iter'
+
+  FunctionDeclaration{defKeyword, functionId, open, parameters, commas, close, returnInfo, body} -> do
+    iter' <- displayNode buffer treeStore iter Nothing declaration
+    displayNode buffer treeStore iter' Nothing defKeyword
+    displayNode buffer treeStore iter' (Just functionId.t) functionId
+    displayNode buffer treeStore iter' Nothing open
+    displayParametersAndCommas iter' parameters commas
+    displayNode buffer treeStore iter' Nothing close
+    displayReturnInfo iter' returnInfo
+    displayStatement buffer treeStore iter' body
+    pure iter'
 
   where
-    displayParametersAndCommas treeIter parameters [] =
-      for_ parameters (displayParameter treeIter)
+    displayParametersAndCommas iter parameters [] =
+      for_ parameters (displayParameter iter)
 
-    displayParametersAndCommas treeIter [] commas =
-      for_ commas (display textBuffer treeStore treeIter Nothing)
+    displayParametersAndCommas iter [] commas =
+      for_ commas (displayNode buffer treeStore iter Nothing)
 
-    displayParametersAndCommas treeIter (parameter : parameters) (comma : commas) = do
-      displayParameter treeIter parameter
-      display textBuffer treeStore treeIter Nothing comma
-      displayParametersAndCommas treeIter parameters commas
+    displayParametersAndCommas iter (parameter : parameters) (comma : commas) = do
+      displayParameter iter parameter
+      displayNode buffer treeStore iter Nothing comma
+      displayParametersAndCommas iter parameters commas
 
-    displayParameter treeIter (id, colon, typeId) = do
-      display textBuffer treeStore treeIter (Just id.t) id
-      display textBuffer treeStore treeIter Nothing colon
-      display textBuffer treeStore treeIter Nothing typeId
+    displayParameter iter (id, colon, typeId) = do
+      displayNode buffer treeStore iter (Just id.t) id
+      displayNode buffer treeStore iter Nothing colon
+      displayNode buffer treeStore iter Nothing typeId
 
-    displayReturnInfo treeIter (Just (arrow, typeId)) = void do
-      display textBuffer treeStore treeIter Nothing arrow
-      display textBuffer treeStore treeIter Nothing typeId
+    displayReturnInfo iter (Just (arrow, typeId)) = void $ do
+      displayNode buffer treeStore iter Nothing arrow
+      displayNode buffer treeStore iter Nothing typeId
 
     displayReturnInfo _ Nothing = pure ()
 
 
-displayStatement :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Statement -> IO (Maybe Gtk.TreeIter)
-displayStatement textBuffer treeStore treeIter statement = case statement of
-  Syntax.DeclarationStatement{declaration} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing statement
-    displayDeclaration textBuffer treeStore treeIter' declaration
-    pure treeIter'
+displayStatement :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Statement -> IO (Maybe Gtk.TreeIter)
+displayStatement buffer treeStore iter statement = case statement of
+  DeclarationStatement{declaration} -> do
+    iter' <- displayNode buffer treeStore iter Nothing statement
+    displayDeclaration buffer treeStore iter' declaration
+    pure iter'
 
-  Syntax.ExpressionStatement{expression, semicolon} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing statement
-    displayExpression textBuffer treeStore treeIter' expression
-    display textBuffer treeStore treeIter' Nothing semicolon
-    pure treeIter'
+  ExpressionStatement{value, semicolon} -> do
+    iter' <- displayNode buffer treeStore iter Nothing statement
+    displayExpression buffer treeStore iter' value
+    displayNode buffer treeStore iter' Nothing semicolon
+    pure iter'
 
-  Syntax.IfStatement{ifKeyword, predicate, trueBranch} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing statement
-    display textBuffer treeStore treeIter' Nothing ifKeyword
-    displayExpression textBuffer treeStore treeIter' predicate
-    displayStatement textBuffer treeStore treeIter' trueBranch
-    pure treeIter'
+  IfStatement{ifKeyword, predicate, trueBranch} -> do
+    iter' <- displayNode buffer treeStore iter Nothing statement
+    displayNode buffer treeStore iter' Nothing ifKeyword
+    displayExpression buffer treeStore iter' predicate
+    displayStatement buffer treeStore iter' trueBranch
+    pure iter'
 
-  Syntax.IfElseStatement{ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing statement
-    display textBuffer treeStore treeIter' Nothing ifKeyword
-    displayExpression textBuffer treeStore treeIter' predicate
-    displayStatement textBuffer treeStore treeIter' trueBranch
-    display textBuffer treeStore treeIter' Nothing elseKeyword
-    displayStatement textBuffer treeStore treeIter' falseBranch
-    pure treeIter'
+  IfElseStatement{ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} -> do
+    iter' <- displayNode buffer treeStore iter Nothing statement
+    displayNode buffer treeStore iter' Nothing ifKeyword
+    displayExpression buffer treeStore iter' predicate
+    displayStatement buffer treeStore iter' trueBranch
+    displayNode buffer treeStore iter' Nothing elseKeyword
+    displayStatement buffer treeStore iter' falseBranch
+    pure iter'
 
-  Syntax.WhileStatement{whileKeyword, predicate, body} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing statement
-    display textBuffer treeStore treeIter' Nothing whileKeyword
-    displayExpression textBuffer treeStore treeIter' predicate
-    displayStatement textBuffer treeStore treeIter' body
-    pure treeIter'
+  WhileStatement{whileKeyword, predicate, body} -> do
+    iter' <- displayNode buffer treeStore iter Nothing statement
+    displayNode buffer treeStore iter' Nothing whileKeyword
+    displayExpression buffer treeStore iter' predicate
+    displayStatement buffer treeStore iter' body
+    pure iter'
 
-  Syntax.DoWhileStatement{doKeyword, body, whileKeyword, predicate, semicolon} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing statement
-    display textBuffer treeStore treeIter' Nothing doKeyword
-    displayStatement textBuffer treeStore treeIter' body
-    display textBuffer treeStore treeIter' Nothing whileKeyword
-    displayExpression textBuffer treeStore treeIter' predicate
-    display textBuffer treeStore treeIter' Nothing semicolon
-    pure treeIter'
+  DoWhileStatement{doKeyword, body, whileKeyword, predicate, semicolon} -> do
+    iter' <- displayNode buffer treeStore iter Nothing statement
+    displayNode buffer treeStore iter' Nothing doKeyword
+    displayStatement buffer treeStore iter' body
+    displayNode buffer treeStore iter' Nothing whileKeyword
+    displayExpression buffer treeStore iter' predicate
+    displayNode buffer treeStore iter' Nothing semicolon
+    pure iter'
 
-  Syntax.ReturnStatement{returnKeyword, result, semicolon} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing statement
-    display textBuffer treeStore treeIter' Nothing returnKeyword
-    maybe (pure Nothing) (displayExpression textBuffer treeStore treeIter') result
-    display textBuffer treeStore treeIter' Nothing semicolon
-    pure treeIter'
+  ReturnStatement{returnKeyword, result, semicolon} -> do
+    iter' <- displayNode buffer treeStore iter Nothing statement
+    displayNode buffer treeStore iter' Nothing returnKeyword
+    maybe (pure Nothing) (displayExpression buffer treeStore iter') result
+    displayNode buffer treeStore iter' Nothing semicolon
+    pure iter'
 
-  Syntax.BlockStatement{open, statements, close} -> do
-    treeIter' <- display textBuffer treeStore treeIter Nothing statement
-    display textBuffer treeStore treeIter' Nothing open
-    for_ statements (displayStatement textBuffer treeStore treeIter')
-    display textBuffer treeStore treeIter' Nothing close
-    pure treeIter'
+  BlockStatement{open, statements, close} -> do
+    iter' <- displayNode buffer treeStore iter Nothing statement
+    displayNode buffer treeStore iter' Nothing open
+    for_ statements (displayStatement buffer treeStore iter')
+    displayNode buffer treeStore iter' Nothing close
+    pure iter'
 
 
-displayExpression :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.Expression -> IO (Maybe Gtk.TreeIter)
-displayExpression textBuffer treeStore treeIter expression = case expression of
-  Syntax.IntegerExpression{t} ->
-    display textBuffer treeStore treeIter (Just t) expression
+displayExpression :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Expression -> IO (Maybe Gtk.TreeIter)
+displayExpression buffer treeStore iter expression = case expression of
+  IntegerExpression{t} ->
+    displayNode buffer treeStore iter (Just t) expression
 
-  Syntax.RationalExpression{t} ->
-    display textBuffer treeStore treeIter (Just t) expression
+  RationalExpression{t} ->
+    displayNode buffer treeStore iter (Just t) expression
 
-  Syntax.VariableExpression{variableId, t} -> do
-    treeIter' <- display textBuffer treeStore treeIter (Just t) expression
-    display textBuffer treeStore treeIter' (Just variableId.t) variableId
-    pure treeIter'
+  VariableExpression{variableId, t} -> do
+    iter' <- displayNode buffer treeStore iter (Just t) expression
+    displayNode buffer treeStore iter' (Just variableId.t) variableId
+    pure iter'
 
-  Syntax.CallExpression{targetId, open, arguments, commas, close, t} -> do
-    treeIter' <- display textBuffer treeStore treeIter (Just t) expression
-    display textBuffer treeStore treeIter' (Just targetId.t) targetId
-    display textBuffer treeStore treeIter' Nothing open
-    displayArgumentsAndCommas treeIter' arguments commas
-    display textBuffer treeStore treeIter' Nothing close
-    pure treeIter'
+  CallExpression{targetId, open, arguments, commas, close, t} -> do
+    iter' <- displayNode buffer treeStore iter (Just t) expression
+    displayNode buffer treeStore iter' (Just targetId.t) targetId
+    displayNode buffer treeStore iter' Nothing open
+    displayArgumentsAndCommas iter' arguments commas
+    displayNode buffer treeStore iter' Nothing close
+    pure iter'
 
-  Syntax.UnaryExpression{unary, operand, t} -> do
-    treeIter' <- display textBuffer treeStore treeIter (Just t) expression
-    displayUnaryOperator textBuffer treeStore treeIter' unary
-    displayExpression textBuffer treeStore treeIter' operand
-    pure treeIter'
+  UnaryExpression{unary, operand, t} -> do
+    iter' <- displayNode buffer treeStore iter (Just t) expression
+    displayUnaryOperator buffer treeStore iter' unary
+    displayExpression buffer treeStore iter' operand
+    pure iter'
 
-  Syntax.BinaryExpression{left, binary, right, t} -> do
-    treeIter' <- display textBuffer treeStore treeIter (Just t) expression
-    displayExpression textBuffer treeStore treeIter' left
-    displayBinaryOperator textBuffer treeStore treeIter' binary
-    displayExpression textBuffer treeStore treeIter' right
-    pure treeIter'
+  BinaryExpression{left, binary, right, t} -> do
+    iter' <- displayNode buffer treeStore iter (Just t) expression
+    displayExpression buffer treeStore iter' left
+    displayBinaryOperator buffer treeStore iter' binary
+    displayExpression buffer treeStore iter' right
+    pure iter'
 
-  Syntax.AssignExpression{variableId, assign, right, t} -> do
-    treeIter' <- display textBuffer treeStore treeIter (Just t) expression
-    display textBuffer treeStore treeIter' (Just variableId.t) variableId
-    displayAssignOperator textBuffer treeStore treeIter' assign
-    displayExpression textBuffer treeStore treeIter' right
-    pure treeIter'
+  AssignExpression{variableId, assign, right, t} -> do
+    iter' <- displayNode buffer treeStore iter (Just t) expression
+    displayNode buffer treeStore iter' (Just variableId.t) variableId
+    displayAssignOperator buffer treeStore iter' assign
+    displayExpression buffer treeStore iter' right
+    pure iter'
 
-  Syntax.ParenthesizedExpression{open, inner, close, t} -> do
-    treeIter' <- display textBuffer treeStore treeIter (Just t) expression
-    display textBuffer treeStore treeIter' Nothing open
-    displayExpression textBuffer treeStore treeIter' inner
-    display textBuffer treeStore treeIter' Nothing close
-    pure treeIter'
+  ParenthesizedExpression{open, inner, close, t} -> do
+    iter' <- displayNode buffer treeStore iter (Just t) expression
+    displayNode buffer treeStore iter' Nothing open
+    displayExpression buffer treeStore iter' inner
+    displayNode buffer treeStore iter' Nothing close
+    pure iter'
 
   where
-    displayArgumentsAndCommas treeIter arguments [] =
-      for_ arguments (displayExpression textBuffer treeStore treeIter)
+    displayArgumentsAndCommas iter arguments [] =
+      for_ arguments (displayExpression buffer treeStore iter)
 
-    displayArgumentsAndCommas treeIter [] commas =
-      for_ commas (display textBuffer treeStore treeIter Nothing)
+    displayArgumentsAndCommas iter [] commas =
+      for_ commas (displayNode buffer treeStore iter Nothing)
 
-    displayArgumentsAndCommas treeIter (argument : arguments) (comma : commas) = do
-      displayExpression textBuffer treeStore treeIter argument
-      display textBuffer treeStore treeIter Nothing comma
-      displayArgumentsAndCommas treeIter arguments commas
-
-
-displayUnaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.UnaryOperator -> IO (Maybe Gtk.TreeIter)
-displayUnaryOperator textBuffer treeStore treeIter unary =
-  display textBuffer treeStore treeIter (Just unary.t) unary
+    displayArgumentsAndCommas iter (argument : arguments) (comma : commas) = do
+      displayExpression buffer treeStore iter argument
+      displayNode buffer treeStore iter Nothing comma
+      displayArgumentsAndCommas iter arguments commas
 
 
-displayBinaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.BinaryOperator -> IO (Maybe Gtk.TreeIter)
-displayBinaryOperator textBuffer treeStore treeIter binary =
-  display textBuffer treeStore treeIter (Just binary.t) binary
+displayUnaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> UnaryOperator -> IO (Maybe Gtk.TreeIter)
+displayUnaryOperator buffer treeStore iter unary =
+  displayNode buffer treeStore iter (Just unary.t) unary
 
 
-displayAssignOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> Syntax.AssignOperator -> IO (Maybe Gtk.TreeIter)
-displayAssignOperator textBuffer treeStore treeIter assign =
-  display textBuffer treeStore treeIter (Just assign.t) assign
+displayBinaryOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> BinaryOperator -> IO (Maybe Gtk.TreeIter)
+displayBinaryOperator buffer treeStore iter binary =
+  displayNode buffer treeStore iter (Just binary.t) binary
 
 
-display :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Syntax.Node c) => a -> b -> Maybe Gtk.TreeIter -> Maybe Type -> c -> IO (Maybe Gtk.TreeIter)
-display textBuffer treeStore treeIter t node = do
-  let label = Just (Syntax.label node)
-  let typeId = Type.label <$> t
+displayAssignOperator :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b) => a -> b -> Maybe Gtk.TreeIter -> AssignOperator -> IO (Maybe Gtk.TreeIter)
+displayAssignOperator buffer treeStore iter assign =
+  displayNode buffer treeStore iter (Just assign.t) assign
 
-  treeIter' <- Gtk.treeStoreAppend treeStore treeIter
 
-  if Syntax.isLeaf node then do
-    startTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.start node)
-    endTextIter <- Gtk.textBufferGetIterAtOffset textBuffer (Span.end node)
-    slice <- Gtk.textBufferGetSlice textBuffer startTextIter endTextIter True
-    Gtk.treeStoreSet treeStore treeIter' [0, 1, 2] =<< for [label, Just slice, typeId] toGValue
-  else
-    Gtk.treeStoreSet treeStore treeIter' [0, 1, 2] =<< for [label, Nothing, typeId] toGValue
+displayNode :: (Gtk.IsTextBuffer a, Gtk.IsTreeStore b, Range c, Node c) => a -> b -> Maybe Gtk.TreeIter -> Maybe Type -> c -> IO (Maybe Gtk.TreeIter)
+displayNode buffer treeStore iter t node = do
+  iter' <- Gtk.treeStoreAppend treeStore iter
 
-  pure (Just treeIter')
+  if isLeaf node then do
+    startIter <- Gtk.textBufferGetIterAtOffset buffer (start node)
+    endIter <- Gtk.textBufferGetIterAtOffset buffer (end node)
+    slice <- Gtk.textBufferGetSlice buffer startIter endIter True
+    gvalues <- for [Just (label node), Just slice, Type.pretty <$> t] toGValue
+    Gtk.treeStoreSet treeStore iter' [0 .. 2] gvalues
+  else do
+    gvalues <- for [Just (label node), Nothing, Type.pretty <$> t] toGValue
+    Gtk.treeStoreSet treeStore iter' [0 .. 2] gvalues
+
+  pure (Just iter')
+
+
+displayState :: Gtk.IsListStore a => a -> State -> IO ()
+displayState listStore state = case state of
+  [] -> pure ()
+
+  (_, variables) : parents | Map.null variables ->
+    displayState listStore parents
+
+  (_, variables) : parents -> do
+    Map.foldMapWithKey f variables
+
+    when (notNull parents) $ do
+      let noText = Nothing :: Maybe Text
+      iter <- Gtk.listStoreAppend listStore
+      gvalues <- for [noText, noText] toGValue
+      Gtk.listStoreSet listStore iter [0 .. 1] gvalues
+
+    displayState listStore parents
+
+    where
+      f name value = do
+        iter <- Gtk.listStoreAppend listStore
+        gvalues <- for [Just name, Just (Value.pretty value)] toGValue
+        Gtk.listStoreSet listStore iter [0 .. 1] gvalues

@@ -5,31 +5,31 @@ module Parser (
   run,
   position,
   satisfy,
-  char,
+  oneOf,
+  noneOf,
   text,
-  either,
+  eoi,
   separatedBy,
   separatedBy1,
-  label,
   commit,
-  eoi
+  withLabel
 ) where
 
-import Prelude hiding (either)
 import Control.Applicative
 import Control.Monad
-import Data.Functor
 import Data.Functor.Identity
 import Data.List
 
 import Data.Text (Text)
 import qualified Data.Text as Text
 
+import Data.Set (Set)
+import qualified Data.Set as Set
+
 import Control.Monad.Trans.Class
 
-import Parser.Input (Input (Input))
-import Parser.Result (Result)
-import qualified Parser.Result as Result
+import Parser.Input hiding (position)
+import Parser.Result hiding (position)
 
 
 type Parser = ParserT Identity
@@ -44,108 +44,144 @@ instance (Monad m, Semigroup a) => Semigroup (ParserT m a) where
 
 
 instance (Monad m, Monoid a) => Monoid (ParserT m a) where
-  mempty = pure mempty
+  mempty = parser (Success mempty)
 
 
 instance Monad m => Applicative (ParserT m) where
-  pure value = parser (Result.Success value)
+  pure x = parser (Success x)
 
-  parser1 <*> parser2 = ParserT $ runT parser1 >=> \case
-    Result.Success f rest -> fmap f <$> runT parser2 rest
-    Result.Failure isFatal position expectations -> pure (Result.Failure isFatal position expectations)
+  parser1 <*> parser2 = ParserT $ \input -> do
+    result1 <- runT parser1 input
+
+    case result1 of
+      Success f rest -> do
+        result2 <- runT parser2 rest
+        pure (f <$> result2)
+
+      Failure isFatal position expectations ->
+        pure (Failure isFatal position expectations)
 
 
 instance Monad m => Monad (ParserT m) where
-  parser >>= f = ParserT $ runT parser >=> \case
-    Result.Success value rest -> runT (f value) rest
-    Result.Failure isFatal position expectations -> pure (Result.Failure isFatal position expectations)
+  parser >>= f = ParserT $ \input -> do
+    result <- runT parser input
+
+    case result of
+      Success x rest ->
+        runT (f x) rest
+
+      Failure isFatal position expectations ->
+        pure (Failure isFatal position expectations)
 
 
 instance MonadFail m => MonadFail (ParserT m) where
-  fail string = ParserT (const (fail string))
+  fail message = ParserT $ \_ -> fail message
+
+
+instance Monad m => Alternative (ParserT m) where
+  empty = parser $ \(Input position _) -> Failure False position []
+
+  parser1 <|> parser2 = ParserT $ \input -> do
+    result1 <- runT parser1 input
+
+    case result1 of
+      Success _ _ -> pure result1
+
+      Failure True _ _ -> pure result1
+
+      Failure False position1 expectations1 -> do
+        result2 <- runT parser2 input
+
+        case result2 of
+          Success _ _ -> pure result2
+
+          Failure isFatal2 position2 expectations2 -> do
+            let (position, expectations) = case compare position1 position2 of
+                  LT -> (position2, expectations2)
+                  EQ -> (position1, expectations1 `union` expectations2)
+                  GT -> (position1, expectations1)
+
+            pure (Failure isFatal2 position expectations)
 
 
 instance Monad m => MonadPlus (ParserT m)
 
 
-instance Monad m => Alternative (ParserT m) where
-  empty = parser \(Input position _) -> Result.Failure False position []
-
-  parser1 <|> parser2 = ParserT \input -> runT parser1 input >>= \case
-    Result.Success value rest -> pure (Result.Success value rest)
-
-    Result.Failure True position expectations -> pure (Result.Failure True position expectations)
-
-    Result.Failure False position1 expectations1 -> runT parser2 input <&> \case
-      Result.Success value rest -> Result.Success value rest
-
-      Result.Failure isFatal2 position2 expectations2 -> case compare position1 position2 of
-        LT -> Result.Failure isFatal2 position2 expectations2
-        EQ -> Result.Failure isFatal2 position1 (expectations1 `union` expectations2)
-        GT -> Result.Failure isFatal2 position1 expectations1
-
-
 instance MonadTrans ParserT where
-  lift ma = ParserT \input -> ma <&> \a -> Result.Success a input
+  lift mx = ParserT $ \input -> do
+    x <- mx
+    pure (Success x input)
 
 
 parser :: Applicative m => (Input -> Result a) -> ParserT m a
-parser f = ParserT (pure . f)
+parser f = ParserT $ \input -> pure (f input)
 
 
 run :: Parser a -> Input -> Result a
-run parser = runIdentity . runT parser
+run parser input = runIdentity (runT parser input)
 
 
-position :: Applicative m => Integral a => ParserT m a
-position = parser \input -> Result.Success (fromIntegral input.position) input
+position :: (Applicative m, Num a) => ParserT m a
+position = parser $ \input -> Success (fromIntegral input.position) input
 
 
 satisfy :: Applicative m => (Char -> Bool) -> ParserT m Char
-satisfy f = parser \(Input position rest) -> case Text.uncons rest of
-  Just (head, tail) | f head -> Result.Success head (Input (position + 1) tail)
-  _ -> Result.Failure False position []
+satisfy f = parser $ \(Input position rest) ->
+  case Text.uncons rest of
+    Just (c, suffix) | f c -> Success c (Input (position + 1) suffix)
+    _ -> Failure False position []
 
 
-char :: Applicative m => Char -> ParserT m Char
-char c = parser \(Input position rest) -> case Text.stripPrefix (Text.singleton c) rest of
-  Just suffix -> Result.Success c (Input (position + 1) suffix)
-  Nothing -> Result.Failure False position [Text.pack (show c)]
+oneOf :: Applicative m => Set Char -> ParserT m Char
+oneOf chars = parser $ \(Input position rest) ->
+  case Text.uncons rest of
+    Just (c, suffix) | Set.member c chars -> Success c (Input (position + 1) suffix)
+    _ -> Failure False position ["one of " <> Text.pack (show chars)]
+
+
+noneOf :: Applicative m => Set Char -> ParserT m Char
+noneOf chars = parser $ \(Input position rest) ->
+  case Text.uncons rest of
+    Just (c, suffix) | Set.member c chars -> Success c (Input (position + 1) suffix)
+    _ -> Failure False position ["none of " <> Text.pack (show chars)]
 
 
 text :: Applicative m => Text -> ParserT m Text
-text t = parser \(Input position rest) -> case Text.stripPrefix t rest of
-  Just suffix -> Result.Success t (Input (position + Text.length t) suffix)
-  Nothing -> Result.Failure False position [Text.pack (show t)]
-
-
-either :: Monad m => ParserT m a -> ParserT m b -> ParserT m (Either a b)
-either parser1 parser2 = fmap Left parser1 <|> fmap Right parser2
-
-
-separatedBy :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
-separatedBy parser separator = separatedBy1 parser separator <|> pure []
-
-
-separatedBy1 :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
-separatedBy1 parser separator = liftA2 (:) parser (many (separator *> parser))
-
-
-label :: Monad m => Text -> ParserT m a -> ParserT m a
-label l parser = ParserT \input -> runT parser input <&> \case
-  Result.Success value rest -> Result.Success value rest
-  Result.Failure isFatal _ _ -> Result.Failure isFatal input.position [l]
-
-
-commit :: Monad m => ParserT m a -> ParserT m a
-commit parser = ParserT \input -> runT parser input <&> \case
-  Result.Success value rest -> Result.Success value rest
-  Result.Failure _ position expectations -> Result.Failure True position expectations
+text t = parser $ \(Input position rest) ->
+  case Text.stripPrefix t rest of
+    Just suffix -> Success t (Input (position + Text.length t) suffix)
+    Nothing -> Failure False position [Text.pack (show t)]
 
 
 eoi :: Applicative m => ParserT m ()
-eoi = parser \input ->
+eoi = parser $ \input ->
   if Text.null input.rest then
-    Result.Success () input
+    Success () input
   else
-    Result.Failure False input.position ["end of input"]
+    Failure False input.position ["end of input"]
+
+
+separatedBy :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
+parser `separatedBy` separator = (parser `separatedBy1` separator) <|> pure []
+
+
+separatedBy1 :: Monad m => ParserT m a -> ParserT m b -> ParserT m [a]
+parser `separatedBy1` separator = liftA2 (:) parser (many (separator *> parser))
+
+
+commit :: Monad m => ParserT m a -> ParserT m a
+commit parser = ParserT $ \input -> do
+  result <- runT parser input
+
+  case result of
+    Success x rest -> pure (Success x rest)
+    Failure _ position expectations -> pure (Failure True position expectations)
+
+
+withLabel :: Monad m => Text -> ParserT m a -> ParserT m a
+withLabel label parser = ParserT $ \input -> do
+  result <- runT parser input
+
+  case result of
+    Success x rest -> pure (Success x rest)
+    Failure isFatal _ _ -> pure (Failure isFatal input.position [label])

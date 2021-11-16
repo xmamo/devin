@@ -1,16 +1,15 @@
 module Evaluator (
-  EvaluatorT (..),
-  Evaluator,
-  evaluator,
+  Evaluator (..),
+  getRoot,
   getConfiguration,
+  getState,
   getVariable,
   setVariable,
   updateVariable,
-  push,
-  pop
+  defineVariable,
+  push
 ) where
 
-import Data.Functor.Identity
 import Data.List
 
 import Data.Text (Text)
@@ -18,54 +17,73 @@ import Data.Text (Text)
 import Data.Map ((!?))
 import qualified Data.Map as Map
 
-import Evaluator.State (State)
-import Evaluator.Variable (Variable)
+import Evaluator.State
+import Syntax
+import Value
 
 import Evaluator.Internal
 
 
-type Evaluator = EvaluatorT Identity
+getRoot :: Applicative m => Evaluator m Devin
+getRoot = Evaluator $ \configuration state ->
+  pure (configuration.root, state)
 
 
-evaluator :: Applicative m => (Configuration m -> State -> (a, State)) -> EvaluatorT m a
-evaluator f = EvaluatorT \configuration state -> pure (f configuration state)
+getConfiguration :: Applicative m => Evaluator m (Configuration m)
+getConfiguration = Evaluator $ \configuration state ->
+  pure (configuration, state)
 
 
-getConfiguration :: Applicative m => EvaluatorT m (Configuration m)
-getConfiguration = evaluator (,)
+getState :: Applicative m => Evaluator m State
+getState = Evaluator $ \_ state ->
+  pure (state, state)
 
 
-getVariable :: Applicative m => Text -> EvaluatorT m Variable
-getVariable name = evaluator \_ state -> (go state, state)
+getVariable :: Applicative m => Text -> Evaluator m Value
+getVariable name = Evaluator $ \_ state -> pure (go state, state)
   where
     go [] = undefined
 
-    go (current : parents) = case current !? name of
+    go ((parent, variables) : parents) = case variables !? name of
       Just variable -> variable
-      Nothing -> go parents
+      Nothing -> go (genericDrop (parent - 1) parents)
 
 
-
-setVariable :: Applicative m => Text -> Variable -> EvaluatorT m ()
-setVariable name variable = evaluator \_ (current : parents) ->
-  ((), Map.insert name variable current : parents)
-
-
-updateVariable :: Applicative m => Text -> (Variable -> Variable) -> EvaluatorT m ()
-updateVariable name f = evaluator \_ state -> ((), go state)
+setVariable :: Applicative m => Text -> Value -> Evaluator m ()
+setVariable name variable = Evaluator $ \_ state -> pure ((), go state)
   where
     go [] = undefined
 
-    go (current : parents) = case current !? name of
-      Just variable -> Map.insert name (f variable) current : parents
-      Nothing -> go parents
+    go ((parent, variables) : parents) = case variables !? name of
+      Just _ ->
+        (parent, Map.insert name variable variables) : parents
+
+      Nothing -> do
+        let (parents1, parents2) = genericSplitAt (parent - 1) parents
+        (parent, variables) : (parents1 ++ go parents2)
 
 
-push :: EvaluatorT m a -> EvaluatorT m a
-push evaluator = EvaluatorT \configuration state ->
-  runT evaluator configuration (Map.empty : state)
+updateVariable :: Applicative m => Text -> (Value -> Value) -> Evaluator m ()
+updateVariable name f = Evaluator $ \_ state -> pure ((), go state)
+  where
+    go [] = undefined
+
+    go ((parent, variables) : parents) = case variables !? name of
+      Just variable ->
+        (parent, Map.insert name (f variable) variables) : parents
+
+      Nothing -> do
+        let (parents1, parents2) = genericSplitAt (parent - 1) parents
+        (parent, variables) : (parents1 ++ go parents2)
 
 
-pop :: Integer -> EvaluatorT m a -> EvaluatorT m a
-pop depth evaluator = EvaluatorT \configuration state ->
-  runT evaluator configuration (genericDrop depth state)
+defineVariable :: Applicative m => Text -> Value -> Evaluator m ()
+defineVariable name variable = Evaluator $ \_ ((parent, variables) : parents) ->
+  pure ((), (parent, Map.insert name variable variables) : parents)
+
+
+push :: (Integral a, Monad m) => a -> Evaluator m b -> Evaluator m b
+push parent evaluator = Evaluator $ \configuration state -> do
+  let state' = (toInteger parent, Map.empty) : state
+  (value, state'') <- runEvaluator evaluator configuration state'
+  pure (value, tail state'')

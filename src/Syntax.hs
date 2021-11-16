@@ -1,5 +1,6 @@
 module Syntax (
   Node (..),
+  Devin (..),
   Declaration (..),
   Statement (..),
   Expression (..),
@@ -23,7 +24,7 @@ doesReturn :: Statement -> Bool
 doesReturn DeclarationStatement{} = False
 doesReturn ExpressionStatement{} = False
 doesReturn IfStatement{} = False
-doesReturn IfElseStatement{trueBranch, falseBranch} = doesReturn trueBranch && doesReturn falseBranch
+doesReturn IfElseStatement{trueBranch, falseBranch} = all doesReturn [trueBranch, falseBranch]
 doesReturn WhileStatement{} = False
 doesReturn DoWhileStatement{body} = doesReturn body
 doesReturn ReturnStatement{} = True
@@ -36,7 +37,7 @@ hasSideEffects RationalExpression{} = False
 hasSideEffects VariableExpression{} = False
 hasSideEffects CallExpression{} = True
 hasSideEffects UnaryExpression{operand} = hasSideEffects operand
-hasSideEffects BinaryExpression{left, right} = hasSideEffects left || hasSideEffects right
+hasSideEffects BinaryExpression{left, right} = any hasSideEffects [left, right]
 hasSideEffects AssignExpression{} = True
 hasSideEffects ParenthesizedExpression{inner} = hasSideEffects inner
 

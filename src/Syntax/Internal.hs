@@ -1,5 +1,6 @@
 module Syntax.Internal (
   Node (..),
+  Devin (..),
   Declaration (..),
   Statement (..),
   Expression (..),
@@ -12,18 +13,24 @@ module Syntax.Internal (
   CallTarget (..)
 ) where
 
-import Prelude hiding (span)
+import Data.List.Extra
 
 import Data.Text (Text)
 
-import Span (Span)
-import qualified Span
+import Range
 import Type (Type)
 
 
-class Span a => Node a where
+class Node a where
   label :: a -> Text
+
   isLeaf :: a -> Bool
+
+  findDeclaration :: (Declaration -> Bool) -> a -> Maybe Declaration
+
+
+data Devin = Devin {declarations :: [Declaration], range :: (Int, Int)}
+  deriving (Eq, Show, Read)
 
 
 data Declaration where
@@ -55,7 +62,7 @@ data Statement where
   } -> Statement
 
   ExpressionStatement :: {
-    expression :: Expression,
+    value :: Expression,
     semicolon :: Token
   } -> Statement
 
@@ -104,15 +111,15 @@ data Statement where
 
 data Expression where
   IntegerExpression :: {
-    span :: (Int, Int),
     integer :: Integer,
-    t :: Type
+    t :: Type,
+    range :: (Int, Int)
   } -> Expression
 
   RationalExpression :: {
-    span :: (Int, Int),
     rational :: Rational,
-    t :: Type
+    t :: Type,
+    range :: (Int, Int)
   } -> Expression
 
   VariableExpression :: {
@@ -162,48 +169,48 @@ data Expression where
 
 
 data UnaryOperator where
-  PlusOperator :: {span :: (Int, Int), t :: Type} -> UnaryOperator
-  MinusOperator :: {span :: (Int, Int), t :: Type} -> UnaryOperator
-  NotOperator :: {span :: (Int, Int), t :: Type} -> UnaryOperator
+  PlusOperator :: {t :: Type, range :: (Int, Int)} -> UnaryOperator
+  MinusOperator :: {t :: Type, range :: (Int, Int)} -> UnaryOperator
+  NotOperator :: {t :: Type, range :: (Int, Int)} -> UnaryOperator
   deriving (Eq, Show, Read)
 
 
 data BinaryOperator where
-  AddOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  SubtractOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  MultiplyOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  DivideOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  ModuloOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  EqualOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  NotEqualOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  LessOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  LessOrEqualOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  GreaterOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  GreaterOrEqualOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  AndOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
-  OrOperator :: {span :: (Int, Int), t :: Type} -> BinaryOperator
+  AddOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  SubtractOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  MultiplyOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  DivideOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  ModuloOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  EqualOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  NotEqualOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  LessOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  LessOrEqualOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  GreaterOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  GreaterOrEqualOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  AndOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
+  OrOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
   deriving (Eq, Show, Read)
 
 
 data AssignOperator where
-  AssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
-  AddAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
-  SubtractAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
-  MultiplyAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
-  DivideAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
-  ModuloAssignOperator :: {span :: (Int, Int), t :: Type} -> AssignOperator
+  AssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
+  AddAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
+  SubtractAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
+  MultiplyAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
+  DivideAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
+  ModuloAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
   deriving (Eq, Show, Read)
 
 
-data Identifier = Identifier {span :: (Int, Int), name :: Text, t :: Type}
+data Identifier = Identifier {name :: Text, t :: Type, range :: (Int, Int)}
   deriving (Eq, Show, Read)
 
 
-newtype Token = Token {span :: (Int, Int)}
+newtype Token = Token {range :: (Int, Int)}
   deriving (Eq, Show, Read)
 
 
-newtype Comment = Comment {span :: (Int, Int)}
+newtype Comment = Comment {range :: (Int, Int)}
   deriving (Eq, Show, Read)
 
 
@@ -213,16 +220,31 @@ data CallTarget where
   FloatToInt :: CallTarget
   IntToFloat :: CallTarget
   FloatToFloat :: CallTarget
-  UserDefined :: {depth :: Integer, parameters :: [Identifier], body :: Statement} -> CallTarget
+  UserDefined :: {parameters :: [Text], depth :: Integer, position :: Integer} -> CallTarget
   deriving (Eq, Show, Read)
 
 
-instance Span Declaration where
-  start VariableDeclaration{varKeyword} = Span.start varKeyword
-  start FunctionDeclaration{defKeyword} = Span.start defKeyword
+instance Range Devin where
+  start Devin{range} = start range
 
-  end VariableDeclaration{semicolon} = Span.end semicolon
-  end FunctionDeclaration{body} = Span.end body
+  end Devin{range} = end range
+
+
+instance Node Devin where
+  label Devin{} = "Devin"
+
+  isLeaf Devin{} = False
+
+  findDeclaration f Devin{declarations} =
+    firstJust (findDeclaration f) declarations
+
+
+instance Range Declaration where
+  start VariableDeclaration{varKeyword} = start varKeyword
+  start FunctionDeclaration{defKeyword} = start defKeyword
+
+  end VariableDeclaration{semicolon} = end semicolon
+  end FunctionDeclaration{body} = end body
 
 
 instance Node Declaration where
@@ -231,25 +253,29 @@ instance Node Declaration where
 
   isLeaf _ = False
 
+  findDeclaration f declaration | f declaration = Just declaration
+  findDeclaration f FunctionDeclaration{body} = findDeclaration f body
+  findDeclaration _ _ = Nothing
 
-instance Span Statement where
-  start DeclarationStatement{declaration} = Span.start declaration
-  start ExpressionStatement{expression} = Span.start expression
-  start IfStatement{ifKeyword} = Span.start ifKeyword
-  start IfElseStatement{ifKeyword} = Span.start ifKeyword
-  start WhileStatement{whileKeyword} = Span.start whileKeyword
-  start DoWhileStatement{doKeyword} = Span.start doKeyword
-  start ReturnStatement{returnKeyword} = Span.start returnKeyword
-  start BlockStatement{open} = Span.start open
 
-  end DeclarationStatement{declaration} = Span.end declaration
-  end ExpressionStatement{semicolon} = Span.end semicolon
-  end IfStatement{trueBranch} = Span.end trueBranch
-  end IfElseStatement{falseBranch} = Span.end falseBranch
-  end WhileStatement{body} = Span.end body
-  end DoWhileStatement{body} = Span.end body
-  end ReturnStatement{semicolon} = Span.end semicolon
-  end BlockStatement{close} = Span.end close
+instance Range Statement where
+  start DeclarationStatement{declaration} = start declaration
+  start ExpressionStatement{value} = start value
+  start IfStatement{ifKeyword} = start ifKeyword
+  start IfElseStatement{ifKeyword} = start ifKeyword
+  start WhileStatement{whileKeyword} = start whileKeyword
+  start DoWhileStatement{doKeyword} = start doKeyword
+  start ReturnStatement{returnKeyword} = start returnKeyword
+  start BlockStatement{open} = start open
+
+  end DeclarationStatement{declaration} = end declaration
+  end ExpressionStatement{semicolon} = end semicolon
+  end IfStatement{trueBranch} = end trueBranch
+  end IfElseStatement{falseBranch} = end falseBranch
+  end WhileStatement{body} = end body
+  end DoWhileStatement{body} = end body
+  end ReturnStatement{semicolon} = end semicolon
+  end BlockStatement{close} = end close
 
 
 instance Node Statement where
@@ -265,25 +291,34 @@ instance Node Statement where
   isLeaf ReturnStatement{result = Nothing} = True
   isLeaf _ = False
 
+  findDeclaration f declaration = case declaration of
+    DeclarationStatement{declaration} -> findDeclaration f declaration
+    IfStatement{trueBranch} -> findDeclaration f trueBranch
+    IfElseStatement{trueBranch, falseBranch} -> firstJust (findDeclaration f) [trueBranch, falseBranch]
+    WhileStatement{body} -> findDeclaration f body
+    DoWhileStatement{body} -> findDeclaration f body
+    BlockStatement{statements} -> firstJust (findDeclaration f) statements
+    _ -> Nothing
 
-instance Span Expression where
-  start IntegerExpression{span} = Span.start span
-  start RationalExpression{span} = Span.start span
-  start VariableExpression{variableId} = Span.start variableId
-  start CallExpression{targetId} = Span.start targetId
-  start UnaryExpression{unary} = Span.start unary
-  start BinaryExpression{left} = Span.start left
-  start AssignExpression{variableId} = Span.start variableId
-  start ParenthesizedExpression{open} = Span.start open
 
-  end IntegerExpression{span} = Span.end span
-  end RationalExpression{span} = Span.end span
-  end VariableExpression{variableId} = Span.end variableId
-  end CallExpression{close} = Span.end close
-  end UnaryExpression{operand} = Span.end operand
-  end BinaryExpression{right} = Span.end right
-  end AssignExpression{right} = Span.end right
-  end ParenthesizedExpression{close} = Span.end close
+instance Range Expression where
+  start IntegerExpression{range} = start range
+  start RationalExpression{range} = start range
+  start VariableExpression{variableId} = start variableId
+  start CallExpression{targetId} = start targetId
+  start UnaryExpression{unary} = start unary
+  start BinaryExpression{left} = start left
+  start AssignExpression{variableId} = start variableId
+  start ParenthesizedExpression{open} = start open
+
+  end IntegerExpression{range} = end range
+  end RationalExpression{range} = end range
+  end VariableExpression{variableId} = end variableId
+  end CallExpression{close} = end close
+  end UnaryExpression{operand} = end operand
+  end BinaryExpression{right} = end right
+  end AssignExpression{right} = end right
+  end ParenthesizedExpression{close} = end close
 
 
 instance Node Expression where
@@ -300,15 +335,17 @@ instance Node Expression where
   isLeaf RationalExpression{} = True
   isLeaf _ = False
 
+  findDeclaration _ _ = Nothing
 
-instance Span UnaryOperator where
-  start PlusOperator{span} = Span.start span
-  start MinusOperator{span} = Span.start span
-  start NotOperator{span} = Span.start span
 
-  end PlusOperator{span} = Span.start span
-  end MinusOperator{span} = Span.start span
-  end NotOperator{span} = Span.start span
+instance Range UnaryOperator where
+  start PlusOperator{range} = start range
+  start MinusOperator{range} = start range
+  start NotOperator{range} = start range
+
+  end PlusOperator{range} = end range
+  end MinusOperator{range} = end range
+  end NotOperator{range} = end range
 
 
 instance Node UnaryOperator where
@@ -318,35 +355,37 @@ instance Node UnaryOperator where
 
   isLeaf _ = True
 
+  findDeclaration _ _ = Nothing
 
-instance Span BinaryOperator where
-  start AddOperator{span} = Span.start span
-  start SubtractOperator{span} = Span.start span
-  start MultiplyOperator{span} = Span.start span
-  start DivideOperator{span} = Span.start span
-  start ModuloOperator{span} = Span.start span
-  start EqualOperator{span} = Span.start span
-  start NotEqualOperator{span} = Span.start span
-  start LessOperator{span} = Span.start span
-  start LessOrEqualOperator{span} = Span.start span
-  start GreaterOperator{span} = Span.start span
-  start GreaterOrEqualOperator{span} = Span.start span
-  start AndOperator{span} = Span.start span
-  start OrOperator{span} = Span.start span
 
-  end AddOperator{span} = Span.end span
-  end SubtractOperator{span} = Span.end span
-  end MultiplyOperator{span} = Span.end span
-  end DivideOperator{span} = Span.end span
-  end ModuloOperator{span} = Span.end span
-  end EqualOperator{span} = Span.end span
-  end NotEqualOperator{span} = Span.end span
-  end LessOperator{span} = Span.end span
-  end LessOrEqualOperator{span} = Span.end span
-  end GreaterOperator{span} = Span.end span
-  end GreaterOrEqualOperator{span} = Span.end span
-  end AndOperator{span} = Span.end span
-  end OrOperator{span} = Span.end span
+instance Range BinaryOperator where
+  start AddOperator{range} = start range
+  start SubtractOperator{range} = start range
+  start MultiplyOperator{range} = start range
+  start DivideOperator{range} = start range
+  start ModuloOperator{range} = start range
+  start EqualOperator{range} = start range
+  start NotEqualOperator{range} = start range
+  start LessOperator{range} = start range
+  start LessOrEqualOperator{range} = start range
+  start GreaterOperator{range} = start range
+  start GreaterOrEqualOperator{range} = start range
+  start AndOperator{range} = start range
+  start OrOperator{range} = start range
+
+  end AddOperator{range} = end range
+  end SubtractOperator{range} = end range
+  end MultiplyOperator{range} = end range
+  end DivideOperator{range} = end range
+  end ModuloOperator{range} = end range
+  end EqualOperator{range} = end range
+  end NotEqualOperator{range} = end range
+  end LessOperator{range} = end range
+  end LessOrEqualOperator{range} = end range
+  end GreaterOperator{range} = end range
+  end GreaterOrEqualOperator{range} = end range
+  end AndOperator{range} = end range
+  end OrOperator{range} = end range
 
 
 instance Node BinaryOperator where
@@ -366,21 +405,23 @@ instance Node BinaryOperator where
 
   isLeaf _ = True
 
+  findDeclaration _ _ = Nothing
 
-instance Span AssignOperator where
-  start AssignOperator{span} = Span.start span
-  start AddAssignOperator{span} = Span.start span
-  start SubtractAssignOperator{span} = Span.start span
-  start MultiplyAssignOperator{span} = Span.start span
-  start DivideAssignOperator{span} = Span.start span
-  start ModuloAssignOperator{span} = Span.start span
 
-  end AssignOperator{span} = Span.end span
-  end AddAssignOperator{span} = Span.end span
-  end SubtractAssignOperator{span} = Span.end span
-  end MultiplyAssignOperator{span} = Span.end span
-  end DivideAssignOperator{span} = Span.end span
-  end ModuloAssignOperator{span} = Span.end span
+instance Range AssignOperator where
+  start AssignOperator{range} = start range
+  start AddAssignOperator{range} = start range
+  start SubtractAssignOperator{range} = start range
+  start MultiplyAssignOperator{range} = start range
+  start DivideAssignOperator{range} = start range
+  start ModuloAssignOperator{range} = start range
+
+  end AssignOperator{range} = end range
+  end AddAssignOperator{range} = end range
+  end SubtractAssignOperator{range} = end range
+  end MultiplyAssignOperator{range} = end range
+  end DivideAssignOperator{range} = end range
+  end ModuloAssignOperator{range} = end range
 
 
 instance Node AssignOperator where
@@ -393,11 +434,13 @@ instance Node AssignOperator where
 
   isLeaf _ = True
 
+  findDeclaration _ _ = Nothing
 
-instance Span Identifier where
-  start Identifier{span} = Span.start span
 
-  end Identifier{span} = Span.end span
+instance Range Identifier where
+  start Identifier{range} = start range
+
+  end Identifier{range} = end range
 
 
 instance Node Identifier where
@@ -405,11 +448,13 @@ instance Node Identifier where
 
   isLeaf Identifier{} = True
 
+  findDeclaration _ _ = Nothing
 
-instance Span Token where
-  start Token{span} = Span.start span
 
-  end Token{span} = Span.end span
+instance Range Token where
+  start Token{range} = start range
+
+  end Token{range} = end range
 
 
 instance Node Token where
@@ -417,14 +462,18 @@ instance Node Token where
 
   isLeaf Token{} = True
 
+  findDeclaration _ _ = Nothing
 
-instance Span Comment where
-  start Comment{span} = Span.start span
 
-  end Comment{span} = Span.end span
+instance Range Comment where
+  start Comment{range} = start range
+
+  end Comment{range} = end range
 
 
 instance Node Comment where
   label Comment{} = "Comment"
 
   isLeaf Comment{} = True
+
+  findDeclaration _ _ = Nothing

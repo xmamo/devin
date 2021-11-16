@@ -10,8 +10,7 @@ import qualified Data.Map as Map
 
 import CallTarget (CallTarget)
 import qualified CallTarget
-import Type (Type)
-import qualified Type
+import Type
 
 
 data Environment = Environment {
@@ -27,17 +26,17 @@ predefined = Environment 0 types variables functions
   where
     types = Map.fromList
       [
-        ("Unit", Type.Unit),
-        ("Bool", Type.Bool),
-        ("Int", Type.Int),
-        ("Float", Type.Float)
+        ("Unit", Unit),
+        ("Bool", Bool),
+        ("Int", Int),
+        ("Float", Float)
       ]
 
     variables = Map.fromList
       [
-        ("unit", Type.Unit),
-        ("true", Type.Bool),
-        ("false", Type.Bool)
+        ("unit", Unit),
+        ("true", Bool),
+        ("false", Bool)
       ]
 
     functions =
@@ -46,13 +45,13 @@ predefined = Environment 0 types variables functions
 
         Map.fromList [
           ("int", [
-            ([Type.Int], Type.Int, CallTarget.IntToInt),
-            ([Type.Float], Type.Int, CallTarget.FloatToInt)
+            ([Int], Int, CallTarget.IntToInt),
+            ([Float], Int, CallTarget.FloatToInt)
           ]),
 
           ("float", [
-            ([Type.Int], Type.Float, CallTarget.IntToFloat),
-            ([Type.Float], Type.Float, CallTarget.FloatToFloat)
+            ([Int], Float, CallTarget.IntToFloat),
+            ([Float], Float, CallTarget.FloatToFloat)
           ])
         ]
       ]
