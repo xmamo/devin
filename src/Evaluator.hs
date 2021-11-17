@@ -10,8 +10,6 @@ module Evaluator (
   push
 ) where
 
-import Data.List
-
 import Data.Text (Text)
 
 import Data.Map ((!?))
@@ -46,7 +44,7 @@ getVariable name = Evaluator $ \_ state -> pure (go state, state)
 
     go ((parent, variables) : parents) = case variables !? name of
       Just variable -> variable
-      Nothing -> go (genericDrop (parent - 1) parents)
+      Nothing -> go (drop (parent - 1) parents)
 
 
 setVariable :: Applicative m => Text -> Value -> Evaluator m ()
@@ -59,7 +57,7 @@ setVariable name variable = Evaluator $ \_ state -> pure ((), go state)
         (parent, Map.insert name variable variables) : parents
 
       Nothing -> do
-        let (parents1, parents2) = genericSplitAt (parent - 1) parents
+        let (parents1, parents2) = splitAt (parent - 1) parents
         (parent, variables) : (parents1 ++ go parents2)
 
 
@@ -73,7 +71,7 @@ updateVariable name f = Evaluator $ \_ state -> pure ((), go state)
         (parent, Map.insert name (f variable) variables) : parents
 
       Nothing -> do
-        let (parents1, parents2) = genericSplitAt (parent - 1) parents
+        let (parents1, parents2) = splitAt (parent - 1) parents
         (parent, variables) : (parents1 ++ go parents2)
 
 
@@ -84,6 +82,6 @@ defineVariable name variable = Evaluator $ \_ ((parent, variables) : parents) ->
 
 push :: (Integral a, Monad m) => a -> Evaluator m b -> Evaluator m b
 push parent evaluator = Evaluator $ \configuration state -> do
-  let state' = (toInteger parent, Map.empty) : state
+  let state' = (fromIntegral parent, Map.empty) : state
   (value, state'') <- runEvaluator evaluator configuration state'
   pure (value, tail state'')

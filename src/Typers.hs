@@ -67,7 +67,7 @@ checkDeclaration2 declaration = case declaration of
   FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
     let parameterIds = parameters <&> (._1)
     let parameterTypes = parameters <&> (._3.t)
-    let returnType = maybe Unit ((.t) . snd) returnInfo
+    let returnType = maybe Unit (._2.t) returnInfo
 
     body' <- push $ do
       for_ parameterIds defineVariable

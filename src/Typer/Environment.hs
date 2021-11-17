@@ -14,7 +14,7 @@ import Type
 
 
 data Environment = Environment {
-  depth :: Integer,
+  depth :: Int,
   types :: Map Text Type,
   variables :: Map Text Type,
   functions :: [Map Text [([Type], Type, CallTarget)]]

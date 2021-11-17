@@ -55,9 +55,9 @@ runTyper (Typer check) environment = do
   (a, environment', sortOn start errors)
 
 
-getDepth :: Typer Integer
+getDepth :: Num a => Typer a
 getDepth = Typer $ \environment ->
-  (environment.depth, environment, [])
+  (fromIntegral environment.depth, environment, [])
 
 
 getTypes :: Typer (Map Text Type)

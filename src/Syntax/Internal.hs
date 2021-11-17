@@ -133,7 +133,7 @@ data Expression where
     arguments :: [Expression],
     commas :: [Token],
     close :: Token,
-    depth :: Integer,
+    depth :: Int,
     target :: CallTarget,
     t :: Type
   } -> Expression
@@ -220,7 +220,7 @@ data CallTarget where
   FloatToInt :: CallTarget
   IntToFloat :: CallTarget
   FloatToFloat :: CallTarget
-  UserDefined :: {parameters :: [Text], depth :: Integer, position :: Integer} -> CallTarget
+  UserDefined :: {parameters :: [Text], depth :: Int, position :: Int} -> CallTarget
   deriving (Eq, Show, Read)
 
 

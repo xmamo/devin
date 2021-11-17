@@ -11,7 +11,7 @@ import Data.Map qualified as Map
 import Value
 
 
-type State = [(Integer, Map Text Value)]
+type State = [(Int, Map Text Value)]
 
 
 predefined :: State
