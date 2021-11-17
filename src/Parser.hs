@@ -12,7 +12,7 @@ module Parser (
   separatedBy,
   separatedBy1,
   commit,
-  withLabel
+  label
 ) where
 
 import Control.Applicative
@@ -178,10 +178,10 @@ commit parser = ParserT $ \input -> do
     Failure _ position expectations -> pure (Failure True position expectations)
 
 
-withLabel :: Monad m => Text -> ParserT m a -> ParserT m a
-withLabel label parser = ParserT $ \input -> do
+label :: Monad m => Text -> ParserT m a -> ParserT m a
+label expectation parser = ParserT $ \input -> do
   result <- runT parser input
 
   case result of
     Success x rest -> pure (Success x rest)
-    Failure isFatal _ _ -> pure (Failure isFatal input.position [label])
+    Failure isFatal _ _ -> pure (Failure isFatal input.position [expectation])

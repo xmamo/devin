@@ -16,7 +16,6 @@ import Control.Monad
 import Data.Char
 import Data.Foldable
 import Data.Functor
-import Data.Maybe
 
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -28,7 +27,7 @@ import Control.Monad.Trans.Writer
 
 import qualified CallTarget
 import Parser hiding (Parser)
-import Syntax hiding (declaration)
+import Syntax hiding (label, declaration)
 import qualified Type
 
 
@@ -98,24 +97,17 @@ statement :: Parser Statement
 statement = asum
   [
     declarationStatement,
-    blockStatement,
     ifElseOrIfStatement,
     whileStatement,
     doWhileStatement,
     returnStatement,
-    expressionStatement
+    expressionStatement,
+    blockStatement
   ]
 
 
 declarationStatement :: Parser Statement
 declarationStatement = DeclarationStatement <$> declaration
-
-
-expressionStatement :: Parser Statement
-expressionStatement = do
-  value <- expression
-  semicolon <- commit (s *> tokenText ";")
-  pure (ExpressionStatement value semicolon)
 
 
 ifElseOrIfStatement :: Parser Statement
@@ -165,6 +157,13 @@ returnStatement = do
   pure (ReturnStatement returnKeyword result semicolon)
 
 
+expressionStatement :: Parser Statement
+expressionStatement = do
+  value <- expression
+  semicolon <- commit (s *> tokenText ";")
+  pure (ExpressionStatement value semicolon)
+
+
 blockStatement :: Parser Statement
 blockStatement = do
   open <- tokenText "{"
@@ -179,12 +178,62 @@ expression :: Parser Expression
 expression = assignExpression <|> binaryOrOperandExpression
 
 
-literalExpression :: Parser Expression
-literalExpression = rationalExpression <|> integerExpression
+assignExpression :: Parser Expression
+assignExpression = do
+  targetId <- identifier
+  assign <- s *> assignOperator
+  value <-  s *> expression
+  pure (AssignExpression targetId assign value Type.Undefined)
+
+
+binaryOrOperandExpression :: Parser Expression
+binaryOrOperandExpression = do
+  left <- operandExpression
+  binary <- optional (s *> binaryOperator)
+
+  case binary of
+    Just binary -> do
+      right <- commit (s *> expression)
+
+      case right of
+        BinaryExpression{} | precedence binary >= precedence right.binary -> do
+          let left' = BinaryExpression left binary right.left Type.Undefined
+          pure (BinaryExpression left' right.binary right.right Type.Undefined)
+
+        _ -> pure (BinaryExpression left binary right Type.Undefined)
+
+    Nothing -> pure left
+
+  where
+    precedence MultiplyOperator{} = 5
+    precedence DivideOperator{} = 5
+    precedence ModuloOperator{} = 5
+    precedence AddOperator{} = 4
+    precedence SubtractOperator{} = 4
+    precedence LessOperator{} = 3
+    precedence LessOrEqualOperator{} = 3
+    precedence GreaterOperator{} = 3
+    precedence GreaterOrEqualOperator{} = 3
+    precedence EqualOperator{} = 2
+    precedence NotEqualOperator{} = 2
+    precedence AndOperator{} = 1
+    precedence OrOperator{} = 1
+
+
+operandExpression :: Parser Expression
+operandExpression = asum
+  [
+    rationalExpression,
+    integerExpression,
+    callExpression,
+    unaryExpression,
+    variableExpression,
+    parenthesizedExpression
+  ]
 
 
 integerExpression :: Parser Expression
-integerExpression = withLabel "integer" $ syntax $ do
+integerExpression = label "integer" $ syntax $ do
   sign <- (text "+" $> 1) <|> (text "-" $> -1) <|> pure 1
   digits <- some (satisfy isDigit)
   let magnitude = foldl (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
@@ -192,11 +241,12 @@ integerExpression = withLabel "integer" $ syntax $ do
 
 
 rationalExpression :: Parser Expression
-rationalExpression = withLabel "rational" $ syntax $ do
+rationalExpression = label "rational" $ syntax $ do
   sign <- (text "+" $> 1) <|> (text "-" $> -1) <|> pure 1
   digits1 <- some (satisfy isDigit)
   digits2 <- text "." *> some (satisfy isDigit)
-  let mantissa = foldl (\a d -> 10 * a + toRational (digitToInt d)) 0 (digits1 ++ digits2)
+  let digits = digits1 ++ digits2
+  let mantissa = foldl (\a d -> 10 * a + toRational (digitToInt d)) 0 digits
   pure (RationalExpression (sign * mantissa * 0.1 ^^ length digits2) Type.Undefined)
 
 
@@ -228,39 +278,8 @@ callExpression = do
 unaryExpression :: Parser Expression
 unaryExpression = do
   unary <- unaryOperator
-
-  operand <- case unary of
-    NotOperator{} -> s *> operandExpression
-    _ -> commit (s *> operandExpression)
-
+  operand <- s *> operandExpression
   pure (UnaryExpression unary operand Type.Undefined)
-
-
-binaryOrOperandExpression :: Parser Expression
-binaryOrOperandExpression = do
-  left <- operandExpression
-  binary <- optional (s *> binaryOperator)
-
-  case binary of
-    Just binary -> do
-      right <- commit (s *> expression)
-
-      case right of
-        BinaryExpression{} | comparePrecedence binary right.binary >= EQ -> do
-          let left' = BinaryExpression left binary right.left Type.Undefined
-          pure (BinaryExpression left' right.binary right.right Type.Undefined)
-
-        _ -> pure (BinaryExpression left binary right Type.Undefined)
-
-    Nothing -> pure left
-
-
-assignExpression :: Parser Expression
-assignExpression = do
-  targetId <- identifier
-  assign <- s *> assignOperator
-  value <- commit (s *> expression)
-  pure (AssignExpression targetId assign value Type.Undefined)
 
 
 parenthesizedExpression :: Parser Expression
@@ -271,17 +290,6 @@ parenthesizedExpression = do
     inner <- s *> expression
     close <- tokenText ")"
     pure (ParenthesizedExpression open inner close Type.Undefined)
-
-
-operandExpression :: Parser Expression
-operandExpression = asum
-  [
-    parenthesizedExpression,
-    literalExpression,
-    callExpression,
-    unaryExpression,
-    variableExpression
-  ]
 
 
 unaryOperator :: Parser UnaryOperator
@@ -313,30 +321,24 @@ binaryOperator = syntax $ asum
 
 
 assignOperator :: Parser AssignOperator
-assignOperator = do
-  x <- optional (text "==")
-  guard (isNothing x)
-
-  syntax $ asum
-    [
-      text "=" $> AssignOperator Type.Undefined,
-      text "+=" $> AddAssignOperator Type.Undefined,
-      text "-=" $> SubtractAssignOperator Type.Undefined,
-      text "*=" $> MultiplyAssignOperator Type.Undefined,
-      text "/=" $> DivideAssignOperator Type.Undefined,
-      text "%=" $> ModuloAssignOperator Type.Undefined
-    ]
+assignOperator = syntax $ asum
+  [
+    text "=" $> AssignOperator Type.Undefined,
+    text "+=" $> AddAssignOperator Type.Undefined,
+    text "-=" $> SubtractAssignOperator Type.Undefined,
+    text "*=" $> MultiplyAssignOperator Type.Undefined,
+    text "/=" $> DivideAssignOperator Type.Undefined,
+    text "%=" $> ModuloAssignOperator Type.Undefined
+  ]
 
 
 -- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
 identifier :: Parser Identifier
-identifier = withLabel "identifier" $ syntax $ do
-  start <- category isStart
-  continue <- many (category isContinue)
+identifier = label "identifier" $ syntax $ do
+  start <- satisfy $ \c -> isStart (generalCategory c)
+  continue <- many (satisfy $ \c -> isContinue (generalCategory c))
   pure (Identifier (Text.pack (start : continue)) Type.Undefined)
   where
-    category f = satisfy $ \c -> f (generalCategory c)
-
     isStart UppercaseLetter = True
     isStart LowercaseLetter = True
     isStart TitlecaseLetter = True
@@ -364,22 +366,18 @@ comment = do
 
 
 keyword :: Text -> Parser Token
-keyword k = withLabel ("keyword " <> k) $ do
+keyword k = label ("keyword " <> k) $ do
   Identifier{range, name} <- identifier
   guard (name == k)
   pure (Token range)
-
-
-token :: Parser a -> Parser Token
-token parser = syntax (parser $> Token)
 
 
 tokenText :: Text -> Parser Token
 tokenText t = token (text t)
 
 
-s :: Parser Token
-s = token (many (void (some (satisfy isSpace)) <|> void comment))
+token :: Parser a -> Parser Token
+token parser = syntax (parser $> Token)
 
 
 syntax :: Num a => Parser ((a, a) -> b) -> Parser b
@@ -388,3 +386,7 @@ syntax parser = do
   f <- parser
   end <- position
   pure (f (start, end))
+
+
+s :: Parser Token
+s = token (many (void (some (satisfy isSpace)) <|> void comment))
