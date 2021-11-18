@@ -7,5 +7,5 @@ data CallTarget where
   FloatToInt :: CallTarget
   IntToFloat :: CallTarget
   FloatToFloat :: CallTarget
-  UserDefined :: {position :: Int, depth :: Int} -> CallTarget
+  UserDefined :: {position :: Int} -> CallTarget
   deriving (Eq, Show, Read)

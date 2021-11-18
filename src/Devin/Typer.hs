@@ -110,8 +110,8 @@ defineFunction functionId callTarget = Typer $ \environment -> do
 
 push :: Typer a -> Typer a
 push (Typer check) = Typer $ \environment -> do
-  let (a, _, errors) = check environment{depth = environment.depth + 1}
-  (a, environment, errors)
+  let (x, _, errors) = check environment{depth = environment.depth + 1}
+  (x, environment, errors)
 
 
 report :: Error -> Typer ()

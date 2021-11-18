@@ -52,7 +52,8 @@ data Declaration where
     commas :: [Token],
     close :: Token,
     returnInfo :: Maybe (Token, Identifier),
-    body :: Statement
+    body :: Statement,
+    depth :: Int
   } -> Declaration
 
   deriving (Eq, Show, Read)

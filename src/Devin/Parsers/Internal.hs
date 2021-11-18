@@ -90,7 +90,7 @@ functionDeclaration = do
     close <- s *> tokenText ")"
     returnInfo <- optional (liftA2 (,) (s *> tokenText "->") (commit (s *> identifier)))
     body <- s *> statement
-    pure (FunctionDeclaration defKeyword functionId open parameters commas close returnInfo body)
+    pure (FunctionDeclaration defKeyword functionId open parameters commas close returnInfo body (-1))
 
 
 statement :: Parser Statement

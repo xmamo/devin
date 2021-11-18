@@ -1,5 +1,6 @@
 module Devin.Typers (
   checkDevin,
+  checkDeclarations,
   checkStatement,
   checkVariable
 ) where
@@ -22,10 +23,15 @@ import Devin.Typer.Error
 
 
 checkDevin :: Devin -> Typer Devin
-checkDevin devin = do
-  declarations' <- for devin.declarations checkDeclaration1
-  declarations'' <- for declarations' checkDeclaration2
-  pure devin{declarations = declarations''}
+checkDevin devin = push $ do
+  declarations' <- checkDeclarations devin.declarations
+  pure devin{declarations = declarations'}
+
+
+checkDeclarations :: Traversable t => t Declaration -> Typer (t Declaration)
+checkDeclarations declarations = do
+  declarations' <- for declarations checkDeclaration1
+  for declarations' checkDeclaration2
 
 
 checkDeclaration1 :: Declaration -> Typer Declaration
@@ -33,8 +39,6 @@ checkDeclaration1 declaration = case declaration of
   VariableDeclaration{} -> pure declaration
 
   FunctionDeclaration{functionId, parameters, returnInfo} -> do
-    depth <- getDepth
-
     parameters' <- for parameters $ \(id, colon, typeId) -> do
       typeId' <- checkType typeId
       pure (id{t = typeId'.t}, colon, typeId')
@@ -49,10 +53,11 @@ checkDeclaration1 declaration = case declaration of
     let parameterTypes = parameters' <&> (._3.t)
     let returnType = maybe Unit (._2.t) returnInfo'
     let functionId' = functionId{t = Function parameterTypes returnType}
-    let callTarget = CallTarget.UserDefined (start declaration) depth
+    let callTarget = CallTarget.UserDefined (start declaration)
     defineFunction functionId' callTarget
 
-    pure declaration{functionId = functionId', parameters = parameters', returnInfo = returnInfo'}
+    depth <- getDepth
+    pure declaration{functionId = functionId', parameters = parameters', returnInfo = returnInfo', depth}
 
 
 checkDeclaration2 :: Declaration -> Typer Declaration
@@ -162,9 +167,9 @@ checkExpression expression = case expression of
     pure expression{variableId = variableId', t = variableId'.t}
 
   CallExpression{targetId, arguments} -> do
+    depth <- getDepth
     arguments' <- for arguments checkExpression
     (targetId', target') <- checkFunction targetId (arguments' <&> (.t))
-    depth <- getDepth
     pure expression{targetId = targetId', arguments = arguments', depth, target = target', t = targetId'.t.returnType}
 
   UnaryExpression{unary, operand} -> do

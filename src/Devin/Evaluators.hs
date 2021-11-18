@@ -132,7 +132,7 @@ evaluateExpression expression = case expression of
 
   VariableExpression{variableId} -> getVariable variableId.name
 
-  CallExpression{arguments, depth, target} -> do
+  CallExpression{arguments, depth = callerDepth, target} -> do
     values <- for arguments evaluateExpression
 
     case (target, values) of
@@ -144,17 +144,17 @@ evaluateExpression expression = case expression of
 
       (CallTarget.FloatToFloat, Float x : _) -> pure (Float x)
 
-      (CallTarget.UserDefined position depth', _) ->
-        push (depth - depth' + 1) $ do
-          root <- getRoot
+      (CallTarget.UserDefined{position}, _) -> do
+        root <- getRoot
 
-          case findDeclaration (\d -> start d == position) root of
-            Just FunctionDeclaration{body, parameters} -> do
+        case findDeclaration (\d -> start d == position) root of
+          Just FunctionDeclaration{body, parameters, depth = calleeDepth} ->
+            push (callerDepth - calleeDepth + 1) $ do
               zipWithM_ (\p -> defineVariable p._1.name) parameters values
               value <- evaluateStatement body
               pure (fromMaybe Unit value)
 
-            _ -> undefined
+          _ -> undefined
 
       _ -> undefined
 
