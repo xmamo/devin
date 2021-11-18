@@ -46,11 +46,10 @@ checkDeclaration1 declaration = case declaration of
 
       Nothing -> pure Nothing
 
-    let parameterNames = parameters' <&> (._1.name)
     let parameterTypes = parameters' <&> (._3.t)
     let returnType = maybe Unit (._2.t) returnInfo'
     let functionId' = functionId{t = Function parameterTypes returnType}
-    let callTarget = CallTarget.UserDefined parameterNames depth (start declaration)
+    let callTarget = CallTarget.UserDefined (start declaration) depth
     defineFunction functionId' callTarget
 
     pure declaration{functionId = functionId', parameters = parameters', returnInfo = returnInfo'}

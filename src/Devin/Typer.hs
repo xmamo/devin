@@ -1,5 +1,5 @@
 module Devin.Typer (
-  Typer (..),
+  Typer,
   runTyper,
   getDepth,
   getTypes,

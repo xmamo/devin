@@ -144,13 +144,13 @@ evaluateExpression expression = case expression of
 
       (CallTarget.FloatToFloat, Float x : _) -> pure (Float x)
 
-      (CallTarget.UserDefined parameters depth' position, _) ->
+      (CallTarget.UserDefined position depth', _) ->
         push (depth - depth' + 1) $ do
           root <- getRoot
 
           case findDeclaration (\d -> start d == position) root of
-            Just FunctionDeclaration{body} -> do
-              zipWithM_ defineVariable parameters values
+            Just FunctionDeclaration{body, parameters} -> do
+              zipWithM_ (\p -> defineVariable p._1.name) parameters values
               value <- evaluateStatement body
               pure (fromMaybe Unit value)
 

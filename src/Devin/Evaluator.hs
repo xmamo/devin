@@ -48,13 +48,13 @@ getVariable name = Evaluator $ \_ state -> pure (go state, state)
 
 
 setVariable :: Applicative m => Text -> Value -> Evaluator m ()
-setVariable name variable = Evaluator $ \_ state -> pure ((), go state)
+setVariable name value = Evaluator $ \_ state -> pure ((), go state)
   where
     go [] = undefined
 
     go ((parent, variables) : parents) = case variables !? name of
       Just _ ->
-        (parent, Map.insert name variable variables) : parents
+        (parent, Map.insert name value variables) : parents
 
       Nothing -> do
         let (parents1, parents2) = splitAt (parent - 1) parents
@@ -76,8 +76,8 @@ updateVariable name f = Evaluator $ \_ state -> pure ((), go state)
 
 
 defineVariable :: Applicative m => Text -> Value -> Evaluator m ()
-defineVariable name variable = Evaluator $ \_ ((parent, variables) : parents) ->
-  pure ((), (parent, Map.insert name variable variables) : parents)
+defineVariable name value = Evaluator $ \_ ((parent, variables) : parents) ->
+  pure ((), (parent, Map.insert name value variables) : parents)
 
 
 push :: (Integral a, Monad m) => a -> Evaluator m b -> Evaluator m b

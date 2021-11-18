@@ -160,7 +160,8 @@ onActivate application = do
       (Just scheme, Nothing) -> GtkSource.styleSchemeGetStyle scheme styleId
       (Nothing, _) -> pure Nothing
 
-    whenJust style $ \style -> GtkSource.styleApply style tag
+    whenJust style $ \style ->
+      GtkSource.styleApply style tag
 
   -- Set up codeTreeView:
 
@@ -296,7 +297,7 @@ onActivate application = do
     tryTakeMVar devinVar
     putMVar parseThreadIdVar =<< forkIO action
 
-  on codeBuffer (PropertyNotify Gtk.textBufferCursorPosition) $ \_ -> void $ do
+  on codeBuffer (PropertyNotify Gtk.textBufferCursorPosition) $ \_ -> do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     Gtk.textBufferRemoveTagByName codeBuffer "bracket" startIter endIter
 
