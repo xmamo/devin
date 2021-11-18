@@ -21,6 +21,7 @@ data Error where
   InvalidAssign :: {assign :: AssignOperator, target :: Type, value :: Type} -> Error
   InvalidType :: {expression :: Expression, expected :: Type, actual :: Type} -> Error
   InvalidReturnType :: {statement :: Statement, expected :: Type, actual :: Type} -> Error
+  CallBeforeDependency :: {targetId :: Identifier, variableId :: Identifier} -> Error
   MissingReturnValue :: {statement :: Statement, expected :: Type} -> Error
   MissingReturnPath :: {functionId :: Identifier, parameters :: [Type]} -> Error
   deriving (Eq, Show, Read)
@@ -36,6 +37,7 @@ instance Range Error where
   start InvalidAssign{assign} = start assign
   start InvalidType{expression} = start expression
   start InvalidReturnType{statement} = start statement
+  start CallBeforeDependency{targetId} = start targetId
   start MissingReturnValue{statement} = start statement
   start MissingReturnPath{functionId} = start functionId
 
@@ -48,6 +50,7 @@ instance Range Error where
   end InvalidAssign{assign} = end assign
   end InvalidType{expression} = end expression
   end InvalidReturnType{statement} = end statement
+  end CallBeforeDependency{targetId} = end targetId
   end MissingReturnValue{statement} = end statement
   end MissingReturnPath{functionId} = end functionId
 
@@ -110,6 +113,9 @@ description error = case error of
 
   InvalidReturnType{expected, actual} ->
     "Invalid return type: expected " <> pretty expected <> ", but got " <> pretty actual
+  
+  CallBeforeDependency{targetId, variableId} ->
+    targetId.name <> " is called before the definition of " <> variableId.name <> " on which it depends upon"
 
   MissingReturnValue{expected} ->
     "Missing return value: expected " <> pretty expected
