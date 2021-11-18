@@ -1,4 +1,4 @@
-module Typer (
+module Devin.Typer (
   Typer (..),
   runTyper,
   getDepth,
@@ -20,12 +20,12 @@ import Data.Text (Text)
 import Data.Map (Map, (!?))
 import qualified Data.Map as Map
 
-import CallTarget (CallTarget)
-import Range
-import Syntax
-import Type
-import Typer.Environment
-import Typer.Error
+import Devin.CallTarget (CallTarget)
+import Devin.Range
+import Devin.Syntax
+import Devin.Type
+import Devin.Typer.Environment
+import Devin.Typer.Error
 
 
 newtype Typer a = Typer (Environment -> (a, Environment, [Error]))

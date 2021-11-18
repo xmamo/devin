@@ -1,4 +1,4 @@
-module Helpers (
+module Devin.Helpers (
   expectationsText,
   getLineColumn,
   getStyle

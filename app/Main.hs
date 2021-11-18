@@ -2,7 +2,7 @@ module Main (main) where
 
 import System.Environment
 
-import qualified "devin" Main as Devin
+import qualified Devin.Main as Devin
 
 
 main :: IO ()

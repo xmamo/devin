@@ -1,4 +1,4 @@
-module Typer.Environment (
+module Devin.Typer.Environment (
   Environment (..),
   predefined
 ) where
@@ -8,9 +8,9 @@ import Data.Text (Text)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import CallTarget (CallTarget)
-import qualified CallTarget
-import Type
+import Devin.CallTarget (CallTarget)
+import qualified Devin.CallTarget as CallTarget
+import Devin.Type
 
 
 data Environment = Environment {

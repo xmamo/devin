@@ -1,4 +1,4 @@
-module Value (
+module Devin.Value (
   Value (..),
   pretty
 ) where

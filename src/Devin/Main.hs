@@ -1,4 +1,4 @@
-module Main (main) where
+module Devin.Main (main) where
 
 import Control.Concurrent
 import Data.Foldable
@@ -24,25 +24,25 @@ import qualified GI.Gtk as Gtk
 import qualified Data.GI.Gtk.Threading as Gtk
 import qualified GI.GtkSource as GtkSource
 
-import Evaluator
-import Evaluators
-import Evaluator.Configuration
-import Helpers
-import qualified Parser
-import Parser.Input
-import Parser.Result
-import qualified Parsers
-import Range
-import Syntax
-import Type (Type)
-import qualified Type
-import Typer
-import qualified Typer.Environment as Environment
-import qualified Typer.Error as Error
-import Typers
-import Evaluator.State (State)
-import qualified Evaluator.State as State
-import qualified Value
+import Devin.Evaluator
+import Devin.Evaluators
+import Devin.Evaluator.Configuration
+import Devin.Helpers
+import qualified Devin.Parser as Parser
+import Devin.Parser.Input
+import Devin.Parser.Result
+import qualified Devin.Parsers as Parsers
+import Devin.Range
+import Devin.Syntax
+import Devin.Type (Type)
+import qualified Devin.Type as Type
+import Devin.Typer
+import qualified Devin.Typer.Environment as Environment
+import qualified Devin.Typer.Error as Error
+import Devin.Typers as Typers
+import Devin.Evaluator.State (State)
+import qualified Devin.Evaluator.State as State
+import qualified Devin.Value as Value
 
 
 main :: IO ()

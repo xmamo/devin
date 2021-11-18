@@ -78,24 +78,24 @@ library:
   source-dirs: src
 
   exposed-modules:
-    - CallTarget
-    - Evaluator
-    - Evaluator.State
-    - Evaluator.Configuration
-    - Evaluators
-    - Main
-    - Parser
-    - Parser.Input
-    - Parser.Result
-    - Parsers
-    - Range
-    - Syntax
-    - Type
-    - Typer
-    - Typer.Environment
-    - Typer.Error
-    - Typers
-    - Value
+    - Devin.CallTarget
+    - Devin.Evaluator
+    - Devin.Evaluator.State
+    - Devin.Evaluator.Configuration
+    - Devin.Evaluators
+    - Devin.Main
+    - Devin.Parser
+    - Devin.Parser.Input
+    - Devin.Parser.Result
+    - Devin.Parsers
+    - Devin.Range
+    - Devin.Syntax
+    - Devin.Type
+    - Devin.Typer
+    - Devin.Typer.Environment
+    - Devin.Typer.Error
+    - Devin.Typers
+    - Devin.Value
 
   dependencies:
     - extra
@@ -117,6 +117,5 @@ executables:
   devin:
     main: Main.hs
     source-dirs: app
-    default-extensions: PackageImports
     ghc-options: -threaded
     dependencies: devin

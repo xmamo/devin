@@ -1,4 +1,4 @@
-module Evaluators (
+module Devin.Evaluators (
   evaluateDevin,
   evaluateDeclaration,
   evaluateStatement,
@@ -12,11 +12,11 @@ import Data.Traversable
 
 import Control.Monad.Extra
 
-import qualified CallTarget
-import Evaluator
-import Range
-import Syntax
-import Value
+import qualified Devin.CallTarget as CallTarget
+import Devin.Evaluator
+import Devin.Range
+import Devin.Syntax
+import Devin.Value
 
 
 evaluateDevin :: Monad m => Devin -> Evaluator m ()

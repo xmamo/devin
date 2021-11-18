@@ -1,4 +1,4 @@
-module Syntax (
+module Devin.Syntax (
   Node (..),
   Devin (..),
   Declaration (..),
@@ -14,7 +14,7 @@ module Syntax (
   hasSideEffects
 ) where
 
-import Syntax.Internal
+import Devin.Syntax.Internal
 
 
 doesReturn :: Statement -> Bool

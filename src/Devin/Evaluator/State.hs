@@ -1,4 +1,4 @@
-module Evaluator.State(
+module Devin.Evaluator.State(
   State,
   predefined
 ) where
@@ -8,7 +8,7 @@ import Data.Text (Text)
 import Data.Map (Map)
 import Data.Map qualified as Map
 
-import Value
+import Devin.Value
 
 
 type State = [(Int, Map Text Value)]

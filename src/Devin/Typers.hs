@@ -1,4 +1,4 @@
-module Typers (
+module Devin.Typers (
   checkDevin,
   checkStatement,
   checkVariable
@@ -12,13 +12,13 @@ import Data.Traversable
 
 import Data.Map ((!?))
 
-import CallTarget (CallTarget)
-import qualified CallTarget
-import Range
-import Syntax
-import Type
-import Typer
-import Typer.Error
+import Devin.CallTarget (CallTarget)
+import qualified Devin.CallTarget as CallTarget
+import Devin.Range
+import Devin.Syntax
+import Devin.Type
+import Devin.Typer
+import Devin.Typer.Error
 
 
 checkDevin :: Devin -> Typer Devin

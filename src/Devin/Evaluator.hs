@@ -1,4 +1,4 @@
-module Evaluator (
+module Devin.Evaluator (
   Evaluator (..),
   getRoot,
   getConfiguration,
@@ -15,11 +15,11 @@ import Data.Text (Text)
 import Data.Map ((!?))
 import qualified Data.Map as Map
 
-import Evaluator.State
-import Syntax
-import Value
+import Devin.Evaluator.State
+import Devin.Syntax
+import Devin.Value
 
-import Evaluator.Internal
+import Devin.Evaluator.Internal
 
 
 getRoot :: Applicative m => Evaluator m Devin

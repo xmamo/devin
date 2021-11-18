@@ -1,4 +1,4 @@
-module Range (Range (..)) where
+module Devin.Range (Range (..)) where
 
 
 class Range a where

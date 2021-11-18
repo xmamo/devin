@@ -1,4 +1,4 @@
-module Parser (
+module Devin.Parser (
   Parser,
   ParserT (..),
   parser,
@@ -28,8 +28,8 @@ import qualified Data.Set as Set
 
 import Control.Monad.Trans.Class
 
-import Parser.Input hiding (position)
-import Parser.Result hiding (position)
+import Devin.Parser.Input hiding (position)
+import Devin.Parser.Result hiding (position)
 
 
 type Parser = ParserT Identity

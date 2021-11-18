@@ -1,12 +1,12 @@
-module Evaluator.Internal (
+module Devin.Evaluator.Internal (
   Evaluator (..),
   Configuration (..),
 ) where
 
 import Control.Monad.Trans.Class
 
-import Evaluator.State
-import Syntax
+import Devin.Evaluator.State
+import Devin.Syntax
 
 
 newtype Evaluator m a =

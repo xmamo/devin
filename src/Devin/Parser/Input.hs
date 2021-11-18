@@ -1,4 +1,4 @@
-module Parser.Input (Input (..)) where
+module Devin.Parser.Input (Input (..)) where
 
 import Data.Text (Text)
 

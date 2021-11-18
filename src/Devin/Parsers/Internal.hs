@@ -1,4 +1,4 @@
-module Parsers.Internal (
+module Devin.Parsers.Internal (
   Parser,
   devin,
   declaration,
@@ -25,10 +25,10 @@ import qualified Data.Set as Set
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 
-import qualified CallTarget
-import Parser hiding (Parser)
-import Syntax hiding (label, declaration)
-import qualified Type
+import qualified Devin.CallTarget as CallTarget
+import Devin.Parser hiding (Parser)
+import Devin.Syntax hiding (label, declaration)
+import qualified Devin.Type as Type
 
 
 type Parser = ParserT (Writer [Comment])

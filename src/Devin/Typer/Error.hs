@@ -1,4 +1,4 @@
-module Typer.Error (
+module Devin.Typer.Error (
   Error (..),
   description
 ) where
@@ -6,9 +6,9 @@ module Typer.Error (
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import Range
-import Syntax
-import Type
+import Devin.Range
+import Devin.Syntax
+import Devin.Type
 
 
 data Error where

@@ -1,4 +1,4 @@
-module Parsers (
+module Devin.Parsers (
   Parser,
   devin,
   declaration,
@@ -15,10 +15,10 @@ import Data.Functor
 
 import Control.Monad.Trans.Writer
 
-import Parser hiding (Parser, run)
-import Syntax hiding (declaration)
+import Devin.Parser hiding (Parser, run)
+import Devin.Syntax hiding (declaration)
 
-import qualified Parsers.Internal as Internal
+import qualified Devin.Parsers.Internal as Internal
 
 
 type Parser m a = ParserT m (a, [Comment])

@@ -1,8 +1,8 @@
-module Parser.Result (Result (..)) where
+module Devin.Parser.Result (Result (..)) where
 
 import Data.Text (Text)
 
-import Parser.Input
+import Devin.Parser.Input
 
 
 data Result a where

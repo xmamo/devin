@@ -1,4 +1,4 @@
-module Syntax.Internal (
+module Devin.Syntax.Internal (
   Node (..),
   Devin (..),
   Declaration (..),
@@ -17,8 +17,8 @@ import Data.List.Extra
 
 import Data.Text (Text)
 
-import Range
-import Type (Type)
+import Devin.Range
+import Devin.Type (Type)
 
 
 class Node a where

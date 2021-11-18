@@ -1,4 +1,4 @@
-module Type (
+module Devin.Type (
   Type (..),
   pretty,
   areCompatible
