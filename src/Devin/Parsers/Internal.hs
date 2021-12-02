@@ -14,7 +14,6 @@ module Devin.Parsers.Internal (
 import Control.Applicative
 import Control.Monad
 import Data.Char
-import Data.Foldable
 import Data.Functor
 
 import Data.Text (Text)
@@ -27,7 +26,7 @@ import Control.Monad.Trans.Writer
 
 import qualified Devin.CallTarget as CallTarget
 import Devin.Parser hiding (Parser)
-import Devin.Syntax hiding (label, declaration)
+import Devin.Syntax hiding (label)
 import qualified Devin.Type as Type
 
 

@@ -20,9 +20,9 @@ import Devin.Value
 
 
 evaluateDevin :: Monad m => Devin -> Evaluator m ()
-evaluateDevin devin = void $ push 1 $ do
+evaluateDevin devin = void $ withNewFrame 1 $ do
   for_ devin.declarations evaluateDeclaration
-  push 1 (evaluateStatement (fromJust (findDeclaration f devin)).body)
+  withNewFrame 1 (evaluateStatement (fromJust (findDeclaration f devin)).body)
   where
     f FunctionDeclaration{functionId} | functionId.name == "main" = True
     f _ = False
@@ -31,10 +31,8 @@ evaluateDevin devin = void $ push 1 $ do
 evaluateDeclaration :: Monad m => Declaration -> Evaluator m ()
 evaluateDeclaration declaration = case declaration of
   VariableDeclaration{variableId, right} -> do
-    configuration <- getConfiguration
-    configuration.beforeExpression right
+    yield declaration
     value <- evaluateExpression right
-    configuration.afterExpression right
     defineVariable variableId.name value
 
   FunctionDeclaration{} -> pure ()
@@ -47,43 +45,35 @@ evaluateStatement statement = case statement of
     pure Nothing
 
   ExpressionStatement{value} -> do
-    configuration <- getConfiguration
-    configuration.beforeStatement statement
+    yield statement
     evaluateExpression value
-    configuration.afterStatement statement
     pure Nothing
 
   IfStatement{predicate, trueBranch} -> do
-    configuration <- getConfiguration
-    configuration.beforeExpression predicate
+    yield predicate
     predicateValue <- evaluateExpression predicate
-    configuration.afterExpression predicate
 
     case predicateValue of
-      Bool True -> push 1 (evaluateStatement trueBranch)
+      Bool True -> withNewFrame 1 (evaluateStatement trueBranch)
       Bool False -> pure Nothing
       _ -> undefined
 
   IfElseStatement{predicate, trueBranch, falseBranch} -> do
-    configuration <- getConfiguration
-    configuration.beforeExpression predicate
+    yield statement
     predicateValue <- evaluateExpression predicate
-    configuration.afterExpression predicate
 
     case predicateValue of
-      Bool True -> push 1 (evaluateStatement trueBranch)
-      Bool False -> push 1 (evaluateStatement falseBranch)
+      Bool True -> withNewFrame 1 (evaluateStatement trueBranch)
+      Bool False -> withNewFrame 1 (evaluateStatement falseBranch)
       _ -> undefined
 
   WhileStatement{predicate, body} -> do
-    configuration <- getConfiguration
-    configuration.beforeExpression predicate
+    yield statement
     predicateValue <- evaluateExpression predicate
-    configuration.afterExpression predicate
 
     case predicateValue of
       Bool True -> do
-        push 1 (evaluateStatement body)
+        withNewFrame 1 (evaluateStatement body)
         evaluateStatement statement
 
       Bool False -> pure Nothing
@@ -91,16 +81,14 @@ evaluateStatement statement = case statement of
       _ -> undefined
 
   DoWhileStatement{body, predicate} -> do
-    value <- push 1 (evaluateStatement body)
+    value <- withNewFrame 1 (evaluateStatement body)
 
     case value of
       Just value -> pure (Just value)
 
       Nothing -> do
-        configuration <- getConfiguration
-        configuration.beforeExpression predicate
+        yield statement
         predicateValue <- evaluateExpression predicate
-        configuration.afterExpression predicate
 
         case predicateValue of
           Bool True -> evaluateStatement statement
@@ -108,20 +96,16 @@ evaluateStatement statement = case statement of
           _ -> undefined
 
   ReturnStatement{result = Just result} -> do
-    configuration <- getConfiguration
-    configuration.beforeStatement statement
+    yield statement
     value <- evaluateExpression result
-    configuration.afterStatement statement
     pure (Just value)
 
   ReturnStatement{result = Nothing} -> do
-    configuration <- getConfiguration
-    configuration.beforeStatement statement
-    configuration.afterStatement statement
+    yield statement
     pure (Just Unit)
 
   BlockStatement{statements} ->
-    push 1 (firstJustM evaluateStatement statements)
+    withNewFrame 1 (firstJustM evaluateStatement statements)
 
 
 evaluateExpression :: Monad m => Expression -> Evaluator m Value
@@ -149,8 +133,8 @@ evaluateExpression expression = case expression of
 
         case findDeclaration (\d -> start d == position) root of
           Just FunctionDeclaration{body, parameters, depth = calleeDepth} ->
-            push (callerDepth - calleeDepth + 1) $ do
-              zipWithM_ (\p -> defineVariable p._1.name) parameters values
+            withNewFrame (callerDepth - calleeDepth + 1) $ do
+              zipWithM_ (\(id, _, _) -> defineVariable id.name) parameters values
               value <- evaluateStatement body
               pure (fromMaybe Unit value)
 

@@ -42,23 +42,20 @@
   # Syntax
   - -XApplicativeDo
 
-  # Types
-  - -XTypeFamilies
-  - -XDataKinds
-
   # Records
   - -XDuplicateRecordFields
 
-  # Class and instances declarations
-  - -XUndecidableInstances
-
   # Literals
   - -XOverloadedStrings
+
+  # Bindings and generalisation
+  - -XMonoLocalBinds
 
 # Overrides
 - suggest: {name: Redundant do}
 - warn: {name: Use explicit module export list}
 - warn: {name: Use module export list}
+- ignore: {name: Use tuple-section}
 - ignore: {name: Use const}
 - ignore: {name: Use curry}
 - ignore: {name: Use uncurry}

@@ -17,13 +17,20 @@ import Devin.CallTarget (CallTarget)
 import qualified Devin.CallTarget as CallTarget
 import Devin.Range
 import Devin.Syntax
+import qualified Devin.Syntax as AssignOperator (AssignOperator (..))
+import qualified Devin.Syntax as BinaryOperator (BinaryOperator (..))
+import qualified Devin.Syntax as Declaration (Declaration (..))
+import qualified Devin.Syntax as Expression (Expression (..))
+import qualified Devin.Syntax as Identifier (Identifier (..))
+import qualified Devin.Syntax as Statement (Statement (..))
+import qualified Devin.Syntax as UnaryOperator (UnaryOperator (..))
 import Devin.Type
 import Devin.Typer
 import Devin.Typer.Error
 
 
 checkDevin :: Devin -> Typer Devin
-checkDevin devin = push $ do
+checkDevin devin = withNewScope $ do
   declarations' <- checkDeclarations devin.declarations
   pure devin{declarations = declarations'}
 
@@ -41,7 +48,7 @@ checkDeclaration1 declaration = case declaration of
   FunctionDeclaration{functionId, parameters, returnInfo} -> do
     parameters' <- for parameters $ \(id, colon, typeId) -> do
       typeId' <- checkType typeId
-      pure (id{t = typeId'.t}, colon, typeId')
+      pure (id{Identifier.t = typeId'.t}, colon, typeId')
 
     returnInfo' <- case returnInfo of
       Just (arrow, typeId) -> do
@@ -50,9 +57,9 @@ checkDeclaration1 declaration = case declaration of
 
       Nothing -> pure Nothing
 
-    let parameterTypes = parameters' <&> (._3.t)
-    let returnType = maybe Unit (._2.t) returnInfo'
-    let functionId' = functionId{t = Function parameterTypes returnType}
+    let parameterTypes = parameters' <&> (\(_, _, typeId) -> typeId.t)
+    let returnType = maybe Unit (\(_, typeId) -> typeId.t) returnInfo'
+    let functionId' = functionId{Identifier.t = Function parameterTypes returnType}
     let callTarget = CallTarget.UserDefined (start declaration)
     defineFunction functionId' callTarget
 
@@ -64,30 +71,30 @@ checkDeclaration2 :: Declaration -> Typer Declaration
 checkDeclaration2 declaration = case declaration of
   VariableDeclaration{variableId, right} -> do
     right' <- checkExpression right
-    let variableId' = variableId{t = right'.t}
+    let variableId' = variableId{Identifier.t = right'.t}
     defineVariable variableId'
-    pure declaration{variableId = variableId', right = right'}
+    pure declaration{Declaration.variableId = variableId', Declaration.right = right'}
 
   FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
-    let parameterIds = parameters <&> (._1)
-    let parameterTypes = parameters <&> (._3.t)
-    let returnType = maybe Unit (._2.t) returnInfo
+    let parameterIds = parameters <&> (\(id, _, _) -> id)
+    let parameterTypes = parameters <&> (\(_, _, typeId) -> typeId.t)
+    let returnType = maybe Unit (\(_, typeId) -> typeId.t) returnInfo
 
-    body' <- push $ do
+    body' <- withNewScope $ do
       for_ parameterIds defineVariable
       checkStatement returnType body
 
     unless (areCompatible returnType Unit || doesReturn body') $
       report (MissingReturnPath functionId parameterTypes)
 
-    pure declaration{body = body'}
+    pure declaration{Declaration.body = body'}
 
 
 checkStatement :: Type -> Statement -> Typer Statement
 checkStatement expectedType statement = case statement of
   ExpressionStatement{value} -> do
     value' <- checkExpression value
-    pure statement{value = value'}
+    pure statement{Statement.value = value'}
 
   DeclarationStatement{declaration} -> do
     checkDeclaration1 declaration
@@ -98,26 +105,26 @@ checkStatement expectedType statement = case statement of
     predicate' <- checkExpression predicate
     let predicateOk = areCompatible predicate'.t Bool
     unless predicateOk (report (InvalidType predicate Bool predicate'.t))
-    trueBranch' <- push (checkStatement expectedType trueBranch)
+    trueBranch' <- withNewScope (checkStatement expectedType trueBranch)
     pure statement{predicate = predicate', trueBranch = trueBranch'}
 
   IfElseStatement{predicate, trueBranch, falseBranch} -> do
     predicate' <- checkExpression predicate
     let predicateOk = areCompatible predicate'.t Bool
     unless predicateOk (report (InvalidType predicate Bool predicate'.t))
-    trueBranch' <- push (checkStatement expectedType trueBranch)
-    falseBranch' <- push (checkStatement expectedType falseBranch)
+    trueBranch' <- withNewScope (checkStatement expectedType trueBranch)
+    falseBranch' <- withNewScope (checkStatement expectedType falseBranch)
     pure statement{predicate = predicate', trueBranch = trueBranch', falseBranch = falseBranch'}
 
   WhileStatement{predicate, body} -> do
     predicate' <- checkExpression predicate
     let predicateOk = areCompatible predicate'.t Bool
     unless predicateOk (report (InvalidType predicate Bool predicate'.t))
-    body' <- push (checkStatement expectedType body)
+    body' <- withNewScope (checkStatement expectedType body)
     pure statement{predicate = predicate', body = body'}
 
   DoWhileStatement{body, predicate} -> do
-    body' <- push (checkStatement expectedType body)
+    body' <- withNewScope (checkStatement expectedType body)
     predicate' <- checkExpression predicate
     let predicateOk = areCompatible predicate'.t Bool
     unless predicateOk (report (InvalidType predicate Bool predicate'.t))
@@ -134,7 +141,7 @@ checkStatement expectedType statement = case statement of
     unless expectedUnit (report (MissingReturnValue statement expectedType))
     pure statement
 
-  BlockStatement{statements} -> push $ do
+  BlockStatement{statements} -> withNewScope $ do
     statements' <- for statements $ \statement -> case statement of
       DeclarationStatement{declaration} -> do
         declaration' <- checkDeclaration1 declaration
@@ -158,9 +165,9 @@ checkStatement expectedType statement = case statement of
 
 checkExpression :: Expression -> Typer Expression
 checkExpression expression = case expression of
-  IntegerExpression{} -> pure expression{t = Int}
+  IntegerExpression{} -> pure expression{Expression.t = Int}
 
-  RationalExpression{} -> pure expression{t = Float}
+  RationalExpression{} -> pure expression{Expression.t = Float}
 
   VariableExpression{variableId} -> do
     variableId' <- checkVariable variableId
@@ -184,7 +191,7 @@ checkExpression expression = case expression of
       (NotOperator{}, Bool) -> pure Bool
       _ -> report (InvalidUnary unary operand'.t) $> Error
 
-    let unary' = unary{t = Function [operand'.t] t}
+    let unary' = unary{UnaryOperator.t = Function [operand'.t] t}
     pure expression{unary = unary', operand = operand', t}
 
   BinaryExpression{left, binary, right} -> do
@@ -217,7 +224,7 @@ checkExpression expression = case expression of
       (Bool, OrOperator{}, Bool) -> pure Bool
       _ -> report (InvalidBinary binary left'.t right'.t) $> Error
 
-    let binary' = binary{t = Function [left'.t, right'.t] t}
+    let binary' = binary{BinaryOperator.t = Function [left'.t, right'.t] t}
     pure expression{left = left', binary = binary', right = right', t}
 
   AssignExpression{variableId, assign, right} -> do
@@ -243,7 +250,7 @@ checkExpression expression = case expression of
       (Float, ModuloAssignOperator{}, Float) -> pure Float
       _ -> report (InvalidAssign assign variableId'.t right'.t) $> Error
 
-    let assign' = assign{t = Function [variableId'.t, right'.t] t}
+    let assign' = assign{AssignOperator.t = Function [variableId'.t, right'.t] t}
     pure expression{variableId = variableId', assign = assign', right = right', t = right'.t}
 
   ParenthesizedExpression{inner} -> do
@@ -256,11 +263,11 @@ checkType typeId = do
   types <- getTypes
 
   case types !? typeId.name of
-    Just t -> pure typeId{t}
+    Just t -> pure typeId{Identifier.t}
 
     Nothing -> do
       report (UnknownType typeId)
-      let typeId' = typeId{t = Unknown typeId.name}
+      let typeId' = typeId{Identifier.t = Unknown typeId.name}
       defineType typeId'
       pure typeId'
 
@@ -270,11 +277,11 @@ checkVariable variableId = do
   variables <- getVariables
 
   case variables !? variableId.name of
-    Just t -> pure variableId{t}
+    Just t -> pure variableId{Identifier.t}
 
     Nothing -> do
       report (UnknownVariable variableId)
-      let variableId' = variableId{t = Error}
+      let variableId' = variableId{Identifier.t = Error}
       defineVariable variableId'
       pure variableId'
 
@@ -284,18 +291,18 @@ checkFunction targetId parameterTypes = go =<< getFunctions
   where
     go [] = do
       report (UnknownFunction targetId parameterTypes)
-      let targetId' = targetId{t = Function parameterTypes Error}
+      let targetId' = targetId{Identifier.t = Function parameterTypes Error}
       defineFunction targetId' CallTarget.Undefined
       pure (targetId', CallTarget.Undefined)
 
     go (current : parents) = do
       let info = current !? targetId.name
 
-      case find (\i -> liftEq areCompatible parameterTypes i._1) =<< info of
+      case find (\(ts, _, _) -> liftEq areCompatible parameterTypes ts) =<< info of
         Just _ | Error `elem` parameterTypes ->
-          pure (targetId{t = Function parameterTypes Error}, CallTarget.Undefined)
+          pure (targetId{Identifier.t = Function parameterTypes Error}, CallTarget.Undefined)
 
         Just (_, returnType, target) ->
-          pure (targetId{t = Function parameterTypes returnType}, target)
+          pure (targetId{Identifier.t = Function parameterTypes returnType}, target)
 
         Nothing -> go parents

@@ -1,0 +1,89 @@
+cabal-version: 2.2
+name: devin
+version: 1.0.0
+synopsis: Devin programming language
+author: Matteo Morena
+category: Language
+
+library
+  default-language: GHC2021
+  hs-source-dirs: src
+
+  build-depends:
+    base,
+    extra,
+    text,
+    containers,
+    transformers,
+    haskell-gi-base,
+    gi-glib,
+    gi-gio,
+    gi-gtk,
+    gi-gtk-hs,
+    gi-gtksource
+
+  exposed-modules:
+    Devin.CallTarget,
+    Devin.Evaluator,
+    Devin.Evaluator.Result,
+    Devin.Evaluator.State,
+    Devin.Evaluators,
+    Devin.Main,
+    Devin.Parser,
+    Devin.Parser.Input,
+    Devin.Parser.Result,
+    Devin.Parsers,
+    Devin.Range,
+    Devin.Syntax,
+    Devin.Type,
+    Devin.Typer,
+    Devin.Typer.Environment,
+    Devin.Typer.Error,
+    Devin.Typers,
+    Devin.Value
+
+  other-modules:
+    Devin.Evaluator.Internal,
+    Devin.Parsers.Internal,
+    Devin.Helpers
+
+  default-extensions:
+    -- Syntax
+    ApplicativeDo,
+
+    -- Records
+    DuplicateRecordFields,
+    NoFieldSelectors,
+    OverloadedRecordDot,
+
+    -- Literals
+    OverloadedStrings,
+
+    -- Bindings and generalisation
+    MonoLocalBinds
+
+  ghc-options:
+    -Wall
+    -Wno-name-shadowing
+    -Wno-type-defaults
+    -Wno-unused-do-bind
+
+executable devin
+  default-language: GHC2021
+  hs-source-dirs: app
+  main-is: Main.hs
+
+  build-depends:
+    base,
+    devin
+
+  default-extensions:
+    -- Syntax
+    ApplicativeDo
+
+  ghc-options:
+    -threaded
+    -Wall
+    -Wno-name-shadowing
+    -Wno-type-defaults
+    -Wno-unused-do-bind

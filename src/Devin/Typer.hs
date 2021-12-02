@@ -8,7 +8,7 @@ module Devin.Typer (
   defineType,
   defineVariable,
   defineFunction,
-  push,
+  withNewScope,
   report
 ) where
 
@@ -25,6 +25,7 @@ import Devin.Range
 import Devin.Syntax
 import Devin.Type
 import Devin.Typer.Environment
+import qualified Devin.Typer.Environment as Environment (Environment (..))
 import Devin.Typer.Error
 
 
@@ -94,7 +95,7 @@ defineFunction functionId callTarget = Typer $ \environment -> do
   let current : parents = environment.functions
 
   case current !? functionId.name of
-    Just infos | any (\i -> liftEq areCompatible parameterTypes i._1) infos ->
+    Just infos | any (\(ts, _, _) -> liftEq areCompatible parameterTypes ts) infos ->
       (False, environment, [FunctionRedefinition functionId parameterTypes])
 
     Just infos -> do
@@ -108,9 +109,9 @@ defineFunction functionId callTarget = Typer $ \environment -> do
       (True, environment{functions = functions'}, [])
 
 
-push :: Typer a -> Typer a
-push (Typer check) = Typer $ \environment -> do
-  let (x, _, errors) = check environment{depth = environment.depth + 1}
+withNewScope :: Typer a -> Typer a
+withNewScope (Typer check) = Typer $ \environment -> do
+  let (x, _, errors) = check environment{Environment.depth = environment.depth + 1}
   (x, environment, errors)
 
 

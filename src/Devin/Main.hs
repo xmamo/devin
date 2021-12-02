@@ -10,8 +10,6 @@ import Control.Monad.IO.Class
 import Control.Monad.Extra
 import Data.List.Extra
 
-import Control.Monad.Trans.Class
-
 import Data.Text (Text)
 import qualified Data.Text as Text
 
@@ -24,9 +22,6 @@ import qualified GI.Gtk as Gtk
 import qualified Data.GI.Gtk.Threading as Gtk
 import qualified GI.GtkSource as GtkSource
 
-import Devin.Evaluator
-import Devin.Evaluators
-import Devin.Evaluator.Configuration
 import Devin.Helpers
 import qualified Devin.Parser as Parser
 import Devin.Parser.Input
@@ -40,8 +35,11 @@ import Devin.Typer
 import qualified Devin.Typer.Environment as Environment
 import qualified Devin.Typer.Error as Error
 import Devin.Typers as Typers
+import Devin.Evaluator
+import Devin.Evaluator.Result
 import Devin.Evaluator.State (State)
 import qualified Devin.Evaluator.State as State
+import Devin.Evaluators
 import qualified Devin.Value as Value
 
 
@@ -60,7 +58,7 @@ onActivate application = do
 
   let styles =
         [
-          ("highlightNode", "search-match"),
+          ("highlight", "search-match"),
           ("bracket", "bracket-match"),
           ("keyword", "def:keyword"),
           ("identifier", "def:identifier"),
@@ -194,43 +192,36 @@ onActivate application = do
   parseThreadIdVar <- newMVar =<< forkIO (pure ())
   devinVar <- newEmptyMVar
   devinVar' <- newEmptyMVar
-  sem <- newQSem 0
 
   Gtk.onButtonClicked playButton $ void $ do
-    let before :: (Range a, Node a) => a -> Evaluator IO ()
-        before range = Evaluator $ \_ state -> do
-          Gtk.postGUIASync $ do
-            (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-            Gtk.textBufferRemoveTagByName codeBuffer "highlightNode" startIter endIter
-            highlightNode codeBuffer "highlightNode" range
-
-            Gtk.listStoreClear stateListStore
-            displayState stateListStore state
-
-          waitQSem sem
-          pure ((), state)
-
-    let after :: a -> Evaluator IO ()
-        after _ = lift (pure ())
-
     Gtk.widgetSetSensitive playButton False
     devin' <- readMVar devinVar'
     Gtk.containerRemove codeTreeScrolledWindow codeTreeView
     Gtk.containerAdd codeTreeScrolledWindow stateTreeView
     Gtk.widgetShow stateTreeView
-    let configuration = Configuration devin' before after before after
 
-    forkIO $ do
-      runEvaluator (evaluateDevin devin') configuration State.predefined
+    let go evaluator state = do
+          (result, state') <- runEvaluator evaluator devin' state
 
-      Gtk.postGUIASync $ do
-        Gtk.containerRemove codeTreeScrolledWindow stateTreeView
-        Gtk.containerAdd codeTreeScrolledWindow codeTreeView
-        Gtk.widgetShow codeTreeView
+          case result of
+            Done _ -> Gtk.postGUIASync $ do
+              Gtk.containerRemove codeTreeScrolledWindow stateTreeView
+              Gtk.containerAdd codeTreeScrolledWindow codeTreeView
+              Gtk.widgetShow codeTreeView
 
-  Gtk.onButtonClicked stepOverButton (signalQSem sem)
+            Step node evaluator' -> do
+              Gtk.postGUIASync $ do
+                (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+                Gtk.textBufferRemoveTagByName codeBuffer "highlight" startIter endIter
+                highlightNode codeBuffer "highlight" node
 
-  Gtk.onButtonClicked stepIntoButton (signalQSem sem)
+                Gtk.listStoreClear stateListStore
+                displayState stateListStore state'
+
+              threadDelay 3000000
+              go evaluator' state'
+
+    forkIO (go (evaluateDevin devin') State.predefined)
 
   Gtk.onTextBufferChanged codeBuffer $ do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer

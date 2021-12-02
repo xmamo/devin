@@ -1,13 +1,16 @@
 module Devin.Evaluator (
   Evaluator (..),
+  runEvaluator,
   getRoot,
-  getConfiguration,
   getState,
   getVariable,
   setVariable,
   updateVariable,
   defineVariable,
-  push
+  pushFrame,
+  popFrame,
+  withNewFrame,
+  yield
 ) where
 
 import Data.Text (Text)
@@ -16,6 +19,7 @@ import Data.Map ((!?))
 import qualified Data.Map as Map
 
 import Devin.Evaluator.State
+import Devin.Range
 import Devin.Syntax
 import Devin.Value
 
@@ -23,65 +27,71 @@ import Devin.Evaluator.Internal
 
 
 getRoot :: Applicative m => Evaluator m Devin
-getRoot = Evaluator $ \configuration state ->
-  pure (configuration.root, state)
-
-
-getConfiguration :: Applicative m => Evaluator m (Configuration m)
-getConfiguration = Evaluator $ \configuration state ->
-  pure (configuration, state)
+getRoot = Evaluator $ \root state -> pure (Done root, state)
 
 
 getState :: Applicative m => Evaluator m State
-getState = Evaluator $ \_ state ->
-  pure (state, state)
+getState = Evaluator $ \_ state -> pure (Done state, state)
 
 
 getVariable :: Applicative m => Text -> Evaluator m Value
-getVariable name = Evaluator $ \_ state -> pure (go state, state)
+getVariable name = Evaluator $ \_ state -> pure (Done (go state), state)
   where
     go [] = undefined
 
-    go ((parent, variables) : parents) = case variables !? name of
+    go ((offset, variables) : parents) = case variables !? name of
       Just variable -> variable
-      Nothing -> go (drop (parent - 1) parents)
+      Nothing -> go (drop (offset - 1) parents)
 
 
 setVariable :: Applicative m => Text -> Value -> Evaluator m ()
-setVariable name value = Evaluator $ \_ state -> pure ((), go state)
+setVariable name value = Evaluator $ \_ state -> pure (Done (), go state)
   where
     go [] = undefined
 
-    go ((parent, variables) : parents) = case variables !? name of
-      Just _ ->
-        (parent, Map.insert name value variables) : parents
+    go ((offset, variables) : parents) | Map.member name variables =
+      (offset, Map.insert name value variables) : parents
 
-      Nothing -> do
-        let (parents1, parents2) = splitAt (parent - 1) parents
-        (parent, variables) : (parents1 ++ go parents2)
+    go ((offset, variables) : parents) = do
+      let (parents1, parents2) = splitAt (offset - 1) parents
+      (offset, variables) : (parents1 ++ go parents2)
 
 
 updateVariable :: Applicative m => Text -> (Value -> Value) -> Evaluator m ()
-updateVariable name f = Evaluator $ \_ state -> pure ((), go state)
+updateVariable name f = Evaluator $ \_ state -> pure (Done (), go state)
   where
     go [] = undefined
 
-    go ((parent, variables) : parents) = case variables !? name of
+    go ((offset, variables) : parents) = case variables !? name of
       Just variable ->
-        (parent, Map.insert name (f variable) variables) : parents
+        (offset, Map.insert name (f variable) variables) : parents
 
       Nothing -> do
-        let (parents1, parents2) = splitAt (parent - 1) parents
-        (parent, variables) : (parents1 ++ go parents2)
+        let (parents1, parents2) = splitAt (offset - 1) parents
+        (offset, variables) : (parents1 ++ go parents2)
 
 
 defineVariable :: Applicative m => Text -> Value -> Evaluator m ()
-defineVariable name value = Evaluator $ \_ ((parent, variables) : parents) ->
-  pure ((), (parent, Map.insert name value variables) : parents)
+defineVariable name value = Evaluator $ \_ ((offset, variables) : parents) ->
+  pure (Done (), (offset, Map.insert name value variables) : parents)
 
 
-push :: (Integral a, Monad m) => a -> Evaluator m b -> Evaluator m b
-push parent evaluator = Evaluator $ \configuration state -> do
-  let state' = (fromIntegral parent, Map.empty) : state
-  (value, state'') <- runEvaluator evaluator configuration state'
-  pure (value, tail state'')
+pushFrame :: (Integral a, Applicative m) => a -> Evaluator m ()
+pushFrame offset = Evaluator $ \root state ->
+  pure (Done (), (fromIntegral offset, Map.empty) : state)
+
+
+popFrame :: Applicative m => Evaluator m ()
+popFrame = Evaluator $ \root state -> pure (Done (), tail state)
+
+
+withNewFrame :: (Integral a, Monad m) => a -> Evaluator m b -> Evaluator m b
+withNewFrame offset evaluator = do
+  pushFrame offset
+  x <- evaluator
+  popFrame
+  pure x
+
+
+yield :: (Range a, Node a, Monad m) => a -> Evaluator m ()
+yield node = Evaluator $ \_ state -> pure (Step node (pure ()), state)

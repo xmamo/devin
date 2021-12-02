@@ -2,6 +2,7 @@ module Devin.Parser (
   Parser,
   ParserT (..),
   parser,
+  runT,
   run,
   position,
   satisfy,
@@ -28,14 +29,14 @@ import qualified Data.Set as Set
 
 import Control.Monad.Trans.Class
 
-import Devin.Parser.Input hiding (position)
-import Devin.Parser.Result hiding (position)
+import Devin.Parser.Input
+import Devin.Parser.Result
 
 
 type Parser = ParserT Identity
 
 
-newtype ParserT m a = ParserT {runT :: Input -> m (Result a)}
+newtype ParserT m a = ParserT (Input -> m (Result a))
   deriving Functor
 
 
@@ -115,6 +116,10 @@ instance MonadTrans ParserT where
 
 parser :: Applicative m => (Input -> Result a) -> ParserT m a
 parser f = ParserT $ \input -> pure (f input)
+
+
+runT :: ParserT m a -> Input -> m (Result a)
+runT (ParserT f) = f
 
 
 run :: Parser a -> Input -> Result a

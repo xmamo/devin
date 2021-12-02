@@ -1,3 +1,2 @@
-/.stack-work/
-/stack.yaml.lock
-/devin.cabal
+/dist/
+/dist-newstyle/

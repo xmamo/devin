@@ -16,7 +16,7 @@ import Data.Functor
 import Control.Monad.Trans.Writer
 
 import Devin.Parser hiding (Parser, run)
-import Devin.Syntax hiding (declaration)
+import Devin.Syntax
 
 import qualified Devin.Parsers.Internal as Internal
 
