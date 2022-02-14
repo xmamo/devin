@@ -4,11 +4,11 @@
 
 1. Install [Homebrew](https://brew.sh/);
 
-2. Install GTK+ 3 and GtkSourceView 4:
+2. Install GTK+ 3 and GtkSourceView 3:
 
    ```sh
    brew install gtk+3
-   brew install gtksourceview4
+   brew install gtksourceview3
    ```
 
 3. Install GHC and Cabal:
@@ -30,7 +30,8 @@
    XDG_DATA_DIRS="${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/:}$(brew --prefix)/share/" cabal build all
    ```
 
-   If the command above fails, retry with `sudo`[^1]. If you do, execute the following commands as well:
+   If the command above fails, retry with `sudo`[^1]. If you do, execute the following commands as
+   well:
 
    ```sh
    test -e ./dist && sudo chown -R "$(whoami)" ./dist
