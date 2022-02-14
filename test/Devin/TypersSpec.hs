@@ -4,13 +4,13 @@ module Devin.TypersSpec (spec) where
 
 import Data.List
 
-import Test.Hspec
-
 import Devin.Display
 import Devin.Parsec
 import Devin.Parsers qualified as Parsers
 import Devin.Typer
 import Devin.Typers
+
+import Test.Hspec
 
 
 spec :: Spec

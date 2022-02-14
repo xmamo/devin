@@ -14,16 +14,16 @@ module Devin.Highlight (
 import Control.Monad.IO.Class
 import Data.Traversable
 
+import Control.Monad.Extra
+
+import Devin.Interval
+
 import Data.Text (Text)
 
 import Data.Set qualified as Set
 
-import Control.Monad.Extra
-
 import Data.GI.Gtk qualified as Gtk
 import GI.GtkSource qualified as GtkSource
-
-import Devin.Interval
 
 
 data Tags = Tags {

@@ -79,10 +79,10 @@ library
     Devin.Utils
 
   build-depends:
-    base,
-    vector,
-    parsec,
-    extra
+    base ^>= 4.14.3,
+    vector ^>= 0.12.3,
+    parsec ^>= 3.1.14,
+    extra ^>= 1.7.10
 
 
 test-suite devin-test
@@ -99,11 +99,11 @@ test-suite devin-test
   build-depends:
     base,
     parsec,
-    hspec,
-    devin
+    devin,
+    hspec ^>= 2.9.4
 
   build-tool-depends:
-    hspec-discover:hspec-discover
+    hspec-discover:hspec-discover ^>= 2.9.4
 
 
 executable devin
@@ -119,18 +119,17 @@ executable devin
 
   build-depends:
     base,
-    text,
     vector,
-    containers,
     parsec,
     extra,
+    devin,
+    text ^>= 1.2.4,
+    containers ^>= 0.6.5,
     haskell-gi-overloading == 0.0,
-    haskell-gi-base,
-    gi-gobject,
-    gi-gio,
-    gi-gtk-hs,
-    gi-gtksource,
-    devin
+    gi-gobject ^>= 2.0.27,
+    gi-gio ^>= 2.0.29,
+    gi-gtk-hs ^>= 0.3.12,
+    gi-gtksource ^>= 3.0.25
 
   ghc-options:
     -threaded

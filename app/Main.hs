@@ -17,19 +17,9 @@ import Data.String
 import System.Environment
 import System.Exit
 
-import Data.Text (Text)
-import Data.Text qualified as Text
-
 import Text.Parsec.Error
 
 import Control.Monad.Extra
-
-import GI.GObject qualified as G
-import GI.Gio qualified as G
-import Data.GI.Gtk qualified as Gtk
-import Data.GI.Gtk.BuildFn qualified as Gtk
-import Data.GI.Gtk.Threading qualified as Gtk
-import GI.GtkSource qualified as GtkSource
 
 import Devin.Display
 import Devin.Evaluator
@@ -40,6 +30,16 @@ import Devin.Parsers qualified as Parsers
 import Devin.Syntax
 import Devin.Typer
 import Devin.Typers
+
+import Data.Text (Text)
+import Data.Text qualified as Text
+
+import GI.GObject qualified as G
+import GI.Gio qualified as G
+import Data.GI.Gtk qualified as Gtk
+import Data.GI.Gtk.BuildFn qualified as Gtk
+import Data.GI.Gtk.Threading qualified as Gtk
+import GI.GtkSource qualified as GtkSource
 
 import Devin.Highlight
 import Devin.Highlight.Braces

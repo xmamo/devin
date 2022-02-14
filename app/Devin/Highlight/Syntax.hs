@@ -14,9 +14,9 @@ import Data.Foldable
 
 import Control.Monad.Extra
 
-import Data.GI.Gtk qualified as Gtk
-
 import Devin.Syntax
+
+import Data.GI.Gtk qualified as Gtk
 
 import Devin.Highlight
 

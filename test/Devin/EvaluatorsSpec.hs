@@ -3,13 +3,13 @@
 
 module Devin.EvaluatorsSpec (spec) where
 
-import Test.Hspec
-
 import Devin.Display
 import Devin.Evaluator
 import Devin.Evaluators
 import Devin.Parsec
 import Devin.Parsers qualified as Parsers
+
+import Test.Hspec
 
 
 spec :: Spec

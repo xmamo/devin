@@ -4,12 +4,12 @@
 
 module Devin.ParsersSpec (spec) where
 
-import Test.Hspec
-
 import Devin.Syntax
 import Devin.Parsec
 import Devin.Parsers (Parser)
 import Devin.Parsers qualified as Parsers
+
+import Test.Hspec
 
 
 spec :: Spec
