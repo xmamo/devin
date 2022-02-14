@@ -1,62 +1,55 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase #-}
+
+#if __GLASGOW_HASKELL__ >= 902
+{-# LANGUAGE NoFieldSelectors #-}
+#endif
+
 module Devin.Syntax (
-  Node (..),
   Devin (..),
   Declaration (..),
   Statement (..),
   Expression (..),
   UnaryOperator (..),
   BinaryOperator (..),
-  AssignOperator (..),
-  Identifier (..),
-  Token (..),
-  Comment (..),
-  doesReturn,
-  hasSideEffects
+  SymbolId (..),
+  TypeId (..),
+  Token (..)
 ) where
 
-import Data.List.Extra
+import Data.Data
 
-import Data.Text (Text)
-
-import Devin.CallTarget (CallTarget)
-import Devin.Range
-import Devin.Type (Type)
+import Devin.Display
+import Devin.Interval
+import Devin.Utils
 
 
-class Node a where
-  label :: a -> Text
-
-  isLeaf :: a -> Bool
-
-  findDeclaration :: (Declaration -> Bool) -> a -> Maybe Declaration
-
-
-data Devin = Devin {declarations :: [Declaration], range :: (Int, Int)}
-  deriving (Eq, Show, Read)
+data Devin = Devin {declarations :: [Declaration], interval :: (Int, Int)}
+  deriving (Eq, Show, Read, Data)
 
 
 data Declaration where
   VariableDeclaration :: {
     varKeyword :: Token,
-    variableId :: Identifier,
+    variableId :: SymbolId,
     equalSign :: Token,
-    right :: Expression,
+    value :: Expression,
     semicolon :: Token
   } -> Declaration
 
   FunctionDeclaration :: {
     defKeyword :: Token,
-    functionId :: Identifier,
+    functionId :: SymbolId,
     open :: Token,
-    parameters :: [(Identifier, Token, Identifier)],
+    parameters :: [(Maybe Token, SymbolId, Maybe (Token, TypeId))],
     commas :: [Token],
     close :: Token,
-    returnInfo :: Maybe (Token, Identifier),
-    body :: Statement,
-    depth :: Int
+    returnInfo :: Maybe (Token, TypeId),
+    body :: Statement
   } -> Declaration
 
-  deriving (Eq, Show, Read)
+  deriving (Eq, Show, Read, Data)
 
 
 data Statement where
@@ -103,392 +96,348 @@ data Statement where
     semicolon :: Token
   } -> Statement
 
+  AssertStatement :: {
+    assertKeyword :: Token,
+    predicate :: Expression,
+    semicolon :: Token
+  } -> Statement
+
   BlockStatement :: {
     open :: Token,
     statements :: [Statement],
     close :: Token
   } -> Statement
 
-  deriving (Eq, Show, Read)
+  deriving (Eq, Show, Read, Data)
 
 
 data Expression where
+  VariableExpression :: {
+    variableName :: String,
+    interval :: (Int, Int)
+  } -> Expression
+
   IntegerExpression :: {
     integer :: Integer,
-    t :: Type,
-    range :: (Int, Int)
+    interval :: (Int, Int)
   } -> Expression
 
   RationalExpression :: {
     rational :: Rational,
-    t :: Type,
-    range :: (Int, Int)
+    interval :: (Int, Int)
   } -> Expression
 
-  VariableExpression :: {
-    variableId :: Identifier,
-    t :: Type
+  ArrayExpression :: {
+    open :: Token,
+    elements :: [Expression],
+    commas :: [Token],
+    close :: Token
+  } -> Expression
+
+  AccessExpression :: {
+    array :: Expression,
+    open :: Token,
+    index :: Expression,
+    close :: Token
   } -> Expression
 
   CallExpression :: {
-    targetId :: Identifier,
+    functionId :: SymbolId,
     open :: Token,
     arguments :: [Expression],
     commas :: [Token],
-    close :: Token,
-    depth :: Int,
-    target :: CallTarget,
-    t :: Type
+    close :: Token
   } -> Expression
 
   UnaryExpression :: {
     unary :: UnaryOperator,
-    operand :: Expression,
-    t :: Type
+    operand :: Expression
   } -> Expression
 
   BinaryExpression :: {
     left :: Expression,
     binary :: BinaryOperator,
-    right :: Expression,
-    t :: Type
-  } -> Expression
-
-  AssignExpression :: {
-    variableId :: Identifier,
-    assign :: AssignOperator,
-    right :: Expression,
-    t :: Type
+    right :: Expression
   } -> Expression
 
   ParenthesizedExpression :: {
     open :: Token,
     inner :: Expression,
-    close :: Token,
-    t :: Type
+    close :: Token
   } -> Expression
 
-  deriving (Eq, Show, Read)
-
-
-data UnaryOperator where
-  PlusOperator :: {t :: Type, range :: (Int, Int)} -> UnaryOperator
-  MinusOperator :: {t :: Type, range :: (Int, Int)} -> UnaryOperator
-  NotOperator :: {t :: Type, range :: (Int, Int)} -> UnaryOperator
-  deriving (Eq, Show, Read)
-
-
-data BinaryOperator where
-  AddOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  SubtractOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  MultiplyOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  DivideOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  ModuloOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  EqualOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  NotEqualOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  LessOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  LessOrEqualOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  GreaterOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  GreaterOrEqualOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  AndOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  OrOperator :: {t :: Type, range :: (Int, Int)} -> BinaryOperator
-  deriving (Eq, Show, Read)
-
-
-data AssignOperator where
-  AssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
-  AddAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
-  SubtractAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
-  MultiplyAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
-  DivideAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
-  ModuloAssignOperator :: {t :: Type, range :: (Int, Int)} -> AssignOperator
-  deriving (Eq, Show, Read)
-
-
-data Identifier = Identifier {name :: Text, t :: Type, range :: (Int, Int)}
-  deriving (Eq, Show, Read)
-
-
-newtype Token = Token {range :: (Int, Int)}
-  deriving (Eq, Show, Read)
-
-
-newtype Comment = Comment {range :: (Int, Int)}
-  deriving (Eq, Show, Read)
-
-
-instance Range Devin where
-  start Devin{range} = start range
-
-  end Devin{range} = end range
-
-
-instance Node Devin where
-  label Devin{} = "Devin"
-
-  isLeaf Devin{} = False
-
-  findDeclaration f Devin{declarations} =
-    firstJust (findDeclaration f) declarations
-
-
-instance Range Declaration where
-  start VariableDeclaration{varKeyword} = start varKeyword
-  start FunctionDeclaration{defKeyword} = start defKeyword
-
-  end VariableDeclaration{semicolon} = end semicolon
-  end FunctionDeclaration{body} = end body
-
-
-instance Node Declaration where
-  label VariableDeclaration{} = "VariableDeclaration"
-  label FunctionDeclaration{} = "FunctionDeclaration"
-
-  isLeaf _ = False
-
-  findDeclaration f declaration | f declaration = Just declaration
-  findDeclaration f FunctionDeclaration{body} = findDeclaration f body
-  findDeclaration _ _ = Nothing
-
-
-instance Range Statement where
-  start DeclarationStatement{declaration} = start declaration
-  start ExpressionStatement{value} = start value
-  start IfStatement{ifKeyword} = start ifKeyword
-  start IfElseStatement{ifKeyword} = start ifKeyword
-  start WhileStatement{whileKeyword} = start whileKeyword
-  start DoWhileStatement{doKeyword} = start doKeyword
-  start ReturnStatement{returnKeyword} = start returnKeyword
-  start BlockStatement{open} = start open
-
-  end DeclarationStatement{declaration} = end declaration
-  end ExpressionStatement{semicolon} = end semicolon
-  end IfStatement{trueBranch} = end trueBranch
-  end IfElseStatement{falseBranch} = end falseBranch
-  end WhileStatement{body} = end body
-  end DoWhileStatement{body} = end body
-  end ReturnStatement{semicolon} = end semicolon
-  end BlockStatement{close} = end close
-
-
-instance Node Statement where
-  label DeclarationStatement{} = "DeclarationStatement"
-  label ExpressionStatement{} = "ExpressionStatement"
-  label IfStatement{} = "IfStatement"
-  label IfElseStatement{} = "IfElseStatement"
-  label WhileStatement{} = "WhileStatement"
-  label DoWhileStatement{} = "DoWhileStatement"
-  label ReturnStatement{} = "ReturnStatement"
-  label BlockStatement{} = "BlockStatement"
-
-  isLeaf ReturnStatement{result = Nothing} = True
-  isLeaf _ = False
-
-  findDeclaration f declaration = case declaration of
-    DeclarationStatement{declaration} -> findDeclaration f declaration
-    IfStatement{trueBranch} -> findDeclaration f trueBranch
-    IfElseStatement{trueBranch, falseBranch} -> firstJust (findDeclaration f) [trueBranch, falseBranch]
-    WhileStatement{body} -> findDeclaration f body
-    DoWhileStatement{body} -> findDeclaration f body
-    BlockStatement{statements} -> firstJust (findDeclaration f) statements
-    _ -> Nothing
-
-
-instance Range Expression where
-  start IntegerExpression{range} = start range
-  start RationalExpression{range} = start range
-  start VariableExpression{variableId} = start variableId
-  start CallExpression{targetId} = start targetId
-  start UnaryExpression{unary} = start unary
-  start BinaryExpression{left} = start left
-  start AssignExpression{variableId} = start variableId
-  start ParenthesizedExpression{open} = start open
-
-  end IntegerExpression{range} = end range
-  end RationalExpression{range} = end range
-  end VariableExpression{variableId} = end variableId
-  end CallExpression{close} = end close
-  end UnaryExpression{operand} = end operand
-  end BinaryExpression{right} = end right
-  end AssignExpression{right} = end right
-  end ParenthesizedExpression{close} = end close
-
-
-instance Node Expression where
-  label IntegerExpression{} = "IntegerExpression"
-  label RationalExpression{} = "RationalExpression"
-  label VariableExpression{} = "VariableExpression"
-  label CallExpression{} = "CallExpression"
-  label UnaryExpression{} = "UnaryExpression"
-  label BinaryExpression{} = "BinaryExpression"
-  label AssignExpression{} = "AssignExpression"
-  label ParenthesizedExpression{} = "ParenthesizedExpression"
-
-  isLeaf IntegerExpression{} = True
-  isLeaf RationalExpression{} = True
-  isLeaf _ = False
-
-  findDeclaration _ _ = Nothing
-
-
-instance Range UnaryOperator where
-  start PlusOperator{range} = start range
-  start MinusOperator{range} = start range
-  start NotOperator{range} = start range
-
-  end PlusOperator{range} = end range
-  end MinusOperator{range} = end range
-  end NotOperator{range} = end range
-
-
-instance Node UnaryOperator where
-  label PlusOperator{} = "PlusOperator"
-  label MinusOperator{} = "MinusOperator"
-  label NotOperator{} = "NotOperator"
-
-  isLeaf _ = True
-
-  findDeclaration _ _ = Nothing
-
-
-instance Range BinaryOperator where
-  start AddOperator{range} = start range
-  start SubtractOperator{range} = start range
-  start MultiplyOperator{range} = start range
-  start DivideOperator{range} = start range
-  start ModuloOperator{range} = start range
-  start EqualOperator{range} = start range
-  start NotEqualOperator{range} = start range
-  start LessOperator{range} = start range
-  start LessOrEqualOperator{range} = start range
-  start GreaterOperator{range} = start range
-  start GreaterOrEqualOperator{range} = start range
-  start AndOperator{range} = start range
-  start OrOperator{range} = start range
-
-  end AddOperator{range} = end range
-  end SubtractOperator{range} = end range
-  end MultiplyOperator{range} = end range
-  end DivideOperator{range} = end range
-  end ModuloOperator{range} = end range
-  end EqualOperator{range} = end range
-  end NotEqualOperator{range} = end range
-  end LessOperator{range} = end range
-  end LessOrEqualOperator{range} = end range
-  end GreaterOperator{range} = end range
-  end GreaterOrEqualOperator{range} = end range
-  end AndOperator{range} = end range
-  end OrOperator{range} = end range
-
-
-instance Node BinaryOperator where
-  label AddOperator{} = "AddOperator"
-  label SubtractOperator{} = "SubtractOperator"
-  label MultiplyOperator{} = "MultiplyOperator"
-  label DivideOperator{} = "DivideOperator"
-  label ModuloOperator{} = "ModuloOperator"
-  label EqualOperator{} = "EqualOperator"
-  label NotEqualOperator{} = "NotEqualOperator"
-  label LessOperator{} = "LessOperator"
-  label LessOrEqualOperator{} = "LessOrEqualOperator"
-  label GreaterOperator{} = "GreaterOperator"
-  label GreaterOrEqualOperator{} = "GreaterOrEqualOperator"
-  label AndOperator{} = "AndOperator"
-  label OrOperator{} = "OrOperator"
-
-  isLeaf _ = True
-
-  findDeclaration _ _ = Nothing
-
-
-instance Range AssignOperator where
-  start AssignOperator{range} = start range
-  start AddAssignOperator{range} = start range
-  start SubtractAssignOperator{range} = start range
-  start MultiplyAssignOperator{range} = start range
-  start DivideAssignOperator{range} = start range
-  start ModuloAssignOperator{range} = start range
-
-  end AssignOperator{range} = end range
-  end AddAssignOperator{range} = end range
-  end SubtractAssignOperator{range} = end range
-  end MultiplyAssignOperator{range} = end range
-  end DivideAssignOperator{range} = end range
-  end ModuloAssignOperator{range} = end range
-
-
-instance Node AssignOperator where
-  label AssignOperator{} = "AssignOperator"
-  label AddAssignOperator{} = "AddAssignOperator"
-  label SubtractAssignOperator{} = "SubtractAssignOperator"
-  label MultiplyAssignOperator{} = "MultiplyAssignOperator"
-  label DivideAssignOperator{} = "DivideAssignOperator"
-  label ModuloAssignOperator{} = "ModuloAssignOperator"
-
-  isLeaf _ = True
-
-  findDeclaration _ _ = Nothing
-
-
-instance Range Identifier where
-  start Identifier{range} = start range
-
-  end Identifier{range} = end range
-
-
-instance Node Identifier where
-  label Identifier{} = "Identifier"
-
-  isLeaf Identifier{} = True
-
-  findDeclaration _ _ = Nothing
-
-
-instance Range Token where
-  start Token{range} = start range
-
-  end Token{range} = end range
-
-
-instance Node Token where
-  label Token{} = "Token"
-
-  isLeaf Token{} = True
-
-  findDeclaration _ _ = Nothing
-
-
-instance Range Comment where
-  start Comment{range} = start range
-
-  end Comment{range} = end range
-
-
-instance Node Comment where
-  label Comment{} = "Comment"
-
-  isLeaf Comment{} = True
-
-  findDeclaration _ _ = Nothing
-
-
-doesReturn :: Statement -> Bool
-doesReturn DeclarationStatement{} = False
-doesReturn ExpressionStatement{} = False
-doesReturn IfStatement{} = False
-doesReturn IfElseStatement{trueBranch, falseBranch} = all doesReturn [trueBranch, falseBranch]
-doesReturn WhileStatement{} = False
-doesReturn DoWhileStatement{body} = doesReturn body
-doesReturn ReturnStatement{} = True
-doesReturn BlockStatement{statements} = any doesReturn statements
-
-
-hasSideEffects :: Expression -> Bool
-hasSideEffects IntegerExpression{} = False
-hasSideEffects RationalExpression{} = False
-hasSideEffects VariableExpression{} = False
-hasSideEffects CallExpression{} = True
-hasSideEffects UnaryExpression{operand} = hasSideEffects operand
-hasSideEffects BinaryExpression{left, right} = any hasSideEffects [left, right]
-hasSideEffects AssignExpression{} = True
-hasSideEffects ParenthesizedExpression{inner} = hasSideEffects inner
+  deriving (Eq, Show, Read, Data)
+
+
+data UnaryOperator
+  = PlusOperator {interval :: (Int, Int)}
+  | MinusOperator {interval :: (Int, Int)}
+  | NotOperator {interval :: (Int, Int)}
+  | LenOperator {interval :: (Int, Int)}
+  deriving (Eq, Show, Read, Data)
+
+
+data BinaryOperator
+  = AddOperator {interval :: (Int, Int)}
+  | SubtractOperator {interval :: (Int, Int)}
+  | MultiplyOperator {interval :: (Int, Int)}
+  | DivideOperator {interval :: (Int, Int)}
+  | ModuloOperator {interval :: (Int, Int)}
+  | EqualOperator {interval :: (Int, Int)}
+  | NotEqualOperator {interval :: (Int, Int)}
+  | LessOperator {interval :: (Int, Int)}
+  | LessOrEqualOperator {interval :: (Int, Int)}
+  | GreaterOperator {interval :: (Int, Int)}
+  | GreaterOrEqualOperator {interval :: (Int, Int)}
+  | AndOperator {interval :: (Int, Int)}
+  | OrOperator {interval :: (Int, Int)}
+  | XorOperator {interval :: (Int, Int)}
+  | PlainAssignOperator {interval :: (Int, Int)}
+  | AddAssignOperator {interval :: (Int, Int)}
+  | SubtractAssignOperator {interval :: (Int, Int)}
+  | MultiplyAssignOperator {interval :: (Int, Int)}
+  | DivideAssignOperator {interval :: (Int, Int)}
+  | ModuloAssignOperator {interval :: (Int, Int)}
+  deriving (Eq, Show, Read, Data)
+
+
+data SymbolId = SymbolId {name :: String, interval :: (Int, Int)}
+  deriving (Eq, Show, Read, Data)
+
+
+data TypeId
+  = PlainTypeId {name :: String, interval :: (Int, Int)}
+  | ArrayTypeId {open :: Token, innerTypeId :: TypeId, close :: Token}
+  deriving (Eq, Show, Read, Data)
+
+
+newtype Token = Token {interval :: (Int, Int)}
+  deriving (Eq, Show, Read, Data)
+
+
+instance Interval Devin where
+  start :: Num a => Devin -> a
+  start Devin {interval} = start interval
+
+
+  end :: Num a => Devin -> a
+  end Devin {interval} = end interval
+
+
+instance Interval Declaration where
+  start :: Num a => Declaration -> a
+  start VariableDeclaration {varKeyword} = start varKeyword
+  start FunctionDeclaration {defKeyword} = start defKeyword
+
+
+  end :: Num a => Declaration -> a
+  end VariableDeclaration {semicolon} = end semicolon
+  end FunctionDeclaration {body} = end body
+
+
+instance Interval Statement where
+  start :: Num a => Statement -> a
+  start DeclarationStatement {declaration} = start declaration
+  start ExpressionStatement {value} = start value
+  start IfStatement {ifKeyword} = start ifKeyword
+  start IfElseStatement {ifKeyword} = start ifKeyword
+  start WhileStatement {whileKeyword} = start whileKeyword
+  start DoWhileStatement {doKeyword} = start doKeyword
+  start ReturnStatement {returnKeyword} = start returnKeyword
+  start AssertStatement {assertKeyword} = start assertKeyword
+  start BlockStatement {open} = start open
+
+
+  end :: Num a => Statement -> a
+  end DeclarationStatement {declaration} = end declaration
+  end ExpressionStatement {semicolon} = end semicolon
+  end IfStatement {trueBranch} = end trueBranch
+  end IfElseStatement {falseBranch} = end falseBranch
+  end WhileStatement {body} = end body
+  end DoWhileStatement {semicolon} = end semicolon
+  end ReturnStatement {semicolon} = end semicolon
+  end AssertStatement {semicolon} = end semicolon
+  end BlockStatement {close} = end close
+
+
+instance Interval Expression where
+  start :: Num a => Expression -> a
+  start VariableExpression {interval} = start interval
+  start IntegerExpression {interval} = start interval
+  start RationalExpression {interval} = start interval
+  start ArrayExpression {open} = start open
+  start AccessExpression {array} = start array
+  start CallExpression {functionId} = start functionId
+  start UnaryExpression {unary} = start unary
+  start BinaryExpression {left} = start left
+  start ParenthesizedExpression {open} = start open
+
+
+  end :: Num a => Expression -> a
+  end VariableExpression {interval} = end interval
+  end IntegerExpression {interval} = end interval
+  end RationalExpression {interval} = end interval
+  end ArrayExpression {close} = end close
+  end AccessExpression {close} = end close
+  end CallExpression {close} = end close
+  end UnaryExpression {operand} = end operand
+  end BinaryExpression {right} = end right
+  end ParenthesizedExpression {close} = end close
+
+
+instance Interval UnaryOperator where
+  start :: Num a => UnaryOperator -> a
+  start PlusOperator {interval} = start interval
+  start MinusOperator {interval} = start interval
+  start NotOperator {interval} = start interval
+  start LenOperator {interval} = start interval
+
+
+  end :: Num a => UnaryOperator -> a
+  end PlusOperator {interval} = end interval
+  end MinusOperator {interval} = end interval
+  end NotOperator {interval} = end interval
+  end LenOperator {interval} = end interval
+
+
+instance Interval BinaryOperator where
+  start :: Num a => BinaryOperator -> a
+  start AddOperator {interval} = start interval
+  start SubtractOperator {interval} = start interval
+  start MultiplyOperator {interval} = start interval
+  start DivideOperator {interval} = start interval
+  start ModuloOperator {interval} = start interval
+  start EqualOperator {interval} = start interval
+  start NotEqualOperator {interval} = start interval
+  start LessOperator {interval} = start interval
+  start LessOrEqualOperator {interval} = start interval
+  start GreaterOperator {interval} = start interval
+  start GreaterOrEqualOperator {interval} = start interval
+  start AndOperator {interval} = start interval
+  start OrOperator {interval} = start interval
+  start XorOperator {interval} = start interval
+  start PlainAssignOperator {interval} = start interval
+  start AddAssignOperator {interval} = start interval
+  start SubtractAssignOperator {interval} = start interval
+  start MultiplyAssignOperator {interval} = start interval
+  start DivideAssignOperator {interval} = start interval
+  start ModuloAssignOperator {interval} = start interval
+
+
+  end :: Num a => BinaryOperator -> a
+  end AddOperator {interval} = end interval
+  end SubtractOperator {interval} = end interval
+  end MultiplyOperator {interval} = end interval
+  end DivideOperator {interval} = end interval
+  end ModuloOperator {interval} = end interval
+  end EqualOperator {interval} = end interval
+  end NotEqualOperator {interval} = end interval
+  end LessOperator {interval} = end interval
+  end LessOrEqualOperator {interval} = end interval
+  end GreaterOperator {interval} = end interval
+  end GreaterOrEqualOperator {interval} = end interval
+  end AndOperator {interval} = end interval
+  end OrOperator {interval} = end interval
+  end XorOperator {interval} = end interval
+  end PlainAssignOperator {interval} = end interval
+  end AddAssignOperator {interval} = end interval
+  end SubtractAssignOperator {interval} = end interval
+  end MultiplyAssignOperator {interval} = end interval
+  end DivideAssignOperator {interval} = end interval
+  end ModuloAssignOperator {interval} = end interval
+
+
+instance Interval SymbolId where
+  start :: Num a => SymbolId -> a
+  start SymbolId {interval} = start interval
+
+
+  end :: Num a => SymbolId -> a
+  end SymbolId {interval} = end interval
+
+
+instance Interval TypeId where
+  start :: Num a => TypeId -> a
+  start PlainTypeId {interval} = start interval
+  start ArrayTypeId {open} = start open
+
+
+  end :: Num a => TypeId -> a
+  end PlainTypeId {interval} = end interval
+  end ArrayTypeId {close} = end close
+
+
+instance Interval Token where
+  start :: Num a => Token -> a
+  start Token {interval} = start interval
+
+
+  end :: Num a => Token -> a
+  end Token {interval} = end interval
+
+
+instance Display Expression where
+  displays :: Expression -> ShowS
+  displays = \case
+    VariableExpression {variableName} -> showString variableName
+    IntegerExpression {integer} -> shows integer
+    RationalExpression {rational} -> showsRatio rational
+    AccessExpression {array, index} -> displays array . showChar '[' . displays index . showChar ']'
+    ParenthesizedExpression {inner} -> showChar '(' . displays inner . showChar ')'
+
+    UnaryExpression {unary = PlusOperator {}, operand} -> showChar '+' . displays operand
+    UnaryExpression {unary = MinusOperator {}, operand} -> showChar '-' . displays operand
+    UnaryExpression {unary = NotOperator {}, operand} -> showString "not " . displays operand
+    UnaryExpression {unary = LenOperator {}, operand} -> showString "len " . displays operand
+
+    BinaryExpression {left, binary, right} ->
+      displays left . showChar ' ' . displays binary . showChar ' ' . displays right
+
+    ArrayExpression {elements = []} -> showString "[]"
+
+    ArrayExpression {elements = element : elements} ->
+      showChar '[' . displays element . go elements
+      where
+        go [] = showChar ']'
+        go (element : elements) = showString ", " . displays element . go elements
+
+    CallExpression {functionId = SymbolId {name}, arguments = []} ->
+      showString name . showString "()"
+
+    CallExpression {functionId = SymbolId {name}, arguments = argument : arguments} ->
+      showString name . showChar '(' . displays argument . go arguments
+      where
+        go [] = showChar ')'
+        go (argument : arguments) = showString ", " . displays argument . go arguments
+
+
+instance Display UnaryOperator where
+  displays :: UnaryOperator -> ShowS
+  displays PlusOperator {} = showChar '+'
+  displays MinusOperator {} = showChar '-'
+  displays NotOperator {} = showString "not"
+  displays LenOperator {} = showString "len"
+
+
+instance Display BinaryOperator where
+  displays :: BinaryOperator -> ShowS
+  displays AddOperator {} = showChar '+'
+  displays SubtractOperator {} = showChar '-'
+  displays MultiplyOperator {} = showChar '*'
+  displays DivideOperator {} = showChar '/'
+  displays ModuloOperator {} = showChar '%'
+  displays EqualOperator {} = showString "=="
+  displays NotEqualOperator {} = showString "!="
+  displays LessOperator {} = showChar '<'
+  displays LessOrEqualOperator {} = showString "<="
+  displays GreaterOperator {} = showChar '>'
+  displays GreaterOrEqualOperator {} = showString ">="
+  displays AndOperator {} = showString "and"
+  displays OrOperator {} = showString "or"
+  displays XorOperator {} = showString "xor"
+  displays PlainAssignOperator {} = showChar '='
+  displays AddAssignOperator {} = showString "+="
+  displays SubtractAssignOperator {} = showString "-="
+  displays MultiplyAssignOperator {} = showString "*="
+  displays DivideAssignOperator {} = showString "/="
+  displays ModuloAssignOperator {} = showString "%="

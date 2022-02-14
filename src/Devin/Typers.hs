@@ -1,308 +1,442 @@
+{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE LambdaCase #-}
+
 module Devin.Typers (
   checkDevin,
-  checkDeclarations,
+  checkDeclaration,
   checkStatement,
-  checkVariable
+  checkExpression
 ) where
 
 import Control.Monad
 import Data.Foldable
-import Data.Functor
-import Data.Functor.Classes
 import Data.Traversable
 
-import Data.Map ((!?))
-
-import Devin.CallTarget (CallTarget)
-import qualified Devin.CallTarget as CallTarget
-import Devin.Range
+import Devin.Error
 import Devin.Syntax
-import qualified Devin.Syntax as AssignOperator (AssignOperator (..))
-import qualified Devin.Syntax as BinaryOperator (BinaryOperator (..))
-import qualified Devin.Syntax as Declaration (Declaration (..))
-import qualified Devin.Syntax as Expression (Expression (..))
-import qualified Devin.Syntax as Identifier (Identifier (..))
-import qualified Devin.Syntax as Statement (Statement (..))
-import qualified Devin.Syntax as UnaryOperator (UnaryOperator (..))
 import Devin.Type
 import Devin.Typer
-import Devin.Typer.Error
 
 
-checkDevin :: Devin -> Typer Devin
-checkDevin devin = withNewScope $ do
-  declarations' <- checkDeclarations devin.declarations
-  pure devin{declarations = declarations'}
+checkDevin :: Devin -> Typer ()
+checkDevin Devin {declarations} = do
+  for_ declarations checkDeclaration1
+  for_ declarations checkDeclaration2
 
 
-checkDeclarations :: Traversable t => t Declaration -> Typer (t Declaration)
-checkDeclarations declarations = do
-  declarations' <- for declarations checkDeclaration1
-  for declarations' checkDeclaration2
+checkDeclaration :: Declaration -> Typer ()
+checkDeclaration declaration = do
+  checkDeclaration1 declaration
+  checkDeclaration2 declaration
 
 
-checkDeclaration1 :: Declaration -> Typer Declaration
-checkDeclaration1 declaration = case declaration of
-  VariableDeclaration{} -> pure declaration
+checkDeclaration1 :: Declaration -> Typer ()
+checkDeclaration1 = \case
+  VariableDeclaration {} -> pure ()
 
-  FunctionDeclaration{functionId, parameters, returnInfo} -> do
-    parameters' <- for parameters $ \(id, colon, typeId) -> do
-      typeId' <- checkType typeId
-      pure (id{Identifier.t = typeId'.t}, colon, typeId')
+  FunctionDeclaration {functionId = SymbolId {name}, parameters, returnInfo} -> do
+    parameterTs <- for parameters $ \(_, _, typeInfo) -> case typeInfo of
+      Just (_, parameterTypeId) -> getType parameterTypeId
+      Nothing -> pure Unknown
 
-    returnInfo' <- case returnInfo of
-      Just (arrow, typeId) -> do
-        typeId' <- checkType typeId
-        pure (Just (arrow, typeId'))
+    returnT <- case returnInfo of
+      Just (_, returnTypeId) -> getType returnTypeId
+      Nothing -> pure Unknown
 
-      Nothing -> pure Nothing
-
-    let parameterTypes = parameters' <&> (\(_, _, typeId) -> typeId.t)
-    let returnType = maybe Unit (\(_, typeId) -> typeId.t) returnInfo'
-    let functionId' = functionId{Identifier.t = Function parameterTypes returnType}
-    let callTarget = CallTarget.UserDefined (start declaration)
-    defineFunction functionId' callTarget
-
-    depth <- getDepth
-    pure declaration{functionId = functionId', parameters = parameters', returnInfo = returnInfo', depth}
+    defineFunctionSignature name (parameterTs, returnT)
 
 
-checkDeclaration2 :: Declaration -> Typer Declaration
-checkDeclaration2 declaration = case declaration of
-  VariableDeclaration{variableId, right} -> do
-    right' <- checkExpression right
-    let variableId' = variableId{Identifier.t = right'.t}
-    defineVariable variableId'
-    pure declaration{Declaration.variableId = variableId', Declaration.right = right'}
+checkDeclaration2 :: Declaration -> Typer ()
+checkDeclaration2 = \case
+  VariableDeclaration {variableId = SymbolId {name}, value} -> do
+    t <- checkExpression value
+    defineVariableType name t
 
-  FunctionDeclaration{functionId, parameters, returnInfo, body} -> do
-    let parameterIds = parameters <&> (\(id, _, _) -> id)
-    let parameterTypes = parameters <&> (\(_, _, typeId) -> typeId.t)
-    let returnType = maybe Unit (\(_, typeId) -> typeId.t) returnInfo
+  FunctionDeclaration {parameters, returnInfo, body} -> withNewScope $ do
+    for_ parameters $ \(_, SymbolId {name}, typeInfo) -> case typeInfo of
+      Just (_, parameterTypeId) -> do
+        parameterT <- getType parameterTypeId
+        defineVariableType name parameterT
 
-    body' <- withNewScope $ do
-      for_ parameterIds defineVariable
-      checkStatement returnType body
+      Nothing -> defineVariableType name Unknown
 
-    unless (areCompatible returnType Unit || doesReturn body') $
-      report (MissingReturnPath functionId parameterTypes)
+    returnT <- case returnInfo of
+      Just (_, returnTypeId) -> getType returnTypeId
+      Nothing -> pure Unknown
 
-    pure declaration{Declaration.body = body'}
-
-
-checkStatement :: Type -> Statement -> Typer Statement
-checkStatement expectedType statement = case statement of
-  ExpressionStatement{value} -> do
-    value' <- checkExpression value
-    pure statement{Statement.value = value'}
-
-  DeclarationStatement{declaration} -> do
-    checkDeclaration1 declaration
-    declaration' <- checkDeclaration2 declaration
-    pure statement{declaration = declaration'}
-
-  IfStatement{predicate, trueBranch} -> do
-    predicate' <- checkExpression predicate
-    let predicateOk = areCompatible predicate'.t Bool
-    unless predicateOk (report (InvalidType predicate Bool predicate'.t))
-    trueBranch' <- withNewScope (checkStatement expectedType trueBranch)
-    pure statement{predicate = predicate', trueBranch = trueBranch'}
-
-  IfElseStatement{predicate, trueBranch, falseBranch} -> do
-    predicate' <- checkExpression predicate
-    let predicateOk = areCompatible predicate'.t Bool
-    unless predicateOk (report (InvalidType predicate Bool predicate'.t))
-    trueBranch' <- withNewScope (checkStatement expectedType trueBranch)
-    falseBranch' <- withNewScope (checkStatement expectedType falseBranch)
-    pure statement{predicate = predicate', trueBranch = trueBranch', falseBranch = falseBranch'}
-
-  WhileStatement{predicate, body} -> do
-    predicate' <- checkExpression predicate
-    let predicateOk = areCompatible predicate'.t Bool
-    unless predicateOk (report (InvalidType predicate Bool predicate'.t))
-    body' <- withNewScope (checkStatement expectedType body)
-    pure statement{predicate = predicate', body = body'}
-
-  DoWhileStatement{body, predicate} -> do
-    body' <- withNewScope (checkStatement expectedType body)
-    predicate' <- checkExpression predicate
-    let predicateOk = areCompatible predicate'.t Bool
-    unless predicateOk (report (InvalidType predicate Bool predicate'.t))
-    pure statement{body = body', predicate = predicate'}
-
-  ReturnStatement{result = Just result} -> do
-    result' <- checkExpression result
-    let resultOk = areCompatible result'.t expectedType
-    unless resultOk (report (InvalidReturnType statement expectedType result'.t))
-    pure statement{result = Just result'}
-
-  ReturnStatement{result = Nothing} -> do
-    let expectedUnit = areCompatible expectedType Unit
-    unless expectedUnit (report (MissingReturnValue statement expectedType))
-    pure statement
-
-  BlockStatement{statements} -> withNewScope $ do
-    statements' <- for statements $ \statement -> case statement of
-      DeclarationStatement{declaration} -> do
-        declaration' <- checkDeclaration1 declaration
-        pure statement{declaration = declaration'}
-
-      _ -> pure statement
-
-    statements'' <- for statements' $ \statement -> case statement of
-      DeclarationStatement{declaration} -> do
-        declaration' <- checkDeclaration2 declaration
-        pure statement{declaration = declaration'}
-
-      _ -> pure statement
-
-    statements''' <- for statements'' $ \statement -> case statement of
-      DeclarationStatement{} -> pure statement
-      _ -> checkStatement expectedType statement
-
-    pure statement{statements = statements'''}
+    checkStatement returnT body
+    pure ()
 
 
-checkExpression :: Expression -> Typer Expression
+checkStatement :: Type -> Statement -> Typer Bool
+checkStatement expectedT statement = case statement of
+  DeclarationStatement {declaration = VariableDeclaration {variableId = SymbolId {name}, value}} -> do
+    t <- checkExpression value
+    defineVariableType name t
+    pure False
+
+  DeclarationStatement {declaration} -> do
+    checkDeclaration declaration
+    pure False
+
+  ExpressionStatement {value} -> do
+    checkExpression value
+    pure False
+
+  IfStatement {predicate, trueBranch} -> do
+    t <- checkExpression predicate
+    when (t /= Bool) (report (InvalidType predicate Bool t))
+    withNewScope (checkStatement expectedT trueBranch)
+    pure False
+
+  IfElseStatement {predicate, trueBranch, falseBranch} -> do
+    t <- checkExpression predicate
+    when (t /= Bool) (report (InvalidType predicate Bool t))
+    trueBranchReturns <- withNewScope (checkStatement expectedT trueBranch)
+    falseBranchReturns <- withNewScope (checkStatement expectedT falseBranch)
+    pure (trueBranchReturns && falseBranchReturns)
+
+  WhileStatement {predicate, body} -> do
+    t <- checkExpression predicate
+    when (t /= Bool) (report (InvalidType predicate Bool t))
+    withNewScope (checkStatement expectedT body)
+    pure False
+
+  DoWhileStatement {body, predicate} -> do
+    returns <- withNewScope (checkStatement expectedT body)
+    t <- checkExpression predicate
+    when (t /= Bool) (report (InvalidType predicate Bool t))
+    pure returns
+
+  ReturnStatement {result = Just result} -> do
+    t <- checkExpression result
+    when (t /= expectedT) (report (InvalidType result expectedT t))
+    pure True
+
+  ReturnStatement {result = Nothing} -> do
+    when (Unit /= expectedT) (report (MissingReturnValue statement expectedT))
+    pure True
+
+  AssertStatement {predicate} -> do
+    t <- checkExpression predicate
+    when (t /= Bool) (report (InvalidType predicate Bool t))
+    pure False
+
+  BlockStatement {statements} -> withNewScope $ do
+    for_ statements $ \case
+      DeclarationStatement {declaration} -> checkDeclaration1 declaration
+      _ -> pure ()
+
+    foldlM (\returns statement -> (returns ||) <$> check statement) False statements
+
+    where
+      check DeclarationStatement {declaration} = do {checkDeclaration2 declaration; pure False}
+      check statement = checkStatement expectedT statement
+
+
+checkExpression :: Expression -> Typer Type
 checkExpression expression = case expression of
-  IntegerExpression{} -> pure expression{Expression.t = Int}
+  IntegerExpression {} -> pure Int
 
-  RationalExpression{} -> pure expression{Expression.t = Float}
+  RationalExpression {} -> pure Float
 
-  VariableExpression{variableId} -> do
-    variableId' <- checkVariable variableId
-    pure expression{variableId = variableId', t = variableId'.t}
+  VariableExpression {variableName, interval} ->
+    lookupVariableType variableName >>= \case
+      Just (t, _) -> pure t
+      Nothing -> report' (UnknownVariable variableName interval)
 
-  CallExpression{targetId, arguments} -> do
-    depth <- getDepth
-    arguments' <- for arguments checkExpression
-    (targetId', target') <- checkFunction targetId (arguments' <&> (.t))
-    pure expression{targetId = targetId', arguments = arguments', depth, target = target', t = targetId'.t.returnType}
+  ArrayExpression {elements} -> do
+    ts <- for elements checkExpression
 
-  UnaryExpression{unary, operand} -> do
-    operand' <- checkExpression operand
+    case ts of
+      [] -> pure (Array Unknown)
 
-    t <- case (unary, operand'.t) of
-      (_, Error) -> pure Error
-      (PlusOperator{}, Int) -> pure Int
-      (PlusOperator{}, Float) -> pure Float
-      (MinusOperator{}, Int) -> pure Int
-      (MinusOperator{}, Float) -> pure Float
-      (NotOperator{}, Bool) -> pure Bool
-      _ -> report (InvalidUnary unary operand'.t) $> Error
+      t : ts -> do
+        zipWithM_ (\e t' -> when (t' /= t) (report (InvalidType e t t'))) elements ts
+        pure (Array t)
 
-    let unary' = unary{UnaryOperator.t = Function [operand'.t] t}
-    pure expression{unary = unary', operand = operand', t}
+  AccessExpression {array, index} -> do
+    arrayT <- checkExpression array
+    indexT <- checkExpression index
 
-  BinaryExpression{left, binary, right} -> do
-    left' <- checkExpression left
-    right' <- checkExpression right
+    case (arrayT, indexT) of
+      (Array t, Int) -> pure t
+      (Array _, _) -> report' (InvalidType index Int indexT)
+      (_, _) -> report' (InvalidType array (Array Unknown) arrayT)
 
-    t <- case (left'.t, binary, right'.t) of
-      (Error, _, _) -> pure Error
-      (_, _, Error) -> pure Error
-      (Int, AddOperator{}, Int) -> pure Int
-      (Float, AddOperator{}, Float) -> pure Float
-      (Int, SubtractOperator{}, Int) -> pure Int
-      (Float, SubtractOperator{}, Float) -> pure Float
-      (Int, MultiplyOperator{}, Int) -> pure Int
-      (Float, MultiplyOperator{}, Float) -> pure Float
-      (Int, DivideOperator{}, Int) -> pure Int
-      (Float, DivideOperator{}, Float) -> pure Float
-      (Int, ModuloOperator{}, Int) -> pure Int
-      (_, EqualOperator{}, _) -> pure Bool
-      (_, NotEqualOperator{}, _) -> pure Bool
-      (Int, LessOperator{}, Int) -> pure Bool
-      (Float, LessOperator{}, Float) -> pure Bool
-      (Int, LessOrEqualOperator{}, Int) -> pure Bool
-      (Float, LessOrEqualOperator{}, Float) -> pure Bool
-      (Int, GreaterOperator{}, Int) -> pure Bool
-      (Float, GreaterOperator{}, Float) -> pure Bool
-      (Int, GreaterOrEqualOperator{}, Int) -> pure Bool
-      (Float, GreaterOrEqualOperator{}, Float) -> pure Bool
-      (Bool, AndOperator{}, Bool) -> pure Bool
-      (Bool, OrOperator{}, Bool) -> pure Bool
-      _ -> report (InvalidBinary binary left'.t right'.t) $> Error
+  CallExpression {functionId = SymbolId {name, interval}, arguments} ->
+    lookupFunctionSignature name >>= \case
+      Just ((parameterTs, returnT), _) -> go 0 arguments parameterTs
+        where
+          go _ [] [] = pure returnT
 
-    let binary' = binary{BinaryOperator.t = Function [left'.t, right'.t] t}
-    pure expression{left = left', binary = binary', right = right', t}
+          go n (argument : arguments) (parameterT : parameterTs) = do
+            argumentT <- checkExpression argument
+            when (argumentT /= parameterT) (report (InvalidType argument parameterT argumentT))
+            go (n + 1) arguments parameterTs
 
-  AssignExpression{variableId, assign, right} -> do
-    variableId' <- checkVariable variableId
-    right' <- checkExpression right
+          go n arguments parameterTs =
+            report' (InvalidArgumentCount expression (n + length parameterTs) (n + length arguments))
 
-    t <- case (variableId'.t, assign, right'.t) of
-      (Error, _, _) -> pure Error
-      (_, _, Error) -> pure Error
-      (Unit, AssignOperator{}, Unit) -> pure Unit
-      (Bool, AssignOperator{}, Bool) -> pure Bool
-      (Int, AssignOperator{}, Int) -> pure Int
-      (Float, AssignOperator{}, Float) -> pure Float
-      (Int, AddAssignOperator{}, Int) -> pure Int
-      (Float, AddAssignOperator{}, Float) -> pure Float
-      (Int, SubtractAssignOperator{}, Int) -> pure Int
-      (Float, SubtractAssignOperator{}, Float) -> pure Float
-      (Int, MultiplyAssignOperator{}, Int) -> pure Int
-      (Float, MultiplyAssignOperator{}, Float) -> pure Float
-      (Int, DivideAssignOperator{}, Int) -> pure Int
-      (Float, DivideAssignOperator{}, Float) -> pure Float
-      (Int, ModuloAssignOperator{}, Int) -> pure Int
-      (Float, ModuloAssignOperator{}, Float) -> pure Float
-      _ -> report (InvalidAssign assign variableId'.t right'.t) $> Error
+      Nothing -> report' (UnknownFunction name interval)
 
-    let assign' = assign{AssignOperator.t = Function [variableId'.t, right'.t] t}
-    pure expression{variableId = variableId', assign = assign', right = right', t = right'.t}
+  UnaryExpression {unary, operand} | PlusOperator {} <- unary -> do
+    operandT <- checkExpression operand
 
-  ParenthesizedExpression{inner} -> do
-    inner' <- checkExpression inner
-    pure expression{inner = inner', t = inner'.t}
+    case operandT of
+      Unknown -> pure Unknown
+      Int -> pure Int
+      Float -> pure Float
+      _ -> report' (InvalidUnary unary operandT)
+
+  UnaryExpression {unary, operand} | MinusOperator {} <- unary -> do
+    operandT <- checkExpression operand
+
+    case operandT of
+      Unknown -> pure Unknown
+      Int -> pure Int
+      Float -> pure Float
+      _ -> report' (InvalidUnary unary operandT)
+
+  UnaryExpression {unary, operand} | NotOperator {} <- unary -> do
+    operandT <- checkExpression operand
+
+    case operandT of
+      Unknown -> pure Unknown
+      Bool -> pure Bool
+      _ -> report' (InvalidUnary unary operandT)
+
+  UnaryExpression {unary, operand} | LenOperator {} <- unary -> do
+    operandT <- checkExpression operand
+
+    case operandT of
+      Unknown -> pure Unknown
+      Array _ -> pure Int
+      _ -> report' (InvalidUnary unary operandT)
+
+  BinaryExpression {left, binary, right} | AddOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (Float, Float) -> pure Float
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | SubtractOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (Float, Float) -> pure Float
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | MultiplyOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (Float, Float) -> pure Float
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | DivideOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (Float, Float) -> pure Float
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | ModuloOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | EqualOperator {} <- binary -> do
+    checkExpression left
+    checkExpression right
+    pure Bool
+
+  BinaryExpression {left, binary, right} | NotEqualOperator {} <- binary -> do
+    checkExpression left
+    checkExpression right
+    pure Bool
+
+  BinaryExpression {left, binary, right} | LessOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Bool
+      (Float, Float) -> pure Bool
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | LessOrEqualOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Bool
+      (Float, Float) -> pure Bool
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | GreaterOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Bool
+      (Float, Float) -> pure Bool
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | GreaterOrEqualOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Bool
+      (Float, Float) -> pure Bool
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | AndOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Bool, Bool) -> pure Bool
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | OrOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Bool, Bool) -> pure Bool
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | XorOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Bool, Bool) -> pure Bool
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | PlainAssignOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    if leftT == rightT then
+      pure leftT
+    else
+      report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | AddAssignOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (Float, Float) -> pure Float
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | SubtractAssignOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (Float, Float) -> pure Float
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | MultiplyAssignOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (Float, Float) -> pure Float
+      (Array t, Int) -> pure (Array t)
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | DivideAssignOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (Float, Float) -> pure Float
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | ModuloAssignOperator {} <- binary -> do
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      (Int, Int) -> pure Int
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+  ParenthesizedExpression {inner} -> checkExpression inner
 
 
-checkType :: Identifier -> Typer Identifier
-checkType typeId = do
-  types <- getTypes
+getType :: TypeId -> Typer Type
+getType = \case
+  PlainTypeId {name, interval} ->
+    lookupType name >>= \case
+      Just (t, _) -> do
+        pure t
 
-  case types !? typeId.name of
-    Just t -> pure typeId{Identifier.t}
+      Nothing -> do
+        report' (UnknownType name interval)
+        defineType name (Placeholder name)
 
-    Nothing -> do
-      report (UnknownType typeId)
-      let typeId' = typeId{Identifier.t = Unknown typeId.name}
-      defineType typeId'
-      pure typeId'
-
-
-checkVariable :: Identifier -> Typer Identifier
-checkVariable variableId = do
-  variables <- getVariables
-
-  case variables !? variableId.name of
-    Just t -> pure variableId{Identifier.t}
-
-    Nothing -> do
-      report (UnknownVariable variableId)
-      let variableId' = variableId{Identifier.t = Error}
-      defineVariable variableId'
-      pure variableId'
+  ArrayTypeId {innerTypeId} -> do
+    t <- getType innerTypeId
+    pure (Array t)
 
 
-checkFunction :: Identifier -> [Type] -> Typer (Identifier, CallTarget)
-checkFunction targetId parameterTypes = go =<< getFunctions
-  where
-    go [] = do
-      report (UnknownFunction targetId parameterTypes)
-      let targetId' = targetId{Identifier.t = Function parameterTypes Error}
-      defineFunction targetId' CallTarget.Undefined
-      pure (targetId', CallTarget.Undefined)
-
-    go (current : parents) = do
-      let info = current !? targetId.name
-
-      case find (\(ts, _, _) -> liftEq areCompatible parameterTypes ts) =<< info of
-        Just _ | Error `elem` parameterTypes ->
-          pure (targetId{Identifier.t = Function parameterTypes Error}, CallTarget.Undefined)
-
-        Just (_, returnType, target) ->
-          pure (targetId{Identifier.t = Function parameterTypes returnType}, target)
-
-        Nothing -> go parents
+report' :: Error -> Typer Type
+report' error = do
+  report error
+  pure Unknown

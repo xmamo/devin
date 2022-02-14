@@ -1,119 +1,126 @@
+{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE LambdaCase #-}
+
 module Devin.Typer (
-  Typer,
-  runTyper,
-  getDepth,
-  getTypes,
-  getVariables,
-  getFunctions,
+  Typer (..),
+  Environment,
+  Scope (..),
+  predefinedEnvironment,
   defineType,
-  defineVariable,
-  defineFunction,
+  lookupType,
+  defineFunctionSignature,
+  lookupFunctionSignature,
+  defineVariableType,
+  lookupVariableType,
   withNewScope,
   report
 ) where
 
-import Data.Functor.Classes
-import Data.List
+import Control.Applicative
+import Data.Data
 
-import Data.Text (Text)
-
-import Data.Map (Map, (!?))
-import qualified Data.Map as Map
-
-import Devin.CallTarget (CallTarget)
-import Devin.Range
-import Devin.Syntax
+import Devin.Error
 import Devin.Type
-import Devin.Typer.Environment
-import qualified Devin.Typer.Environment as Environment (Environment (..))
-import Devin.Typer.Error
 
 
-newtype Typer a = Typer (Environment -> (a, Environment, [Error]))
+newtype Typer a = Typer {runTyper :: Environment -> (a, Environment, [Error])}
   deriving Functor
 
 
-instance Applicative Typer where
-  pure x = Typer $ \environment -> (x, environment, [])
+type Environment = [Scope]
 
-  Typer check1 <*> Typer check2 = Typer $ \environment -> do
-    let (f, environment', errors1) = check1 environment
-    let (x, environment'', errors2) = check2 environment'
-    (f x, environment'', errors2 ++ errors1)
+
+data Scope = Scope {
+  types :: [(String, Type)],
+  functions :: [(String, ([Type], Type))],
+  variables :: [(String, Type)]
+} deriving (Eq, Show, Read, Data)
+
+
+instance Applicative Typer where
+  pure :: a -> Typer a
+  pure x = Typer (\environment -> (x, environment, []))
+
+
+  liftA2 :: (a -> b -> c) -> Typer a -> Typer b -> Typer c
+  liftA2 f mx my = Typer $ \environment ->
+    let (x, environment', errors1) = runTyper mx environment
+        (y, environment'', errors2) = runTyper my environment'
+     in (f x y, environment'', errors1 ++ errors2)
 
 
 instance Monad Typer where
-  Typer check1 >>= f = Typer $ \environment -> do
-    let (x1, environment', errors1) = check1 environment
-    let Typer check2 = f x1
-    let (x2, environment'', errors2) = check2 environment'
-    (x2, environment'', errors2 ++ errors1)
+  (>>=) :: Typer a -> (a -> Typer b) -> Typer b
+  mx >>= f = Typer $ \environment ->
+    let (x, environment', errors1) = runTyper mx environment
+        (y, environment'', errors2) = runTyper (f x) environment'
+     in (y, environment'', errors1 ++ errors2)
 
 
-runTyper :: Typer a -> Environment -> (a, Environment, [Error])
-runTyper (Typer check) environment = do
-  let (a, environment', errors) = check environment
-  (a, environment', sortOn start errors)
+predefinedEnvironment :: Environment
+predefinedEnvironment =
+  let types = [("Unit", Unit), ("Bool", Bool), ("Int", Int), ("Float", Float)]
+      functions = [("toInt", ([Float], Int)), ("toFloat", ([Int], Float))]
+      variables = [("true", Bool), ("false", Bool), ("unit", Unit)]
+   in [Scope types functions variables]
 
 
-getDepth :: Num a => Typer a
-getDepth = Typer $ \environment ->
-  (fromIntegral environment.depth, environment, [])
+defineType :: String -> Type -> Typer Type
+defineType name t = Typer $ \case
+  [] ->
+    (t, [Scope [(name, t)] [] []], [])
+
+  scope : parents ->
+    (t, scope {types = (name, t) : types scope} : parents, [])
 
 
-getTypes :: Typer (Map Text Type)
-getTypes = Typer $ \environment ->
-  (environment.types, environment, [])
+lookupType :: String -> Typer (Maybe (Type, Int))
+lookupType name = Typer (\environment -> (go 0 environment, environment, []))
+  where
+    go _ [] = Nothing
+
+    go depth (Scope {types} : parents) = case lookup name types of
+      Just t -> Just (t, depth)
+      Nothing -> go (depth + 1) parents
 
 
-getVariables :: Typer (Map Text Type)
-getVariables = Typer $ \environment ->
-  (environment.variables, environment, [])
+defineFunctionSignature :: String -> ([Type], Type) -> Typer ()
+defineFunctionSignature name signature = Typer $ \case
+  [] -> ((), [Scope [] [(name, signature)] []], [])
+  scope : parents -> ((), scope {functions = (name, signature) : functions scope} : parents, [])
 
 
-getFunctions :: Typer [Map Text [([Type], Type, CallTarget)]]
-getFunctions = Typer $ \environment ->
-  (environment.functions, environment, [])
+lookupFunctionSignature :: String -> Typer (Maybe (([Type], Type), Int))
+lookupFunctionSignature name = Typer (\environment -> (go 0 environment, environment, []))
+  where
+    go _ [] = Nothing
+
+    go depth (Scope {functions} : parents) = case lookup name functions of
+      Just signature -> Just (signature, depth)
+      Nothing -> go (depth + 1) parents
 
 
-defineType :: Identifier -> Typer ()
-defineType typeId = Typer $ \environment -> do
-  let types' = Map.insert typeId.name typeId.t environment.types
-  ((), environment{types = types'}, [])
+defineVariableType :: String -> Type -> Typer ()
+defineVariableType name t = Typer $ \case
+  [] -> ((), [Scope [] [] [(name, t)]], [])
+  scope : parents -> ((), scope {variables = (name, t) : variables scope} : parents, [])
 
 
-defineVariable :: Identifier -> Typer ()
-defineVariable variableId = Typer $ \environment -> do
-  let variables' = Map.insert variableId.name variableId.t environment.variables
-  ((), environment{variables = variables'}, [])
+lookupVariableType :: String -> Typer (Maybe (Type, Int))
+lookupVariableType name = Typer (\environment -> (go 0 environment, environment, []))
+  where
+    go _ [] = Nothing
 
-
-defineFunction :: Identifier -> CallTarget -> Typer Bool
-defineFunction functionId callTarget = Typer $ \environment -> do
-  let parameterTypes = functionId.t.parameterTypes
-  let returnType = functionId.t.returnType
-  let current : parents = environment.functions
-
-  case current !? functionId.name of
-    Just infos | any (\(ts, _, _) -> liftEq areCompatible parameterTypes ts) infos ->
-      (False, environment, [FunctionRedefinition functionId parameterTypes])
-
-    Just infos -> do
-      let infos' = (parameterTypes, returnType, callTarget) : infos
-      let functions' = Map.insert functionId.name infos' current : parents
-      (True, environment{functions = functions'}, [])
-
-    Nothing -> do
-      let infos' = [(parameterTypes, returnType, callTarget)]
-      let functions' = Map.insert functionId.name infos' current : parents
-      (True, environment{functions = functions'}, [])
+    go depth (Scope {variables} : parents) = case lookup name variables of
+      Just t -> Just (t, depth)
+      Nothing -> go (depth + 1) parents
 
 
 withNewScope :: Typer a -> Typer a
-withNewScope (Typer check) = Typer $ \environment -> do
-  let (x, _, errors) = check environment{Environment.depth = environment.depth + 1}
-  (x, environment, errors)
+withNewScope mx = Typer $ \environment ->
+  let (x, _, errors) = runTyper mx environment
+   in (x, environment, errors)
 
 
 report :: Error -> Typer ()
-report error = Typer $ \environment -> ((), environment, [error])
+report error = Typer (\environment -> ((), environment, [error]))

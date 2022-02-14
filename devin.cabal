@@ -1,89 +1,136 @@
 cabal-version: 2.2
+
 name: devin
 version: 1.0.0
 synopsis: Devin programming language
 author: Matteo Morena
 category: Language
 
+
+common common
+  if impl(ghc >= 9.2.1)
+    default-language: GHC2021
+  else
+    default-language: Haskell2010
+
+    default-extensions:
+      NoCUSKs,
+      NoDatatypeContexts,
+      BangPatterns,
+      BinaryLiterals,
+      ConstrainedClassMethods,
+      ConstraintKinds,
+      DeriveDataTypeable,
+      DeriveFoldable,
+      DeriveFunctor,
+      DeriveGeneric,
+      DeriveLift,
+      DeriveTraversable,
+      EmptyCase,
+      EmptyDataDeriving,
+      ExistentialQuantification,
+      ExplicitForAll,
+      FlexibleContexts,
+      FlexibleInstances,
+      GADTSyntax,
+      GeneralizedNewtypeDeriving,
+      HexFloatLiterals,
+      ImportQualifiedPost,
+      InstanceSigs,
+      KindSignatures,
+      MultiParamTypeClasses,
+      NamedFieldPuns,
+      NamedWildCards,
+      NumericUnderscores,
+      PolyKinds,
+      PostfixOperators,
+      RankNTypes,
+      ScopedTypeVariables,
+      StandaloneDeriving,
+      StandaloneKindSignatures,
+      TupleSections,
+      TypeApplications,
+      TypeOperators,
+      TypeSynonymInstances
+
+  ghc-options:
+    -Wall
+    -Wno-name-shadowing
+    -Wno-type-defaults
+    -Wno-unused-do-bind
+
+
 library
-  default-language: GHC2021
+  import: common
   hs-source-dirs: src
 
-  build-depends:
-    base,
-    extra,
-    text,
-    containers,
-    transformers,
-    haskell-gi-base,
-    gi-glib,
-    gi-gio,
-    gi-gtk,
-    gi-gtk-hs,
-    gi-gtksource
-
   exposed-modules:
-    Devin.CallTarget,
+    Devin.Display,
+    Devin.Error,
     Devin.Evaluator,
-    Devin.Evaluator.Result,
-    Devin.Evaluator.State,
     Devin.Evaluators,
-    Devin.Main,
-    Devin.Parser,
-    Devin.Parser.Input,
-    Devin.Parser.Result,
+    Devin.Interval,
+    Devin.Parsec,
     Devin.Parsers,
-    Devin.Range,
     Devin.Syntax,
     Devin.Type,
     Devin.Typer,
-    Devin.Typer.Environment,
-    Devin.Typer.Error,
     Devin.Typers,
-    Devin.Value
-
-  other-modules:
-    Devin.Evaluator.Internal,
-    Devin.Parsers.Internal,
-    Devin.Helpers
-
-  default-extensions:
-    -- Syntax
-    ApplicativeDo,
-
-    -- Records
-    DuplicateRecordFields,
-    NoFieldSelectors,
-    OverloadedRecordDot,
-
-    -- Literals
-    OverloadedStrings,
-
-    -- Bindings and generalisation
-    MonoLocalBinds
-
-  ghc-options:
-    -Wall
-    -Wno-name-shadowing
-    -Wno-type-defaults
-    -Wno-unused-do-bind
-
-executable devin
-  default-language: GHC2021
-  hs-source-dirs: app
-  main-is: Main.hs
+    Devin.Utils
 
   build-depends:
     base,
+    vector,
+    parsec,
+    extra
+
+
+test-suite devin-test
+  import: common
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+
+  other-modules:
+    Devin.EvaluatorsSpec,
+    Devin.ParsersSpec,
+    Devin.TypersSpec
+
+  build-depends:
+    base,
+    parsec,
+    hspec,
     devin
 
-  default-extensions:
-    -- Syntax
-    ApplicativeDo
+  build-tool-depends:
+    hspec-discover:hspec-discover
+
+
+executable devin
+  import: common
+  hs-source-dirs: app
+  main-is: Main.hs
+
+  other-modules:
+    Devin.Highlight,
+    Devin.Highlight.Braces,
+    Devin.Highlight.Syntax,
+    Devin.Tree
+
+  build-depends:
+    base,
+    text,
+    vector,
+    containers,
+    parsec,
+    extra,
+    haskell-gi-overloading == 0.0,
+    haskell-gi-base,
+    gi-gobject,
+    gi-gio,
+    gi-gtk-hs,
+    gi-gtksource,
+    devin
 
   ghc-options:
     -threaded
-    -Wall
-    -Wno-name-shadowing
-    -Wno-type-defaults
-    -Wno-unused-do-bind
