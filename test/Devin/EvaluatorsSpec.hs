@@ -58,6 +58,43 @@ spec = do
 
     it "should succeed on program 5" $ do
       executionShouldSucceed
+        "def main()\n\
+        \    assert factorial(6) == 720;\n\
+        \\n\
+        \def factorial(n) {\n\
+        \    assert n >= 0;\n\
+        \    var result = 1;\n\
+        \\n\
+        \    while n > 1 {\n\
+        \        result *= n;\n\
+        \        n -= 1;\n\
+        \    }\n\
+        \\n\
+        \    return result;\n\
+        \}"
+
+    it "should succeed on program 6" $ do
+      executionShouldSucceed
+        "def main()\n\
+        \    assert factorial(6) == 720;\n\
+        \\n\
+        \def factorial(n) {\n\
+        \    if n == 0\n\
+        \        return 1;\n\
+        \\n\
+        \    assert n > 0;\n\
+        \    var result = 1;\n\
+        \\n\
+        \    do {\n\
+        \        result *= n;\n\
+        \        n -= 1;\n\
+        \    } while n > 1;\n\
+        \\n\
+        \    return result;\n\
+        \}"
+
+    it "should succeed on program 7" $ do
+      executionShouldSucceed
         "def main() {\n\
         \    var array = [9, 7, 2, 5];\n\
         \    update(array, 1, -42);\n\
@@ -67,7 +104,7 @@ spec = do
         \def update(ref array, index, value)\n\
         \    array[index] = value;"
 
-    it "should succeed on program 6" $ do
+    it "should succeed on program 8" $ do
       executionShouldSucceed
         "def main() {\n\
         \    var array = [9, 7, 2, 5];\n\
@@ -78,7 +115,7 @@ spec = do
         \def noupdate(array, index, value)\n\
         \    array[index] = value;"
 
-    it "should succeed on program 7" $ do
+    it "should succeed on program 9" $ do
       executionShouldSucceed
         "def main() {\n\
         \    assert isOdd(69);\n\
@@ -103,7 +140,7 @@ spec = do
         \        return isEven(n - 1);\n\
         \}"
 
-    it "should succeed on program 8" $ do
+    it "should succeed on program 10" $ do
       executionShouldSucceed
         "def main() {\n\
         \    var c = -1;\n\
