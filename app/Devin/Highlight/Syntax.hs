@@ -81,7 +81,8 @@ highlightStatement tags buffer statement = case statement of
     highlightInterval (keywordTag tags) buffer returnKeyword
     whenJust result (highlightExpression tags buffer)
 
-  AssertStatement {predicate} ->
+  AssertStatement {assertKeyword, predicate} -> do
+    highlightInterval (keywordTag tags) buffer assertKeyword
     highlightExpression tags buffer predicate
 
   BlockStatement {statements} ->
