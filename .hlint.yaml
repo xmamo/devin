@@ -1,7 +1,9 @@
 # Overrides
 - warn: {name: Use explicit module export list}
 - warn: {name: Use module export list}
+- ignore: {name: Use <$>}
 - ignore: {name: Use join}
+- ignore: {name: Avoid lambda using `infix`}
 - ignore: {name: Use tuple-section}
 - group: {name: generalise-for-conciseness, enabled: true}
 - group: {name: extra, enabled: true}
