@@ -152,7 +152,7 @@ checkExpression expression = case expression of
     case ts of
       [] -> pure (Array Unknown)
 
-      t : ts -> do
+      t : _ -> do
         zipWithM_ (\e t' -> when (t' /= t) (report (InvalidType e t t'))) elements ts
         pure (Array t)
 
