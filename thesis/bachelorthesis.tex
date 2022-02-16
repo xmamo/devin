@@ -1,0 +1,141 @@
+%&PDFLaTeX
+
+\documentclass[12pt,american,draft]{PhdThesis}
+
+\usepackage[american]{babel}
+\usepackage[final]{graphicx}
+
+\usepackage{enumitem}
+\usepackage{forest}
+
+\forestset{
+  default preamble = {
+    for tree = {draw, ellipse}
+  }
+}
+
+\author{Matteo Morena}
+\email{morena.matteo@gmail.com}
+\supervisor{Marco Comini}
+\title{Implementation of an interpreter with graphical interface of a simple imperative language}
+\date{2021--2022}
+
+\begin{document}
+  \pagestyle{empty}
+  \maketitle
+
+  % \begin{dedication}
+  %   TBD
+  % \end{dedication}
+
+  % \begin{abstract}
+  %   TBD
+  % \end{abstract}
+
+  % \begin{acknowledgments}
+  %   TBD
+  % \end{acknowledgments}
+
+  \frontmatter
+  \partstyle{serifbig}
+  \chaptertitlestyle{serifbig}
+  \pagestyle{serif}
+  % \tableofcontents
+  % \listoffigures
+  % \listoftables
+
+  % \introduction
+  % TBD
+
+  % \section*{an intro section}
+  % TBD
+
+  \mainmatter
+
+  % \chapter{Preliminaries}
+  % TBD
+
+  % \section{a preliminaries section}
+  % TBD
+
+  \part{Conceptual overview}
+
+  \chapter{Parsing}
+
+  The first phase of any compiler or interpreter is called \emph{parsing}. The purpose of this
+  phase is to analyze an input string and determine if it conforms to some set of rules; if it
+  does, a logical representation of the input is constructed.
+
+  Consider a parser for arithmetic expressions. The input of the parser is any sequence of
+  characters. Invalid strings like \mbox{\texttt{(1 +)}} and \mbox{\texttt{(3 * * 4)}} get rejected.
+  Valid strings like \mbox{\texttt{(2 * (3 + 4))}} get accepted.
+
+  The \emph{language} accepted by a parser is the set of all possible inputs which the parser may
+  accept. The set of rules which a parser has to verify is called \emph{grammar} of the language.
+  For example, the string \mbox{\texttt{(2 * (3 + 4))}} conforms to the rules of the grammar of
+  arithmetic expressions.
+
+  \section{Syntax trees}
+
+  A \emph{syntax tree} is the representation of a string accepted by the parser; this data
+  structure stores the syntactic structure of the input.
+
+  A syntax tree may retain all information necessary to reconstruct the input; in this case, it is
+  called a \emph{concrete} syntax tree. If some information about the source is discarded
+  (comments, for example), it is called an \emph{abstract} syntax tree.
+
+  Consider the language of arithmetic expressions: we can think of at least two possible syntax
+  trees for the string \mbox{\texttt{(2 + 3 * (4 + 5))}}, depending on how much information has been
+  kept. When information is thrown away, the semantic meaning stays the same: for instance, details
+  about parenthesization can be discarded if the resulting syntax tree still represents the
+  same order of operations.
+
+  \begin{figure}[h]
+    \centering
+
+    \begin{ttfamily}
+      \begin{forest}[+ [2] [* [3] [+ [4] [5]]]]\end{forest}
+      \begin{forest}[( ) [+ [2] [* [3] [( ) [+ [4] [5]]]]]]\end{forest}
+    \end{ttfamily}
+
+    \caption{Two semantically equivalent syntax trees for \mbox{\texttt{(2 + 3 * (4 + 5))}}}
+  \end{figure}
+
+  As we'll see later, the parser for Devin uses a single tree representation which retains enough
+  information for syntax highlighting, but also discards whitespace. For our purposes, the
+  distinction between abstract and concrete syntax tree isn't necessary: for this reason, from now
+  on I'll just use the term \emph{syntax tree}.
+
+  \section{Recursive descent parsing}
+
+  There are many ways to recognize some input and generate an associated syntax tree. There has been
+  much academic research, and it is trivial to find so-called \emph{parser generators}: these are
+  tools which, given a grammar, automatically generate code for parsing the language in question.
+  Such tools build upon well-known algorithms, such as LL, LR, LALR, just to throw a few names
+  around. These tools are great and very performant; however, they're kind of magical.
+
+  In this section, we'll see how there's no fundamental need for any generators; although such tools
+  are handy, it isn't actually that difficult to write a parser from scratch, using a technique
+  called \emph{recursive descent parsing}. Recursive descent parsers are used by the GCC compiler
+  and the V8 JavaScript engines, for example\cite{CIPERDP}.
+
+  \backmatter
+
+  % \conclusions
+  % TBD
+
+  % \appendix
+
+  % \chapter{Some technicalities}
+  % TBD
+
+  % \section{a section}
+  % TBD
+
+  \backmatter
+
+  \bibliography{biblio}
+  \bibliographystyle{plain}
+
+  % \printindex  % use makeindex to generate the index
+\end{document}
