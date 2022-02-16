@@ -1,18 +1,27 @@
 %&PDFLaTeX
 
-\documentclass[12pt,american,draft]{PhdThesis}
+\documentclass[11pt, american, draft]{PhdThesis}
 
 \usepackage[american]{babel}
 \usepackage[final]{graphicx}
 
 \usepackage{enumitem}
+\usepackage[T1]{fontenc}
 \usepackage{forest}
+\usepackage[final]{listings}
+\usepackage{lmodern}
 \usepackage{url}
 
 \forestset{
   default preamble = {
     for tree = {draw, ellipse}
   }
+}
+
+\lstset{
+  basicstyle = \fontseries{lc}\selectfont\ttfamily,
+  basewidth = 0.52em,
+  upquote = true
 }
 
 \author{Matteo Morena}
@@ -41,7 +50,7 @@
   \partstyle{serifbig}
   \chaptertitlestyle{serifbig}
   \pagestyle{serif}
-  % \tableofcontents
+  \tableofcontents
   % \listoffigures
   % \listoftables
 
@@ -72,9 +81,49 @@
   Valid strings like \mbox{\texttt{(2 * (3 + 4))}} get accepted.
 
   The \emph{language} accepted by a parser is the set of all possible inputs which the parser may
-  accept. The set of rules which a parser has to verify is called \emph{grammar} of the language.
-  For example, the string \mbox{\texttt{(2 * (3 + 4))}} conforms to the rules of the grammar of
-  arithmetic expressions.
+  accept. The set of rules to which the input has to conform to is called the \emph{grammar} of the
+  language.
+
+  As an example, we could define the grammar for arithmetic expressions as follows:
+
+  \begin{itemize}[noitemsep,topsep=0pt]
+    \item An \emph{expression} can either be a literal expression, a binary expression, or a
+          parenthesized expression;
+
+    \item A sequence of characters representing a number is a \emph{literal expression};
+
+    \item If $x$ and $y$ are expressions, then $x$, followed by an operator, followed by $y$, is a
+          binary expression. An operator is one of the following characters: \texttt{+}, \texttt{-},
+          \texttt{*}, \texttt{/}.
+    
+    \item If $x$ is an expression, then \texttt{(}, followed by $x$, followed by \texttt{)} is a
+          \emph{parenthesized expression}.
+  \end{itemize}
+  
+  According to such rules, the string \mbox{\texttt{(2 * (3 + 4))}} is a valid arithmetic
+  expression. By definition:
+
+  \begin{itemize}[noitemsep,topsep=0pt]
+    \item \texttt{2}, \texttt{3} and \texttt{4} are literals;
+    \item \mbox{\texttt{3 + 4}} is a binary expression;
+    \item \mbox{\texttt{(3 + 4)}} is a parenthesized expression;
+    \item \mbox{\texttt{2 * (3 + 4)}} is a binary expression;
+    \item \mbox{\texttt{(2 * (3 + 4))}} is an expression.
+  \end{itemize}
+
+  \section{Grammar metalanguages}
+
+  To express language grammars in a succinct manner, metalanguages notations are commonly used. As
+  the prefix ``meta--'' suggests, we use a language to describe another language.
+
+  A commonly used metalanguage is the Extended Backus--Naur form.
+
+  \begin{lstlisting}
+expression = parenthesizedExpression | binaryExpression | literalExpression;
+literalExpression = ['+' | "-"], digit, {digit};
+binaryExpression = expression, ("+" | "-" | "*" | "/"), expression;
+parenthesizedExpression = "(", expression, ")";
+  \end{lstlisting}
 
   \section{Syntax trees}
 
@@ -119,6 +168,19 @@
   are handy, it isn't actually that difficult to write a parser from scratch, using a technique
   called \emph{recursive descent parsing}. Recursive descent parsers are used by the GCC compiler
   and the V8 JavaScript engines, for example\cite{nystrom}.
+
+  Let's consider the language of arithmetic expressions. We can formalize the rules for valid
+  arithmetic expressions as follows:
+
+  \begin{itemize}
+    \item An \emph{expression} can either be a literal expression or a binary expression;
+
+    \item A sequence of characters representing a number is a \emph{literal expression};
+
+    \item If $x$ and $y$ are expressions, then $x$, followed by an operator, followed by $y$, is a
+          binary expression. An \emph{operator} is one of the following characters: \mbox{+},
+          \mbox{-}, \mbox{*}, \mbox{/}.
+  \end{itemize}
 
   \backmatter
 

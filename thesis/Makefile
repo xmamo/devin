@@ -1,4 +1,4 @@
-bachelorthesis.pdf: PhdThesis theorems *.cfg *.bib *.tex
+bachelorthesis.pdf: PhdThesis theorems *.bib *.cfg *.tex
 	$(MAKE) -C PhdThesis
 	$(MAKE) -C theorems
 	TEXINPUTS=:PhdThesis:theorems pdflatex -interaction nonstopmode bachelorthesis.tex
@@ -15,5 +15,5 @@ theorems:
 .PHONY: clean
 clean:
 	test -f PhdThesis/Makefile && $(MAKE) -C PhdThesis clean
-	test -f theorems/Makefile  && $(MAKE) -C theorems clean
+	test -f theorems/Makefile && $(MAKE) -C theorems clean
 	rm -f *.aux *.bbl *.blg *.lof *.log *.lot *.pdf *.toc
