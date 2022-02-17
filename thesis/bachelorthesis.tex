@@ -8,20 +8,12 @@
 \usepackage{enumitem}
 \usepackage[T1]{fontenc}
 \usepackage{forest}
-\usepackage[final]{listings}
-\usepackage{lmodern}
 \usepackage{url}
 
 \forestset{
   default preamble = {
     for tree = {draw, ellipse}
   }
-}
-
-\lstset{
-  basicstyle = \fontseries{lc}\selectfont\ttfamily,
-  basewidth = 0.52em,
-  upquote = true
 }
 
 \author{Matteo Morena}
@@ -77,8 +69,8 @@
   does, a logical representation of the input is constructed.
 
   Consider a parser for arithmetic expressions. The input of the parser is any sequence of
-  characters. Invalid strings like \mbox{\texttt{(1 +)}} and \mbox{\texttt{(3 * * 4)}} get rejected.
-  Valid strings like \mbox{\texttt{(2 * (3 + 4))}} get accepted.
+  characters. Invalid strings like \texttt{(1 +)} and \texttt{(3 * * 4)} get rejected. Valid
+  strings like \texttt{(2 * (3 + 4))} get accepted.
 
   The \emph{language} accepted by a parser is the set of all possible inputs which the parser may
   accept. The set of rules to which the input has to conform to is called the \emph{grammar} of the
@@ -87,43 +79,36 @@
   As an example, we could define the grammar for arithmetic expressions as follows:
 
   \begin{itemize}[noitemsep,topsep=0pt]
-    \item An \emph{expression} can either be a literal expression, a binary expression, or a
-          parenthesized expression;
+    \item A sequence of characters representing a number is a \emph{literal expression}.
 
-    \item A sequence of characters representing a number is a \emph{literal expression};
-
-    \item If $x$ and $y$ are expressions, then $x$, followed by an operator, followed by $y$, is a
-          binary expression. An operator is one of the following characters: \texttt{+}, \texttt{-},
-          \texttt{*}, \texttt{/}.
-    
     \item If $x$ is an expression, then \texttt{(}, followed by $x$, followed by \texttt{)} is a
           \emph{parenthesized expression}.
+
+    \item If $x$ is a literal or parenthesized expression, then $x$, preceded by a unary operator,
+          is a \emph{unary expression}. An unary operator is one of the following
+          characters:~\texttt{+}, \texttt{-}.
+
+    \item If $x$ and $y$ are unary or parenthesized expressions, then $x$, followed by a
+          multiplicative operator, followed by $y$, is a \emph{multiplicative expression}. A
+          multiplicative operator is one of the following characters: \texttt{*}, \texttt{/}.
+
+    \item If $x$ and $y$ are multiplicative or parenthesized expressions, then $x$, followed by an
+          additive operator, followed by $y$, is an \emph{additive expression}. An additive operator
+          is one of the following characters: \texttt{+}, \texttt{-}.
   \end{itemize}
-  
-  According to such rules, the string \mbox{\texttt{(2 * (3 + 4))}} is a valid arithmetic
-  expression. By definition:
+
+  \newpage
+
+  According to such rules, the string \texttt{(2 * (3 + 4))} is a valid arithmetic expression. By
+  definition:
 
   \begin{itemize}[noitemsep,topsep=0pt]
     \item \texttt{2}, \texttt{3} and \texttt{4} are literals;
-    \item \mbox{\texttt{3 + 4}} is a binary expression;
-    \item \mbox{\texttt{(3 + 4)}} is a parenthesized expression;
-    \item \mbox{\texttt{2 * (3 + 4)}} is a binary expression;
-    \item \mbox{\texttt{(2 * (3 + 4))}} is an expression.
+    \item \texttt{3 + 4} is an additive expression;
+    \item \texttt{(3 + 4)} is a parenthesized expression;
+    \item \texttt{2 * (3 + 4)} is a multiplicative expression;
+    \item \texttt{(2 * (3 + 4))} is an expression.
   \end{itemize}
-
-  \section{Grammar metalanguages}
-
-  To express language grammars in a succinct manner, metalanguages notations are commonly used. As
-  the prefix ``meta--'' suggests, we use a language to describe another language.
-
-  A commonly used metalanguage is the Extended Backus--Naur form.
-
-  \begin{lstlisting}
-expression = parenthesizedExpression | binaryExpression | literalExpression;
-literalExpression = ['+' | "-"], digit, {digit};
-binaryExpression = expression, ("+" | "-" | "*" | "/"), expression;
-parenthesizedExpression = "(", expression, ")";
-  \end{lstlisting}
 
   \section{Syntax trees}
 
@@ -135,10 +120,10 @@ parenthesizedExpression = "(", expression, ")";
   (comments, for example), it is called an \emph{abstract} syntax tree.
 
   Consider the language of arithmetic expressions: we can think of at least two possible syntax
-  trees for the string \mbox{\texttt{(2 + 3 * (4 + 5))}}, depending on how much information has been
-  kept. When information is thrown away, the semantic meaning stays the same: for instance, details
-  about parenthesization can be discarded if the resulting syntax tree still represents the
-  same order of operations.
+  trees for the string \texttt{(2 + 3 * (4 + 5))}, depending on how much information has been kept.
+  When information is thrown away, the semantic meaning stays the same: for instance, details about
+  parenthesization can be discarded if the resulting syntax tree still represents the same order of
+  operations.
 
   \begin{figure}[h]
     \centering
@@ -148,15 +133,17 @@ parenthesizedExpression = "(", expression, ")";
       \begin{forest}[( ) [+ [2] [* [3] [( ) [+ [4] [5]]]]]]\end{forest}
     \end{ttfamily}
 
-    \caption{Two semantically equivalent syntax trees for \mbox{\texttt{(2 + 3 * (4 + 5))}}}
+    \caption{Two semantically equivalent syntax trees for \texttt{(2 + 3 * (4 + 5))}}
   \end{figure}
+
+  \newpage
 
   As we'll see later, the parser for Devin uses a single tree representation which retains enough
   information for syntax highlighting, but also discards whitespace. For our purposes, the
   distinction between abstract and concrete syntax tree isn't necessary: for this reason, from now
   on I'll just use the term \emph{syntax tree}.
 
-  \section{Recursive descent parsing}
+  \section{Parser combinators}
 
   There are many ways to recognize some input and generate an associated syntax tree. There has been
   much academic research, and it is trivial to find so-called \emph{parser generators}: these are
@@ -169,17 +156,67 @@ parenthesizedExpression = "(", expression, ")";
   called \emph{recursive descent parsing}. Recursive descent parsers are used by the GCC compiler
   and the V8 JavaScript engines, for example\cite{nystrom}.
 
-  Let's consider the language of arithmetic expressions. We can formalize the rules for valid
-  arithmetic expressions as follows:
+  Recursive descent is a method of constructing a parser using a collection of recursive functions.
+  The simplest functions parse the atoms (or \emph{tokens}) of the target language; examples of such
+  functions are parsers for numbers and identifiers. By gluing together simpler functions, more
+  complex parsers can be created: for example, a parser for two-dimensional coordinates
+  \texttt{($x$, $y$)} can be built by using the parsers for open-parenthesis, number, comma, number,
+  and close-parenthesis respectively. Finally, parsers can be combined recursively: a parser $P$
+  could depend on a parser $Q$, which in turn depends on $P$. Consider any language supporting
+  \texttt{while} statements: the body of the \texttt{while} is yet another statement, which in turn
+  could be a \texttt{while}~statement.
 
-  \begin{itemize}
-    \item An \emph{expression} can either be a literal expression or a binary expression;
+  Recursive descent can be implemented in any imperative language; of course, a similar technique
+  can be applied to functional programming as well. The functional approach lends itself perfectly
+  for this kind of task; in particular, higher order functions abstract the boilerplate necessary to
+  glue together different parsing functions. These higher order functions are called \emph{parser
+  combinators}, as they combine simpler parsers into more complex ones.
 
-    \item A sequence of characters representing a number is a \emph{literal expression};
+  \newpage
 
-    \item If $x$ and $y$ are expressions, then $x$, followed by an operator, followed by $y$, is a
-          binary expression. An \emph{operator} is one of the following characters: \mbox{+},
-          \mbox{-}, \mbox{*}, \mbox{/}.
+  The general interface employed by parser combinators is that of a function which takes some input
+  string; the function returns either an error or some result together with the remaining input. For
+  instance, applying the function parsing an integer on the input string \texttt{21*2} yields the
+  tuple $\left(21, \texttt{*2}\right)$.
+
+  Some common parser combinators are:
+
+  \begin{itemize}[noitemsep,topsep=0pt]
+    \item The \emph{sequence combinator}. Informally, this combinator runs two parsers in succession
+          and combines their results.
+
+          Let $P$ and $Q$ be two parsers. The sequence combinator runs $P$; if it succeeds, then $Q$
+          is run on the remaining input. If $Q$ also succeeds, the combinator succeeds with the
+          combined results of $P$ and $Q$. If $P$ or $Q$ fail, then the combinator also fails.
+
+    \item The \emph{alternative combinator}. Informally, this combinator implements choice.
+
+          Let $P$ and $Q$ be two parsers. The alternative combinator runs $P$ and $Q$ on the same
+          input. If $P$ succeeds, the combinator succeeds with the same result as $P$ did; if $Q$
+          succeeds, the combinator succeeds with the same result as $Q$ did. If both $P$ and $Q$
+          fail, then the combinator also fails.
+
+    \item The \emph{option combinator}. Informally, this combinator runs a parser zero or one time.
+
+          Let $P$ be a parser. The option combinator tries to run $P$. If $P$ succeeds, the
+          combinator succeeds with the same result as $P$ did. If $P$ fails, the combinator succeeds
+          with an empty result.
+
+    \item The \emph{repetition combinator}. Informally, this combinator runs a parser many times.
+
+          Let $P$ be a parser. The repetition combinator tries to run $P$ as many times as possible,
+          until $P$ fails. Each time $P$ succeeds, the remaining input is fed back into the next
+          application of $P$ itself. This combinator succeeds with the accumulated results of all
+          successful runs.
+
+    \item The \emph{bind combinator}. Informally, this combinator allows one parser to depend on the
+          result of another parser. As we will see, this is the most powerful combinator of them
+          all. All others could be expressed in terms of the bind combinator.
+
+          Let $P$ be a parser and $f$ a one-parameter function yielding
+          another parser. The bind combinator tries to run $P$; if it succeeds, it applies $f$ on
+          the result of $P$, running the resulting parser on the remaining input. If $P$ fails, this
+          combinator also fails.
   \end{itemize}
 
   \backmatter
