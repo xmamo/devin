@@ -1,12 +1,10 @@
-%&PDFLaTeX
-
 \documentclass[11pt, american, draft]{PhdThesis}
 
 \usepackage[american]{babel}
 \usepackage[final]{graphicx}
 
-\usepackage{enumitem}
 \usepackage[T1]{fontenc}
+\usepackage{enumitem}
 \usepackage{forest}
 \usepackage{url}
 
@@ -68,6 +66,8 @@
   phase is to analyze an input string and determine if it conforms to some set of rules; if it
   does, a logical representation of the input is constructed.
 
+  \section{Languages and grammars}
+
   Consider a parser for arithmetic expressions. The input of the parser is any sequence of
   characters. Invalid strings like \texttt{(1 +)} and \texttt{(3 * * 4)} get rejected. Valid
   strings like \texttt{(2 * (3 + 4))} get accepted.
@@ -86,7 +86,7 @@
 
     \item If $x$ is a literal or parenthesized expression, then $x$, preceded by a unary operator,
           is a \emph{unary expression}. An unary operator is one of the following
-          characters:~\texttt{+}, \texttt{-}.
+          characters: \texttt{+}, \texttt{-}.
 
     \item If $x$ and $y$ are unary or parenthesized expressions, then $x$, followed by a
           multiplicative operator, followed by $y$, is a \emph{multiplicative expression}. A
@@ -96,8 +96,6 @@
           additive operator, followed by $y$, is an \emph{additive expression}. An additive operator
           is one of the following characters: \texttt{+}, \texttt{-}.
   \end{itemize}
-
-  \newpage
 
   According to such rules, the string \texttt{(2 * (3 + 4))} is a valid arithmetic expression. By
   definition:
@@ -125,7 +123,7 @@
   parenthesization can be discarded if the resulting syntax tree still represents the same order of
   operations.
 
-  \begin{figure}[h]
+  \begin{figure}
     \centering
 
     \begin{ttfamily}
@@ -135,8 +133,6 @@
 
     \caption{Two semantically equivalent syntax trees for \texttt{(2 + 3 * (4 + 5))}}
   \end{figure}
-
-  \newpage
 
   As we'll see later, the parser for Devin uses a single tree representation which retains enough
   information for syntax highlighting, but also discards whitespace. For our purposes, the
@@ -164,7 +160,7 @@
   and close-parenthesis respectively. Finally, parsers can be combined recursively: a parser $P$
   could depend on a parser $Q$, which in turn depends on $P$. Consider any language supporting
   \texttt{while} statements: the body of the \texttt{while} is yet another statement, which in turn
-  could be a \texttt{while}~statement.
+  could be a \texttt{while} statement.
 
   Recursive descent can be implemented in any imperative language; of course, a similar technique
   can be applied to functional programming as well. The functional approach lends itself perfectly
@@ -172,12 +168,10 @@
   glue together different parsing functions. These higher order functions are called \emph{parser
   combinators}, as they combine simpler parsers into more complex ones.
 
-  \newpage
-
   The general interface employed by parser combinators is that of a function which takes some input
   string; the function returns either an error or some result together with the remaining input. For
   instance, applying the function parsing an integer on the input string \texttt{21*2} yields the
-  tuple $\left(21, \texttt{*2}\right)$.
+  pair $\left(21, \texttt{*2}\right)$.
 
   Some common parser combinators are:
 
@@ -218,6 +212,55 @@
           the result of $P$, running the resulting parser on the remaining input. If $P$ fails, this
           combinator also fails.
   \end{itemize}
+
+  \chapter{Tree traversal}
+
+  Once a syntax tree has been constructed by the parser, the tree can be traversed in a multitude of
+  ways. In general, syntax trees can not only represent the structure of a programming languages,
+  but also the structure of markup languages or other kinds of structured languages. For the
+  purposes of this thesis, I'll discuss the processing of programming languages only.
+
+  It is important to note the grammar of a language only describes its \emph{syntax}: on its own,
+  it only defines which inputs strings are valid, and which are not. Similarly, a parser only
+  transforms syntactically valid input strings into trees: it is the role of other components to
+  give \emph{semantic meaning} to such trees.
+
+  \begin{itemize}[noitemsep,topsep=0pt]
+    \item An \emph{evaluator} would associate the nodes of a syntax tree with actions to execute.
+          Examples of such actions are performing arithmetic calculations, conditionally executing
+          other nodes, and assigning or retrieving values from variables.
+
+    \item A \emph{compiler} would translate a syntax tree into some other form. For instance, the
+          GCC compiler produces object files from valid C syntax; in turn, object files can be
+          parsed by the system's linker, which translates a collection of such files into a runnable
+          executable.
+
+    \item On languages where the semantics involve static types, a \emph{type checker} would verify
+          that no type errors would be produced by evaluation or compilation. In such systems, the
+          type checker coexists with an evaluator or compiler (or both); it is fundamental that all
+          components obey to the same semantics. Often, the evaluator or compiler depends on some
+          additional information provided by the type checker: this won't be the case for Devin.
+
+    \item Similarly to type checking, a \emph{linter} would analyze the syntax tree as well.
+          Contrary to the type checking, the linter may not depend on static types (if any);
+          furthermore, successful compilation or execution doesn't depend on linting. Rather, the
+          linter suggests how the original source could be improved. Like with the type checker, all
+          components must obey to the same semantics.
+
+    \item A \emph{syntax highlighter} would use the information stored in a syntax tree to perform
+          syntax highlighting. Such a syntax tree would be rather concrete, as each node would be
+          associated with a position in the parser's input string.
+  \end{itemize}
+
+  \section{Evaluation}
+
+  \section{Type checking}
+
+  \section{Syntax highlighting}
+
+  \chapter{The monadic interface}
+
+
 
   \backmatter
 
