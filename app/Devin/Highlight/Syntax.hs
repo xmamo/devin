@@ -1,5 +1,6 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 
 module Devin.Highlight.Syntax (
@@ -47,7 +48,7 @@ highlightDeclaration tags buffer declaration = case declaration of
 
 
 highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => Tags -> a -> Statement -> m ()
-highlightStatement tags buffer statement = case statement of
+highlightStatement tags buffer = \case
   DeclarationStatement {declaration} ->
     highlightDeclaration tags buffer declaration
 
@@ -84,6 +85,9 @@ highlightStatement tags buffer statement = case statement of
   AssertStatement {assertKeyword, predicate} -> do
     highlightInterval (keywordTag tags) buffer assertKeyword
     highlightExpression tags buffer predicate
+
+  DebugStatement {debugKeyword} ->
+    highlightInterval (keywordTag tags) buffer debugKeyword
 
   BlockStatement {statements} ->
     for_ statements (highlightStatement tags buffer)

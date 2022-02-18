@@ -268,19 +268,11 @@ onActivate application = do
             takeMVar evaluationThreadIdVar
             Gtk.postGUIASync cleanup
 
-          -- Don't pause on some intermediate steps:
-          Step (BeforeDeclaration FunctionDeclaration {}) evaluator' -> go evaluator' state'
-          Step (AfterDeclaration FunctionDeclaration {}) evaluator' -> go evaluator' state'
-          Step (BeforeStatement (DeclarationStatement _)) evaluator' -> go evaluator' state'
-          Step (AfterStatement (DeclarationStatement _)) evaluator' -> go evaluator' state'
-          Step (BeforeExpression _) evaluator' -> go evaluator' state'
-          Step (AfterExpression _) evaluator' -> go evaluator' state'
-
-          Step onSyntax evaluator' -> do
+          Debug statement evaluator' -> do
             Gtk.postGUIASync $ do
               (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
               Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
-              highlightInterval (highlightTag tags) codeBuffer onSyntax
+              highlightInterval (highlightTag tags) codeBuffer statement
 
               forest <- stateForest state'
               rootPath <- Gtk.treePathNew

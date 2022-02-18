@@ -134,6 +134,12 @@ statementTree = \case
       tokenTree "return" returnKeyword,
       tokenTree ";" semicolon
     ]
+  
+  DebugStatement {debugKeyword, semicolon} ->
+    Tree.Node ("DebugStatement", "") [
+      tokenTree "debug" debugKeyword,
+      tokenTree ";" semicolon
+    ]
 
   BlockStatement {open, statements, close} ->
     Tree.Node ("BlockStatement", "") $ concat [

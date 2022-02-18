@@ -112,10 +112,11 @@ statement = choice
     ifStatement,
     whileStatement,
     doWhileStatement,
-    assertStatement,
     returnStatement,
-    blockStatement,
-    expressionStatement
+    assertStatement,
+    debugStatement,
+    expressionStatement,
+    blockStatement
   ]
 
 
@@ -176,6 +177,13 @@ assertStatement = do
   predicate <- s *> expression
   semicolon <- s *> token ";"
   pure (AssertStatement assertKeyword predicate semicolon)
+
+
+debugStatement :: Stream s m Char => ParserT s m Statement
+debugStatement = do
+  debugKeyword <- keyword "debug"
+  semicolon <- s *> token ";"
+  pure (DebugStatement debugKeyword semicolon)
 
 
 blockStatement :: Stream s m Char => ParserT s m Statement

@@ -77,13 +77,17 @@ highlightStatementBraces tag buffer insertIter statement = case statement of
       highlightExpressionBraces tag buffer insertIter predicate
     ]
 
-  ReturnStatement {result = Nothing} -> pure False
+  ReturnStatement {result = Nothing} ->
+    pure False
 
   ReturnStatement {result = Just result} ->
     highlightExpressionBraces tag buffer insertIter result
 
   AssertStatement {predicate} ->
     highlightExpressionBraces tag buffer insertIter predicate
+
+  DebugStatement {} ->
+    pure False
 
   BlockStatement {open, statements, close} ->
     orM [

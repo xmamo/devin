@@ -43,20 +43,18 @@ evaluateDevin Devin {declarations} = do
 
 
 evaluateDeclaration :: Declaration -> Evaluator ()
-evaluateDeclaration = onDeclaration $ \declaration -> case declaration of
+evaluateDeclaration declaration = case declaration of
   VariableDeclaration {variableId = SymbolId {name}, value} -> do
     r <- evaluateExpression value
     r' <- cloneReference r
     defineVariable name r'
 
-  FunctionDeclaration {functionId = SymbolId {name}} -> do
-    yield (BeforeDeclaration declaration)
+  FunctionDeclaration {functionId = SymbolId {name}} ->
     defineFunction name (UserDefined declaration)
-    yield (AfterDeclaration declaration)
 
 
 evaluateStatement :: Statement -> Evaluator (Maybe Reference)
-evaluateStatement = onStatement $ \statement -> case statement of
+evaluateStatement statement = case statement of
   DeclarationStatement {declaration} -> do
     evaluateDeclaration declaration
     pure Nothing
@@ -139,6 +137,10 @@ evaluateStatement = onStatement $ \statement -> case statement of
         t <- getType v
         raise (InvalidType predicate Type.Bool t)
 
+  DebugStatement {} -> do
+    debug statement
+    pure Nothing
+
   BlockStatement {statements} -> withNewFrame 1 $ do
     for_ statements $ \case
       DeclarationStatement {declaration} | FunctionDeclaration {} <- declaration ->
@@ -153,7 +155,7 @@ evaluateStatement = onStatement $ \statement -> case statement of
 
 
 evaluateExpression :: Expression -> Evaluator Reference
-evaluateExpression = onExpression $ \expression -> case expression of
+evaluateExpression expression = case expression of
   IntegerExpression {integer} | Just x <- toIntegralSized integer -> newReference (Int x)
   IntegerExpression {} -> raise (IntegerOverflow expression)
 

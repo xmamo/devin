@@ -102,6 +102,11 @@ data Statement where
     semicolon :: Token
   } -> Statement
 
+  DebugStatement :: {
+    debugKeyword :: Token,
+    semicolon :: Token
+  } -> Statement
+
   BlockStatement :: {
     open :: Token,
     statements :: [Statement],
@@ -245,6 +250,7 @@ instance Interval Statement where
   start DoWhileStatement {doKeyword} = start doKeyword
   start ReturnStatement {returnKeyword} = start returnKeyword
   start AssertStatement {assertKeyword} = start assertKeyword
+  start DebugStatement {debugKeyword} = start debugKeyword
   start BlockStatement {open} = start open
 
 
@@ -257,6 +263,7 @@ instance Interval Statement where
   end DoWhileStatement {semicolon} = end semicolon
   end ReturnStatement {semicolon} = end semicolon
   end AssertStatement {semicolon} = end semicolon
+  end DebugStatement {debugKeyword} = end debugKeyword
   end BlockStatement {close} = end close
 
 

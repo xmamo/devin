@@ -123,6 +123,8 @@ checkStatement expectedT statement = case statement of
     when (t /= Bool) (report (InvalidType predicate Bool t))
     pure False
 
+  DebugStatement {} -> pure False
+
   BlockStatement {statements} -> withNewScope $ do
     for_ statements $ \case
       DeclarationStatement {declaration} -> checkDeclaration1 declaration

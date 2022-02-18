@@ -4,7 +4,6 @@
 module Devin.Evaluator (
   Evaluator (..),
   Result (..),
-  OnSyntax (..),
   State,
   Frame (..),
   Function (..),
@@ -24,11 +23,8 @@ module Devin.Evaluator (
   defineVariable,
   lookupVariable,
   withNewFrame,
-  raise,
-  yield,
-  onDeclaration,
-  onStatement,
-  onExpression
+  debug,
+  raise
 ) where
 
 import Control.Applicative
@@ -41,7 +37,6 @@ import Data.Vector (Vector, (!))
 import Data.Vector qualified as Vector
 
 import Devin.Error
-import Devin.Interval
 import Devin.Syntax
 
 
@@ -51,19 +46,9 @@ newtype Evaluator a = Evaluator (State -> IO (Result a, State))
 
 data Result a
   = Done a
-  | Step OnSyntax (Evaluator a)
+  | Debug Statement (Evaluator a)
   | Error Error
   deriving Functor
-
-
-data OnSyntax
-  = BeforeDeclaration Declaration
-  | AfterDeclaration Declaration
-  | BeforeStatement Statement
-  | AfterStatement Statement
-  | BeforeExpression Expression
-  | AfterExpression Expression
-  deriving (Eq, Read, Show, Data)
 
 
 type State = [Frame]
@@ -94,24 +79,6 @@ data Value
 newtype Reference = Reference (IORef Value)
 
 
-instance Interval OnSyntax where
-  start :: Num a => OnSyntax -> a
-  start (BeforeExpression expression) = start expression
-  start (AfterExpression expression) = start expression
-  start (BeforeStatement statement) = start statement
-  start (AfterStatement statement) = start statement
-  start (BeforeDeclaration declaration) = start declaration
-  start (AfterDeclaration declaration) = start declaration
-
-  end :: Num a => OnSyntax -> a
-  end (BeforeExpression expression) = end expression
-  end (AfterExpression expression) = end expression
-  end (BeforeStatement statement) = end statement
-  end (AfterStatement statement) = end statement
-  end (BeforeDeclaration declaration) = end declaration
-  end (AfterDeclaration declaration) = end declaration
-
-
 instance Applicative Evaluator where
   pure :: a -> Evaluator a
   pure x = Evaluator (\state -> pure (Done x, state))
@@ -123,7 +90,7 @@ instance Applicative Evaluator where
 
     case result of
       Done x -> runEvaluatorStep (f x <$> my) state'
-      Step onSyntax mx -> pure (Step onSyntax (liftA2 f mx my), state')
+      Debug statement mx -> pure (Debug statement (liftA2 f mx my), state')
       Error error -> pure (Error error, state')
 
 
@@ -134,7 +101,7 @@ instance Monad Evaluator where
 
     case result of
       Done x -> runEvaluatorStep (f x) state'
-      Step onSyntax mx -> pure (Step onSyntax (f =<< mx), state')
+      Debug statement mx -> pure (Debug statement (f =<< mx), state')
       Error error -> pure (Error error, state')
 
 
@@ -170,7 +137,7 @@ runEvaluator mx state = do
 
   case result of
     Done x -> pure (Right x, state')
-    Step _ mx -> runEvaluator mx state'
+    Debug _ mx -> runEvaluator mx state'
     Error error -> pure (Left error, state')
 
 
@@ -291,33 +258,9 @@ withNewFrame offset mx = do
     popFrame = Evaluator (\state -> pure (Done (), tail state))
 
 
+debug :: Statement -> Evaluator ()
+debug statement = Evaluator (\state -> pure (Debug statement (pure ()), state))
+
+
 raise :: Error -> Evaluator a
 raise error = Evaluator (\state -> pure (Error error, state))
-
-
-yield :: OnSyntax -> Evaluator ()
-yield onSyntax = Evaluator (\state -> pure (Step onSyntax (pure ()), state))
-
-
-onDeclaration :: (Declaration -> Evaluator b) -> Declaration -> Evaluator b
-onDeclaration f declaration = do
-  yield (BeforeDeclaration declaration)
-  x <- f declaration
-  yield (AfterDeclaration declaration)
-  pure x
-
-
-onStatement :: (Statement -> Evaluator b) -> Statement -> Evaluator b
-onStatement f statement = do
-  yield (BeforeStatement statement)
-  x <- f statement
-  yield (AfterStatement statement)
-  pure x
-
-
-onExpression :: (Expression -> Evaluator b) -> Expression -> Evaluator b
-onExpression f expression = do
-  yield (BeforeExpression expression)
-  x <- f expression
-  yield (AfterExpression expression)
-  pure x
