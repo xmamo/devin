@@ -263,7 +263,7 @@ instance Interval Statement where
   end DoWhileStatement {semicolon} = end semicolon
   end ReturnStatement {semicolon} = end semicolon
   end AssertStatement {semicolon} = end semicolon
-  end DebugStatement {debugKeyword} = end debugKeyword
+  end DebugStatement {semicolon} = end semicolon
   end BlockStatement {close} = end close
 
 
