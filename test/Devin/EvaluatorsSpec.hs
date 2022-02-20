@@ -15,7 +15,7 @@ import Test.Hspec
 spec :: Spec
 spec = do
   describe "evaluateDevin" $ do
-    it "should succeed on program 1" $ do
+    it "should succeed on program 1" $
       executionShouldSucceed
         "def main() {\n\
         \    var x = 1;\n\
@@ -24,7 +24,7 @@ spec = do
         \    assert z == 5;\n\
         \}"
 
-    it "should succeed on program 2" $ do
+    it "should succeed on program 2" $
       executionShouldSucceed
         "def main() {\n\
         \    var array1 = [4, -2, 1, 0];\n\
@@ -34,7 +34,7 @@ spec = do
         \    assert array2 == [4, -2, 1, 0];\n\
         \}"
 
-    it "should succeed on program 3" $ do
+    it "should succeed on program 3" $
       executionShouldSucceed
         "def main()\n\
         \    assert sum(34, 35) == 69;\n\
@@ -42,7 +42,7 @@ spec = do
         \def sum(a, b)\n\
         \    return a + b;"
 
-    it "should succeed on program 4" $ do
+    it "should succeed on program 4" $
       executionShouldSucceed
         "def main()\n\
         \    assert factorial(6) == 720;\n\
@@ -56,7 +56,7 @@ spec = do
         \    return n * factorial(n - 1);\n\
         \}"
 
-    it "should succeed on program 5" $ do
+    it "should succeed on program 5" $
       executionShouldSucceed
         "def main()\n\
         \    assert factorial(6) == 720;\n\
@@ -73,7 +73,7 @@ spec = do
         \    return result;\n\
         \}"
 
-    it "should succeed on program 6" $ do
+    it "should succeed on program 6" $
       executionShouldSucceed
         "def main()\n\
         \    assert factorial(6) == 720;\n\
@@ -93,7 +93,7 @@ spec = do
         \    return result;\n\
         \}"
 
-    it "should succeed on program 7" $ do
+    it "should succeed on program 7" $
       executionShouldSucceed
         "def main() {\n\
         \    var array = [9, 7, 2, 5];\n\
@@ -104,7 +104,7 @@ spec = do
         \def update(ref array, index, value)\n\
         \    array[index] = value;"
 
-    it "should succeed on program 8" $ do
+    it "should succeed on program 8" $
       executionShouldSucceed
         "def main() {\n\
         \    var array = [9, 7, 2, 5];\n\
@@ -115,7 +115,7 @@ spec = do
         \def noupdate(array, index, value)\n\
         \    array[index] = value;"
 
-    it "should succeed on program 9" $ do
+    it "should succeed on program 9" $
       executionShouldSucceed
         "def main() {\n\
         \    assert isOdd(69);\n\
@@ -140,7 +140,7 @@ spec = do
         \        return isEven(n - 1);\n\
         \}"
 
-    it "should succeed on program 10" $ do
+    it "should succeed on program 10" $
       executionShouldSucceed
         "def main() {\n\
         \    var c = -1;\n\

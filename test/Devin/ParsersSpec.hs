@@ -15,14 +15,14 @@ import Test.Hspec
 spec :: Spec
 spec = do
   describe "expression" $ do
-    it "should accept fragment 1" $ do
+    it "should accept fragment 1" $
       shouldParse Parsers.expression "1 += 2 " BinaryExpression {
         left = IntegerExpression 1 (0, 1),
         binary = AddAssignOperator (2, 4),
         right = IntegerExpression 2 (5, 6)
       }
 
-    it "should accept fragment 2" $ do
+    it "should accept fragment 2" $
       shouldParse Parsers.expression "1+ 2*3 -(1) " BinaryExpression {
         left = BinaryExpression {
           left = IntegerExpression 1 (0, 1),
@@ -45,7 +45,7 @@ spec = do
         }
       }
 
-    it "should accept fragment 3" $ do
+    it "should accept fragment 3" $
       shouldParse Parsers.expression "a+ -2.1= f (x, y ,z ) *=88 " BinaryExpression {
         left = VariableExpression "a" (0, 1),
 
@@ -83,8 +83,8 @@ spec = do
         }
       }
 
-  describe "binaryOperator" $ do
-    it "should accept fragment 4" $ do
+  describe "binaryOperator" $
+    it "should accept fragment 4" $
       shouldParse Parsers.binaryOperator "+ " (AddOperator (0, 1))
 
 
