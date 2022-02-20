@@ -86,41 +86,41 @@ checkStatement expectedT statement = case statement of
 
   IfStatement {predicate, trueBranch} -> do
     t <- checkExpression predicate
-    when (t /= Bool) (report (InvalidType predicate Bool t))
+    unless (t <: Bool) (report (InvalidType predicate Bool t))
     withNewScope (checkStatement expectedT trueBranch)
     pure False
 
   IfElseStatement {predicate, trueBranch, falseBranch} -> do
     t <- checkExpression predicate
-    when (t /= Bool) (report (InvalidType predicate Bool t))
+    unless (t <: Bool) (report (InvalidType predicate Bool t))
     trueBranchReturns <- withNewScope (checkStatement expectedT trueBranch)
     falseBranchReturns <- withNewScope (checkStatement expectedT falseBranch)
     pure (trueBranchReturns && falseBranchReturns)
 
   WhileStatement {predicate, body} -> do
     t <- checkExpression predicate
-    when (t /= Bool) (report (InvalidType predicate Bool t))
+    unless (t <: Bool) (report (InvalidType predicate Bool t))
     withNewScope (checkStatement expectedT body)
     pure False
 
   DoWhileStatement {body, predicate} -> do
     returns <- withNewScope (checkStatement expectedT body)
     t <- checkExpression predicate
-    when (t /= Bool) (report (InvalidType predicate Bool t))
+    unless (t <: Bool) (report (InvalidType predicate Bool t))
     pure returns
 
   ReturnStatement {result = Just result} -> do
     t <- checkExpression result
-    when (t /= expectedT) (report (InvalidType result expectedT t))
+    unless (t <: expectedT) (report (InvalidType result expectedT t))
     pure True
 
   ReturnStatement {result = Nothing} -> do
-    when (Unit /= expectedT) (report (MissingReturnValue statement expectedT))
+    unless (Unit <: expectedT) (report (MissingReturnValue statement expectedT))
     pure True
 
   AssertStatement {predicate} -> do
     t <- checkExpression predicate
-    when (t /= Bool) (report (InvalidType predicate Bool t))
+    unless (t <: Bool) (report (InvalidType predicate Bool t))
     pure False
 
   DebugStatement {} -> pure False
@@ -148,15 +148,26 @@ checkExpression expression = case expression of
       Just (t, _) -> pure t
       Nothing -> report' (UnknownVariable variableName interval)
 
-  ArrayExpression {elements} -> do
-    ts <- for elements checkExpression
+  ArrayExpression {elements = []} -> pure (Array Unknown)
 
-    case ts of
-      [] -> pure (Array Unknown)
+  ArrayExpression {elements = element : elements} -> go elements =<< checkExpression element
+    where
+      go elements Unknown = do
+        for_ elements checkExpression
+        pure (Array Unknown)
 
-      t : _ -> do
-        zipWithM_ (\e t' -> when (t' /= t) (report (InvalidType e t t'))) elements ts
-        pure (Array t)
+      go [] t = pure (Array t)
+
+      go (element : elements) t = checkExpression element >>= \case
+        Unknown -> do
+          for_ elements checkExpression
+          pure (Array Unknown)
+
+        t' | t' <: t -> go elements t'
+
+        _ -> do
+          for_ elements checkExpression
+          pure (Array Any)
 
   AccessExpression {array, index} -> do
     arrayT <- checkExpression array
@@ -175,7 +186,7 @@ checkExpression expression = case expression of
 
           go n (argument : arguments) (parameterT : parameterTs) = do
             argumentT <- checkExpression argument
-            when (argumentT /= parameterT) (report (InvalidType argument parameterT argumentT))
+            unless (argumentT <: parameterT) (report (InvalidType argument parameterT argumentT))
             go (n + 1) arguments parameterTs
 
           go n arguments parameterTs =
@@ -359,7 +370,7 @@ checkExpression expression = case expression of
     leftT <- checkExpression left
     rightT <- checkExpression right
 
-    if leftT == rightT then
+    if leftT <: rightT then
       pure leftT
     else
       report' (InvalidBinary binary leftT rightT)

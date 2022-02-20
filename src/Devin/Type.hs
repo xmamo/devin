@@ -1,12 +1,17 @@
-module Devin.Type (Type (..)) where
+module Devin.Type (
+  Type (..),
+  (<:)
+) where
 
 import Data.Data
+import Data.Functor.Classes
 
 import Devin.Display
 
 
 data Type
   = Unknown
+  | Any
   | Unit
   | Bool
   | Int
@@ -17,23 +22,24 @@ data Type
   deriving (Show, Read, Data)
 
 
-instance Eq Type where
-  (==) :: Type -> Type -> Bool
-  Unknown == _ = True
-  _ == Unknown = True
-  Unit == Unit = True
-  Bool == Bool = True
-  Int == Int = True
-  Float == Float = True
-  Array t1 == Array t2 = t1 == t2
-  Function ts1 t1 == Function t2 r2 = (ts1, t1) == (t2, r2)
-  Placeholder name1 == Placeholder name2 = name1 == name2
-  _ == _ = False
+(<:) :: Type -> Type -> Bool
+Unknown <: _ = True
+_ <: Unknown = True
+_ <: Any = True
+Unit <: Unit = True
+Bool <: Bool = True
+Int <: Int = True
+Float <: Float = True
+Array t1 <: Array t2 = t1 <: t2
+Function ts1 r1 <: Function ts2 r2 = liftEq (<:) ts1 ts2 && r1 <: r2
+Placeholder name1 <: Placeholder name2 = name1 == name2
+_ <: _ = False
 
 
 instance Display Type where
   displays :: Type -> ShowS
   displays Unknown = showChar '?'
+  displays Any = showChar '∗'
   displays Unit = showString "Unit"
   displays Bool = showString "Bool"
   displays Int = showString "Int"

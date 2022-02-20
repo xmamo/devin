@@ -22,7 +22,7 @@ spec = do
         \    var x = sum(1, 2.0);\n\
         \\n\
         \def sum(a: Int, b) -> Int\n\
-        \     return a + b;"
+        \     return 0;"
 
     it "should fail on program 2" $ do
       typeCheckingShouldFail
@@ -30,7 +30,7 @@ spec = do
         \    var x = sum(1, 2.0);\n\
         \\n\
         \def sum(a: Int, b: Int) -> Int\n\
-        \     return a + b;"
+        \     return 0;"
 
     it "should succeed on program 3" $ do
       typeCheckingShouldSucceed
@@ -38,7 +38,27 @@ spec = do
         \    var x = sum(1, 2);\n\
         \\n\
         \def sum(a: Int, b: Int) -> Int\n\
-        \     return a + b;"
+        \     return 0;"
+
+    it "should fail on program 4" $ do
+      typeCheckingShouldFail
+        "def main()\n\
+        \    var x = sum([1, false, 3]);\n\
+        \\n\
+        \def sum(list: [Int]) -> Int\n\
+        \    return 0;\n\
+        \"
+
+    it "should succeed on program 5" $ do
+      typeCheckingShouldSucceed
+        "def main() {\n\
+        \    def f(x) return x;\n\
+        \    var x = sum([f(1), false, 3]);\n\
+        \}\n\
+        \\n\
+        \def sum(list: [Int]) -> Int\n\
+        \    return 0;\n\
+        \"
 
 
 typeCheckingShouldSucceed :: String -> Expectation

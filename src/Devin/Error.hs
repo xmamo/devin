@@ -80,7 +80,7 @@ data Error where
     statement :: Statement
   } -> Error
 
-  deriving (Eq, Show, Read, Data)
+  deriving (Show, Read, Data)
 
 
 instance Interval Error where

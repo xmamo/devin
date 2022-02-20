@@ -22,7 +22,7 @@ import Data.Foldable.Extra
 import Devin.Error
 import Devin.Evaluator
 import Devin.Syntax
-import Devin.Type (Type)
+import Devin.Type (Type, (<:))
 import Devin.Type qualified as Type
 
 
@@ -685,7 +685,7 @@ getType = \case
     r <- readReference (Vector.head rs)
     t <- getType r
 
-    let f Type.Unknown = False; f t' = t' == t
+    let f Type.Unknown = False; f t' = t' <: t
     ok <- allM (\r -> f <$> (getType =<< readReference r)) rs
     pure (Type.Array (if ok then t else Type.Unknown))
 

@@ -34,7 +34,7 @@ data Scope = Scope {
   types :: [(String, Type)],
   functions :: [(String, ([Type], Type))],
   variables :: [(String, Type)]
-} deriving (Eq, Show, Read, Data)
+} deriving (Show, Read, Data)
 
 
 instance Applicative Typer where
