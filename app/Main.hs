@@ -141,10 +141,12 @@ onActivate application = do
   applyTags tags tagTable
 
   syntaxTreeVar <- newEmptyMVar
-  evaluationThreadIdVar <- newEmptyMVar
+  parserThreadIdVar <- newEmptyMVar
+  typerThreadIdVar <- newEmptyMVar
+  evaluatorThreadIdVar <- newEmptyMVar
   playButtonClickCallbackVar <- newEmptyMVar
 
-  -- Set up callback for codeBuffer "changed" signals.
+  -- Set up codeBuffer callback for "changed" signals.
   -- The callback takes care of syntax highlighting.
 
   Gtk.onTextBufferChanged codeBuffer $ do
@@ -156,83 +158,99 @@ onActivate application = do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     text <- Gtk.textBufferGetText codeBuffer startIter endIter True
 
-    case runParser (liftA2 (,) Parsers.devin getState) [] "" (0, text) of
+    whenJustM (tryTakeMVar parserThreadIdVar) killThread
+    whenJustM (tryTakeMVar typerThreadIdVar) killThread
+
+    parserThread <- forkIO $ runParserT (liftA2 (,) Parsers.devin getState) [] "" (0, text) >>= \case
       -- Parser failure:
       Left parseError -> do
         let offset = toOffset (errorPos parseError) text
         let messages = errorMessages parseError
 
-        -- Remove previuous "error" highlighting, if any
-        Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
+        Gtk.postGUIASync $ do
+          -- Remove previous "error" highlighting, if any
+          Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
-        -- Highlight as "error", starting from the parseError offset to the end
-        startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
-        Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
+          -- Highlight as "error", starting from the parseError offset to the end
+          startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
+          Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
-        -- Update the error log; clear the syntax tree preview
-        (line, column) <- getLineColumn startIter
-        Gtk.seqStoreClear logStore
-        Gtk.seqStoreAppend logStore (showLineColumn (line, column), showMessages messages)
-        Gtk.forestStoreClear syntaxTreeStore
+          -- Update the error log; clear the syntax tree preview
+          (line, column) <- getLineColumn startIter
+          Gtk.seqStoreClear logStore
+          Gtk.seqStoreAppend logStore (showLineColumn (line, column), showMessages messages)
+          Gtk.forestStoreClear syntaxTreeStore
 
       -- Parser success:
       Right (devin, comments) -> do
         let Devin {declarations} = devin
         putMVar syntaxTreeVar devin
 
-        -- Remove any previous highlighting
-        Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
-        Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
-        Gtk.textBufferRemoveTag codeBuffer (keywordTag tags) startIter endIter
-        Gtk.textBufferRemoveTag codeBuffer (variableIdTag tags) startIter endIter
-        Gtk.textBufferRemoveTag codeBuffer (functionIdTag tags) startIter endIter
-        Gtk.textBufferRemoveTag codeBuffer (typeTag tags) startIter endIter
-        Gtk.textBufferRemoveTag codeBuffer (numberTag tags) startIter endIter
-        Gtk.textBufferRemoveTag codeBuffer (operatorTag tags) startIter endIter
-        Gtk.textBufferRemoveTag codeBuffer (commentTag tags) startIter endIter
-        Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
+        Gtk.postGUIASync $ do
+          -- Remove any previous highlighting
+          Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (keywordTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (variableIdTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (functionIdTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (typeTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (numberTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (operatorTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (commentTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
-        -- Highlight syntax
-        highlightDevin tags codeBuffer devin
-        for_ comments (highlightInterval (commentTag tags) codeBuffer)
+          -- Highlight syntax
+          highlightDevin tags codeBuffer devin
+          for_ comments (highlightInterval (commentTag tags) codeBuffer)
 
-        -- Highlight matching braces
-        insertMark <- Gtk.textBufferGetInsert codeBuffer
-        insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
-        highlightDevinBraces tags codeBuffer insertIter devin
+          -- Highlight matching braces
+          insertMark <- Gtk.textBufferGetInsert codeBuffer
+          insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
+          highlightDevinBraces tags codeBuffer insertIter devin
 
-        -- Update the syntax tree preview
-        rootPath <- Gtk.treePathNew
-        Gtk.forestStoreClear syntaxTreeStore
-        Gtk.forestStoreInsertForest syntaxTreeStore rootPath 0 (map declarationTree declarations)
-        Gtk.treeViewExpandAll syntaxTreeView
+          -- Update the syntax tree preview
+          rootPath <- Gtk.treePathNew
+          Gtk.forestStoreClear syntaxTreeStore
+          Gtk.forestStoreInsertForest syntaxTreeStore rootPath 0 (map declarationTree declarations)
+          Gtk.treeViewExpandAll syntaxTreeView
 
-        -- Clear any previous error messages
-        Gtk.seqStoreClear logStore
+        whenJustM (tryTakeMVar typerThreadIdVar) killThread
 
-        case runTyper (checkDevin devin) predefinedEnvironment of
+        typerThreadId <- forkIO $ pure (runTyper (checkDevin devin) predefinedEnvironment) >>= \case
           -- Typer success:
           ((), environment, []) -> do
-            -- Enable the play button if "main()" has been found
+            -- Enable the play button if "main()" has been found:
+
             let (hasMain, _, _) = runTyper checkHasMain environment
-            Gtk.widgetSetSensitive playButton hasMain
+
+            Gtk.postGUIASync $ do
+              Gtk.widgetSetSensitive playButton hasMain
+              Gtk.seqStoreClear logStore
+
             where
               checkHasMain = lookupFunctionSignature "main" >>= \case
                 Just (([], _), _) -> pure True
                 _ -> pure False
 
           -- Typer failure:
-          ((), _, errors) -> for_ errors $ \error -> do
-            -- Highlight the part of code which caused the failure as "error"
-            startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
-            endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
-            Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
+          ((), _, errors) -> Gtk.postGUIASync $ do
+            Gtk.seqStoreClear logStore
 
-            -- Append the error desctiption to the log
-            (line, column) <- getLineColumn startIter
-            Gtk.seqStoreAppend logStore (showLineColumn (line, column), Text.pack (display error))
+            for_ errors $ \error -> do
+              -- Highlight the part of code which caused the failure
+              startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
+              endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
+              Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
-  -- Set up callback for codeBuffer "notify::cursor-position" signals.
+              -- Append the error description to the log
+              (line, column) <- getLineColumn startIter
+              Gtk.seqStoreAppend logStore (showLineColumn (line, column), Text.pack (display error))
+
+        putMVar typerThreadIdVar typerThreadId
+
+    putMVar parserThreadIdVar parserThread
+
+  -- Set up codeBuffer callback for "notify::cursor-position" signals.
   -- The callback takes care of highlighting matching braces.
 
   G.onObjectNotify codeBuffer (Just "cursor-position") $ \_ -> do
@@ -247,7 +265,7 @@ onActivate application = do
 
   -- The play button exhibits different behavior depending on context:
   -- 1. Initially, its function is to start the evaluation process;
-  -- 2. Once it has been started, pressing the button again will advance the evaluation by one step.
+  -- 2. Pressing the button again will advance the evaluation until the next debug statement.
   -- initialPlayButtonCallback holds the action corresponding to (1).
 
   let initialPlayButtonCallback = whenJustM (tryReadMVar syntaxTreeVar) $ \devin -> do
@@ -258,15 +276,17 @@ onActivate application = do
         Gtk.widgetShowAll scrolledWindow2
 
         state <- makePredefinedState
-        putMVar evaluationThreadIdVar =<< forkIO (go (evaluateDevin devin) state)
+
+        evaluatorThreadId <- forkIO (go (evaluateDevin devin) state)
+        putMVar evaluatorThreadIdVar evaluatorThreadId
 
       go evaluator state = do
         (result, state') <- runEvaluatorStep evaluator state
 
         case result of
           Done _ -> do
-            takeMVar evaluationThreadIdVar
-            Gtk.postGUIASync cleanup
+            tryTakeMVar evaluatorThreadIdVar
+            cleanup
 
           Debug statement evaluator' -> do
             Gtk.postGUIASync $ do
@@ -312,7 +332,8 @@ onActivate application = do
             Gtk.dialogRun dialog
             Gtk.widgetDestroy dialog
             Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
-            takeMVar evaluationThreadIdVar
+
+            tryTakeMVar evaluatorThreadIdVar
             cleanup
 
       cleanup = do
@@ -328,11 +349,10 @@ onActivate application = do
         tryTakeMVar playButtonClickCallbackVar
         putMVar playButtonClickCallbackVar initialPlayButtonCallback
 
-  -- Most of the functionality for the "play" and "stop" buttons has already been written in
-  -- the previous part.
+  -- Set up playButton and stopButton callbacks for "clicked" signals:
 
   Gtk.onButtonClicked stopButton $ do
-    killThread =<< takeMVar evaluationThreadIdVar
+    killThread =<< takeMVar evaluatorThreadIdVar
     cleanup
 
   Gtk.onButtonClicked playButton $ tryReadMVar playButtonClickCallbackVar >>= \case
