@@ -16,7 +16,16 @@ import Test.Hspec
 spec :: Spec
 spec = do
   describe "checkDevin" $ do
-    it "should succeed on program 1" $ do
+    it "should fail on program 1" $
+      typeCheckingShouldFail
+        "def sum(list: [Int]) -> Int {}"
+
+    it "should succeed on program 2" $
+      typeCheckingShouldSucceed
+        "def sum(list: [Int]) -> Int\n\
+        \    return 0;"
+
+    it "should succeed on program 3" $
       typeCheckingShouldSucceed
         "def main()\n\
         \    var x = sum(1, 2.0);\n\
@@ -24,7 +33,7 @@ spec = do
         \def sum(a: Int, b) -> Int\n\
         \     return 0;"
 
-    it "should fail on program 2" $ do
+    it "should fail on program 4" $
       typeCheckingShouldFail
         "def main()\n\
         \    var x = sum(1, 2.0);\n\
@@ -32,7 +41,7 @@ spec = do
         \def sum(a: Int, b: Int) -> Int\n\
         \     return 0;"
 
-    it "should succeed on program 3" $ do
+    it "should succeed on program 5" $
       typeCheckingShouldSucceed
         "def main()\n\
         \    var x = sum(1, 2);\n\
@@ -40,7 +49,7 @@ spec = do
         \def sum(a: Int, b: Int) -> Int\n\
         \     return 0;"
 
-    it "should fail on program 4" $ do
+    it "should fail on program 6" $
       typeCheckingShouldFail
         "def main()\n\
         \    var x = sum([1, false, 3]);\n\
@@ -49,7 +58,7 @@ spec = do
         \    return 0;\n\
         \"
 
-    it "should succeed on program 5" $ do
+    it "should succeed on program 7" $
       typeCheckingShouldSucceed
         "def main() {\n\
         \    def f(x) return x;\n\

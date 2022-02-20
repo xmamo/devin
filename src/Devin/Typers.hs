@@ -65,8 +65,13 @@ checkDeclaration2 = \case
       Just (_, returnTypeId) -> getType returnTypeId
       Nothing -> pure Unknown
 
-    checkStatement returnT body
-    pure ()
+    case returnT of
+      Unknown -> void (checkStatement Unknown body)
+      Unit -> void (checkStatement Unit body)
+
+      _ -> do
+        doesReturn <- checkStatement returnT body
+        unless doesReturn (report (MissingReturnStatement body))
 
 
 checkStatement :: Type -> Statement -> Typer Bool
@@ -93,9 +98,9 @@ checkStatement expectedT statement = case statement of
   IfElseStatement {predicate, trueBranch, falseBranch} -> do
     t <- checkExpression predicate
     unless (t <: Bool) (report (InvalidType predicate Bool t))
-    trueBranchReturns <- withNewScope (checkStatement expectedT trueBranch)
-    falseBranchReturns <- withNewScope (checkStatement expectedT falseBranch)
-    pure (trueBranchReturns && falseBranchReturns)
+    trueBranchDoesReturn <- withNewScope (checkStatement expectedT trueBranch)
+    falseBranchDoesReturn <- withNewScope (checkStatement expectedT falseBranch)
+    pure (trueBranchDoesReturn && falseBranchDoesReturn)
 
   WhileStatement {predicate, body} -> do
     t <- checkExpression predicate
@@ -104,10 +109,10 @@ checkStatement expectedT statement = case statement of
     pure False
 
   DoWhileStatement {body, predicate} -> do
-    returns <- withNewScope (checkStatement expectedT body)
+    doesReturn <- withNewScope (checkStatement expectedT body)
     t <- checkExpression predicate
     unless (t <: Bool) (report (InvalidType predicate Bool t))
-    pure returns
+    pure doesReturn
 
   ReturnStatement {result = Just result} -> do
     t <- checkExpression result
@@ -130,7 +135,7 @@ checkStatement expectedT statement = case statement of
       DeclarationStatement {declaration} -> checkDeclaration1 declaration
       _ -> pure ()
 
-    foldlM (\returns statement -> (returns ||) <$> check statement) False statements
+    foldlM (\doesReturn statement -> (doesReturn ||) <$> check statement) False statements
 
     where
       check DeclarationStatement {declaration} = do {checkDeclaration2 declaration; pure False}

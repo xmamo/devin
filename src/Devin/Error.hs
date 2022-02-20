@@ -50,12 +50,18 @@ data Error where
     actualT :: Type
   } -> Error
 
+  -- Type checking errors:
+
   MissingReturnValue :: {
     statement :: Statement,
     expectedT :: Type
   } -> Error
 
-  -- Runtime-only errors:
+  MissingReturnStatement :: {
+    statement :: Statement
+  } -> Error
+
+  -- Runtime errors:
 
   IntegerOverflow :: {
     expression :: Expression
@@ -92,6 +98,7 @@ instance Interval Error where
   start InvalidBinary {binary} = start binary
   start InvalidType {expression} = start expression
   start MissingReturnValue {statement} = start statement
+  start MissingReturnStatement {statement} = start statement
   start IntegerOverflow {expression} = start expression
   start DivisionByZero {expression} = start expression
   start IndexOutOfBounds {expression} = start expression
@@ -107,6 +114,7 @@ instance Interval Error where
   end InvalidBinary {binary} = end binary
   end InvalidType {expression} = end expression
   end MissingReturnValue {statement} = end statement
+  end MissingReturnStatement {statement} = end statement
   end IntegerOverflow {expression} = end expression
   end DivisionByZero {expression} = end expression
   end IndexOutOfBounds {expression} = end expression
@@ -151,6 +159,9 @@ instance Display Error where
 
     MissingReturnValue {} ->
       showString "Missing return value"
+
+    MissingReturnStatement {} ->
+      showString "Missing return statement"
 
     IntegerOverflow {} ->
       showString "Integer overflow"
