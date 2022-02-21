@@ -292,7 +292,7 @@ displaysValue = \case
   Array rs -> do
     x <- readReference (rs ! 0)
     s1 <- displaysValue x
-    s2 <- go (Vector.length rs) 0
+    s2 <- go (Vector.length rs) 1
     pure (showChar '[' . s1 . s2)
 
     where
