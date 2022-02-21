@@ -21,6 +21,7 @@ import System.Exit
 import Text.Parsec.Error
 
 import Control.Monad.Extra
+import Data.List.Extra
 
 import Devin.Display
 import Devin.Evaluator
@@ -317,13 +318,16 @@ onActivate application = do
             endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
             Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
-            (line, column) <- getLineColumn startIter
-            let s = showsLineColumn (line, column) . showChar '\t' . displays error
-
             -- Display the error message.
             -- gi-gtk doesn't provide bindings for gtk_message_dialog_new() and related functions.
             -- To get around this limitation, we use GtkBuilder to load the MessageDialog from an
             -- XML string. This is ugly, but it works.
+
+            (line, column) <- getLineColumn startIter
+            let s = showsLineColumn (line, column) (showChar '\t' (display error))
+            let s' = replace "&" "&amp;" s
+            let s'' = replace "<" "&lt;" s'
+            let s''' = replace ">" "&gt;" s''
 
             let string = Text.pack $
                   "<interface>\n\
@@ -331,7 +335,7 @@ onActivate application = do
                   \    <property name=\"title\">Error</property>\n\
                   \    <property name=\"message-type\">error</property>\n\
                   \    <property name=\"buttons\">close</property>\n\
-                  \    <property name=\"text\">" ++ s "</property>\n\
+                  \    <property name=\"text\">" ++ s''' ++ "</property>\n\
                   \  </object>\n\
                   \</interface>"
 
