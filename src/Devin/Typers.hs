@@ -242,6 +242,9 @@ checkExpression expression = case expression of
       (_, Unknown) -> pure Unknown
       (Int, Int) -> pure Int
       (Float, Float) -> pure Float
+      (Array Unknown, Array _) -> pure (Array Unknown)
+      (Array _, Array Unknown) -> pure (Array Unknown)
+      (Array t1, Array t2) | t1 <: t2 && t2 <: t1 -> pure (Array t1)
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | SubtractOperator {} <- binary -> do
@@ -264,6 +267,8 @@ checkExpression expression = case expression of
       (_, Unknown) -> pure Unknown
       (Int, Int) -> pure Int
       (Float, Float) -> pure Float
+      (Array t, Int) -> pure (Array t)
+      (Int, Array t) -> pure (Array t)
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | DivideOperator {} <- binary -> do

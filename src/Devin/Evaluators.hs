@@ -370,7 +370,7 @@ evaluateExpression expression = case expression of
       (Int x, Array rs) -> do
         let n = Vector.length rs
 
-        case safeBinary (+) x n of
+        case safeBinary (*) x n of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n' -> do
@@ -380,7 +380,7 @@ evaluateExpression expression = case expression of
       (Array rs, Int y) -> do
         let n = Vector.length rs
 
-        case safeBinary (+) n y of
+        case safeBinary (*) n y of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n' -> do
