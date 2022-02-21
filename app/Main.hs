@@ -13,6 +13,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Foldable
+import Data.IORef
 import Data.String
 import System.Environment
 import System.Exit
@@ -140,11 +141,11 @@ onActivate application = do
   tagTable <- Gtk.textBufferGetTagTable codeBuffer
   applyTags tags tagTable
 
-  syntaxTreeVar <- newEmptyMVar
-  parserThreadIdVar <- newEmptyMVar
-  typerThreadIdVar <- newEmptyMVar
-  evaluatorThreadIdVar <- newEmptyMVar
-  playButtonClickCallbackVar <- newEmptyMVar
+  syntaxTreeRef <- newIORef Nothing
+  parserThreadIdRef <- newIORef =<< forkIO (pure ())
+  typerThreadIdRef <- newIORef =<< forkIO (pure ())
+  evaluatorThreadIdVar <- newIORef =<< forkIO (pure ())
+  playButtonClickCallbackVar <- newIORef (pure ())
 
   -- Set up codeBuffer callback for "changed" signals.
   -- The callback takes care of syntax highlighting.
@@ -152,14 +153,17 @@ onActivate application = do
   Gtk.onTextBufferChanged codeBuffer $ do
     -- The newly inserted code might be syntactically invalid.
     -- Preemptively discard the old syntax tree (if any) and disable the "play" button.
-    tryTakeMVar syntaxTreeVar
+    atomicWriteIORef syntaxTreeRef Nothing
     Gtk.widgetSetSensitive playButton False
 
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     text <- Gtk.textBufferGetText codeBuffer startIter endIter True
 
-    whenJustM (tryTakeMVar parserThreadIdVar) killThread
-    whenJustM (tryTakeMVar typerThreadIdVar) killThread
+    parserThreadId <- readIORef parserThreadIdRef
+    killThread parserThreadId
+
+    typerThreadId <- readIORef typerThreadIdRef
+    killThread typerThreadId
 
     parserThread <- forkIO $ runParserT (liftA2 (,) Parsers.devin getState) [] "" (0, text) >>= \case
       -- Parser failure:
@@ -169,6 +173,7 @@ onActivate application = do
 
         Gtk.postGUIASync $ do
           -- Remove previous "error" highlighting, if any
+          (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
           Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
           -- Highlight as "error", starting from the parseError offset to the end
@@ -184,10 +189,11 @@ onActivate application = do
       -- Parser success:
       Right (devin, comments) -> do
         let Devin {declarations} = devin
-        putMVar syntaxTreeVar devin
+        atomicWriteIORef syntaxTreeRef (Just devin)
 
         Gtk.postGUIASync $ do
           -- Remove any previous highlighting
+          (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
           Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
           Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
           Gtk.textBufferRemoveTag codeBuffer (keywordTag tags) startIter endIter
@@ -214,13 +220,12 @@ onActivate application = do
           Gtk.forestStoreInsertForest syntaxTreeStore rootPath 0 (map declarationTree declarations)
           Gtk.treeViewExpandAll syntaxTreeView
 
-        whenJustM (tryTakeMVar typerThreadIdVar) killThread
+        typerThreadId <- readIORef typerThreadIdRef
+        killThread typerThreadId
 
         typerThreadId <- forkIO $ pure (runTyper (checkDevin devin) predefinedEnvironment) >>= \case
           -- Typer success:
           ((), environment, []) -> do
-            -- Enable the play button if "main()" has been found:
-
             let (hasMain, _, _) = runTyper checkHasMain environment
 
             Gtk.postGUIASync $ do
@@ -246,9 +251,9 @@ onActivate application = do
               (line, column) <- getLineColumn startIter
               Gtk.seqStoreAppend logStore (showLineColumn (line, column), Text.pack (display error))
 
-        putMVar typerThreadIdVar typerThreadId
+        atomicWriteIORef typerThreadIdRef typerThreadId
 
-    putMVar parserThreadIdVar parserThread
+    atomicWriteIORef parserThreadIdRef parserThread
 
   -- Set up codeBuffer callback for "notify::cursor-position" signals.
   -- The callback takes care of highlighting matching braces.
@@ -257,7 +262,7 @@ onActivate application = do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
 
-    whenJustM (tryReadMVar syntaxTreeVar) $ \devin -> do
+    whenJustM (readIORef syntaxTreeRef) $ \devin -> do
       insertMark <- Gtk.textBufferGetInsert codeBuffer
       insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
       highlightDevinBraces tags codeBuffer insertIter devin
@@ -268,7 +273,8 @@ onActivate application = do
   -- 2. Pressing the button again will advance the evaluation until the next debug statement.
   -- initialPlayButtonCallback holds the action corresponding to (1).
 
-  let initialPlayButtonCallback = whenJustM (tryReadMVar syntaxTreeVar) $ \devin -> do
+  let initialPlayButtonCallback = whenJustM (readIORef syntaxTreeRef) $ \devin -> do
+        Gtk.widgetSetSensitive playButton False
         Gtk.widgetSetSensitive stopButton True
         Gtk.textViewSetEditable codeTextView False
         Gtk.containerRemove scrolledWindow2 syntaxTreeView
@@ -276,34 +282,37 @@ onActivate application = do
         Gtk.widgetShowAll scrolledWindow2
 
         state <- makePredefinedState
-
         evaluatorThreadId <- forkIO (go (evaluateDevin devin) state)
-        putMVar evaluatorThreadIdVar evaluatorThreadId
+        atomicWriteIORef evaluatorThreadIdVar evaluatorThreadId
 
       go evaluator state = do
         (result, state') <- runEvaluatorStep evaluator state
 
+        Gtk.postGUIASync $ do
+          forest <- stateForest state'
+          rootPath <- Gtk.treePathNew
+          Gtk.forestStoreClear stateStore
+          Gtk.forestStoreInsertForest stateStore rootPath 0 forest
+          Gtk.treeViewExpandAll stateView
+
         case result of
-          Done _ -> do
-            tryTakeMVar evaluatorThreadIdVar
-            cleanup
+          Done _ -> Gtk.postGUIASync cleanup
 
           Debug statement evaluator' -> do
-            Gtk.postGUIASync $ do
+            atomicWriteIORef playButtonClickCallbackVar $ do
+              Gtk.postGUIASync (Gtk.widgetSetSensitive playButton False)
+
               (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
               Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
+
+              evaluatorThreadId <- forkIO (go evaluator' state')
+              atomicWriteIORef evaluatorThreadIdVar evaluatorThreadId
+
+            Gtk.postGUIASync $ do
+              Gtk.widgetSetSensitive playButton True
               highlightInterval (highlightTag tags) codeBuffer statement
 
-              forest <- stateForest state'
-              rootPath <- Gtk.treePathNew
-              Gtk.forestStoreClear stateStore
-              Gtk.forestStoreInsertForest stateStore rootPath 0 forest
-              Gtk.treeViewExpandAll stateView
-
-            tryTakeMVar playButtonClickCallbackVar
-            putMVar playButtonClickCallbackVar (go evaluator' state')
-
-          Error error -> do
+          Error error -> Gtk.postGUIASync $ do
             startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
             endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
             Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
@@ -333,7 +342,6 @@ onActivate application = do
             Gtk.widgetDestroy dialog
             Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
-            tryTakeMVar evaluatorThreadIdVar
             cleanup
 
       cleanup = do
@@ -341,23 +349,26 @@ onActivate application = do
         Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
         Gtk.textViewSetEditable codeTextView True
+        Gtk.widgetSetSensitive playButton True
         Gtk.widgetSetSensitive stopButton False
         Gtk.containerRemove scrolledWindow2 stateView
         Gtk.containerAdd scrolledWindow2 syntaxTreeView
         Gtk.widgetShowAll scrolledWindow2
 
-        tryTakeMVar playButtonClickCallbackVar
-        putMVar playButtonClickCallbackVar initialPlayButtonCallback
+        writeIORef playButtonClickCallbackVar initialPlayButtonCallback
 
   -- Set up playButton and stopButton callbacks for "clicked" signals:
 
+  atomicWriteIORef playButtonClickCallbackVar initialPlayButtonCallback
+
   Gtk.onButtonClicked stopButton $ do
-    killThread =<< takeMVar evaluatorThreadIdVar
+    evaluatorThreadId <- readIORef evaluatorThreadIdVar
+    killThread evaluatorThreadId
     cleanup
 
-  Gtk.onButtonClicked playButton $ tryReadMVar playButtonClickCallbackVar >>= \case
-    Just callback -> callback
-    Nothing -> initialPlayButtonCallback
+  Gtk.onButtonClicked playButton $ do
+    playButtonClickCallback <- readIORef playButtonClickCallbackVar
+    playButtonClickCallback
 
   -- Display the UI:
 
