@@ -324,10 +324,10 @@ onActivate application = do
             -- XML string. This is ugly, but it works.
 
             (line, column) <- getLineColumn startIter
-            let s = showsLineColumn (line, column) (showChar '\t' (display error))
-            let s' = replace "&" "&amp;" s
-            let s'' = replace "<" "&lt;" s'
-            let s''' = replace ">" "&gt;" s''
+            let s = showsLineColumn (line, column) (showChar ' ' (display error))
+            let s' = replace ">" "&gt;" (replace "<" "&lt;" (replace "&" "&amp;" s))
+            let s'' = "<tt>" ++ s' ++ "</tt>"
+            let s''' = replace ">" "&gt;" (replace "<" "&lt;" (replace "&" "&amp;" s''))
 
             let string = Text.pack $
                   "<interface>\n\
@@ -336,6 +336,7 @@ onActivate application = do
                   \    <property name=\"message-type\">error</property>\n\
                   \    <property name=\"buttons\">close</property>\n\
                   \    <property name=\"text\">" ++ s''' ++ "</property>\n\
+                  \    <property name=\"use-markup\">True</property>\n\
                   \  </object>\n\
                   \</interface>"
 
