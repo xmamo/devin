@@ -17,6 +17,7 @@ module Devin.Evaluator (
   writeReference,
   cloneReference,
   compareReferences,
+  cloneValue,
   compareValues,
   defineFunction,
   lookupFunction,
@@ -158,16 +159,8 @@ writeReference (Reference ref) v = liftIO (writeIORef ref v)
 cloneReference :: MonadIO m => Reference -> m Reference
 cloneReference r = do
   v <- readReference r
-
-  case v of
-    Unit -> newReference Unit
-    Bool x -> newReference (Bool x)
-    Int x -> newReference (Int x)
-    Float x -> newReference (Float x)
-
-    Array rs -> do
-      rs' <- Vector.forM rs cloneReference
-      newReference (Array rs')
+  v' <- cloneValue v
+  newReference v'
 
 
 compareReferences :: MonadIO m => Reference -> Reference -> m Bool
@@ -175,6 +168,18 @@ compareReferences r1 r2 = liftIO $ do
   v1 <- readReference r1
   v2 <- readReference r2
   compareValues v1 v2
+
+
+cloneValue :: MonadIO m => Value -> m Value
+cloneValue = \case
+  Unit -> pure Unit
+  Bool x -> pure (Bool x)
+  Int x -> pure (Int x)
+  Float x -> pure (Float x)
+
+  Array rs -> do
+    rs' <- Vector.forM rs cloneReference
+    pure (Array rs')
 
 
 compareValues :: MonadIO m => Value -> Value -> m Bool

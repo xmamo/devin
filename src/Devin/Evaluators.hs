@@ -562,8 +562,9 @@ evaluateExpression expression = case expression of
 
     rightR <- evaluateExpression right
     rightV <- readReference rightR
+    rightV' <- cloneValue rightV
 
-    writeReference' leftR rightV
+    writeReference' leftR rightV'
 
   BinaryExpression {left, binary, right} | AddAssignOperator {} <- binary -> do
     leftR <- evaluateExpression left
