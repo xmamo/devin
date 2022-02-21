@@ -33,8 +33,17 @@ spec = do
         \    assert array1 == [4, 7, 1, 0];\n\
         \    assert array2 == [4, -2, 1, 0];\n\
         \}"
-
+    
     it "should succeed on program 3" $
+      executionShouldSucceed
+        "def main() {\n\
+        \    var array = [1, 2];\n\
+        \    assert array * 5 == [1, 2, 1, 2, 1, 2, 1, 2, 1, 2];\n\
+        \    assert array * 0 == [];\n\
+        \    assert array * -2 == [];\n\
+        \}"
+
+    it "should succeed on program 4" $
       executionShouldSucceed
         "def main()\n\
         \    assert sum(34, 35) == 69;\n\
@@ -42,7 +51,7 @@ spec = do
         \def sum(a, b)\n\
         \    return a + b;"
 
-    it "should succeed on program 4" $
+    it "should succeed on program 5" $
       executionShouldSucceed
         "def main()\n\
         \    assert factorial(6) == 720;\n\
@@ -56,7 +65,7 @@ spec = do
         \    return n * factorial(n - 1);\n\
         \}"
 
-    it "should succeed on program 5" $
+    it "should succeed on program 6" $
       executionShouldSucceed
         "def main()\n\
         \    assert factorial(6) == 720;\n\
@@ -73,7 +82,7 @@ spec = do
         \    return result;\n\
         \}"
 
-    it "should succeed on program 6" $
+    it "should succeed on program 7" $
       executionShouldSucceed
         "def main()\n\
         \    assert factorial(6) == 720;\n\
@@ -93,7 +102,7 @@ spec = do
         \    return result;\n\
         \}"
 
-    it "should succeed on program 7" $
+    it "should succeed on program 8" $
       executionShouldSucceed
         "def main() {\n\
         \    var array = [9, 7, 2, 5];\n\
@@ -104,7 +113,7 @@ spec = do
         \def update(ref array, index, value)\n\
         \    array[index] = value;"
 
-    it "should succeed on program 8" $
+    it "should succeed on program 9" $
       executionShouldSucceed
         "def main() {\n\
         \    var array = [9, 7, 2, 5];\n\
@@ -115,7 +124,7 @@ spec = do
         \def noupdate(array, index, value)\n\
         \    array[index] = value;"
 
-    it "should succeed on program 9" $
+    it "should succeed on program 10" $
       executionShouldSucceed
         "def main() {\n\
         \    assert isOdd(69);\n\
@@ -140,7 +149,7 @@ spec = do
         \        return isEven(n - 1);\n\
         \}"
 
-    it "should succeed on program 10" $
+    it "should succeed on program 11" $
       executionShouldSucceed
         "def main() {\n\
         \    var c = -1;\n\
@@ -154,6 +163,34 @@ spec = do
         \    assert count() == 1;\n\
         \    assert count() == 2;\n\
         \    assert count() == 3;\n\
+        \}"
+
+    it "should succeed on program 12" $
+      executionShouldSucceed
+        "def main() -> Unit {\n\
+        \    var list = [9, 2, 1, 21, -2, 4];\n\
+        \    bubbleSort(list);\n\
+        \    assert list == [-2, 1, 2, 4, 9, 21];\n\
+        \}\n\
+        \\n\
+        \def bubbleSort(ref list: [Int]) -> Unit {\n\
+        \    var i = 0;\n\
+        \\n\
+        \    while i < len list {\n\
+        \        var j = i + 1;\n\
+        \\n\
+        \        while j < len list {\n\
+        \            if list[i] > list[j] {\n\
+        \                var t = list[i];\n\
+        \                list[i] = list[j];\n\
+        \                list[j] = t;\n\
+        \            }\n\
+        \\n\
+        \            j += 1;\n\
+        \        }\n\
+        \\n\
+        \        i += 1;\n\
+        \    }\n\
         \}"
 
 
