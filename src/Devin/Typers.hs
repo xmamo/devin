@@ -53,7 +53,7 @@ checkDeclaration2 = \case
     t <- checkExpression value
     defineVariableType name t
 
-  FunctionDeclaration {parameters, returnInfo, body} -> withNewScope $ do
+  FunctionDeclaration {functionId, parameters, returnInfo, body} -> withNewScope $ do
     for_ parameters $ \(_, SymbolId {name}, typeInfo) -> case typeInfo of
       Just (_, parameterTypeId) -> do
         parameterT <- getType parameterTypeId
@@ -71,7 +71,7 @@ checkDeclaration2 = \case
 
       _ -> do
         doesReturn <- checkStatement returnT body
-        unless doesReturn (report (MissingReturnStatement body))
+        unless doesReturn (report (MissingReturnStatement functionId))
 
 
 checkStatement :: Type -> Statement -> Typer Bool

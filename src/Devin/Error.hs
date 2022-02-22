@@ -58,7 +58,7 @@ data Error where
   } -> Error
 
   MissingReturnStatement :: {
-    statement :: Statement
+    functionId :: SymbolId
   } -> Error
 
   -- Runtime errors:
@@ -98,7 +98,7 @@ instance Interval Error where
   start InvalidBinary {binary} = start binary
   start InvalidType {expression} = start expression
   start MissingReturnValue {statement} = start statement
-  start MissingReturnStatement {statement} = start statement
+  start MissingReturnStatement {functionId} = start functionId
   start IntegerOverflow {expression} = start expression
   start DivisionByZero {expression} = start expression
   start IndexOutOfBounds {expression} = start expression
@@ -114,7 +114,7 @@ instance Interval Error where
   end InvalidBinary {binary} = end binary
   end InvalidType {expression} = end expression
   end MissingReturnValue {statement} = end statement
-  end MissingReturnStatement {statement} = end statement
+  end MissingReturnStatement {functionId} = end functionId
   end IntegerOverflow {expression} = end expression
   end DivisionByZero {expression} = end expression
   end IndexOutOfBounds {expression} = end expression
