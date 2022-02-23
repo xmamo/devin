@@ -20,10 +20,10 @@ import Devin.Interval
 
 import Data.Text (Text)
 
-import Data.Set qualified as Set
+import qualified Data.Set as Set
 
-import Data.GI.Gtk qualified as Gtk
-import GI.GtkSource qualified as GtkSource
+import qualified Data.GI.Gtk as Gtk
+import qualified GI.GtkSource as GtkSource
 
 
 data Tags = Tags {

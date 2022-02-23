@@ -6,59 +6,14 @@ synopsis: Devin programming language
 author: Matteo Morena
 category: Language
 
-
 common common
-  if impl(ghc >= 9.2.1)
-    default-language: GHC2021
-  else
-    default-language: Haskell2010
-
-    default-extensions:
-      NoCUSKs,
-      NoDatatypeContexts,
-      BangPatterns,
-      BinaryLiterals,
-      ConstrainedClassMethods,
-      ConstraintKinds,
-      DeriveDataTypeable,
-      DeriveFoldable,
-      DeriveFunctor,
-      DeriveGeneric,
-      DeriveLift,
-      DeriveTraversable,
-      EmptyCase,
-      EmptyDataDeriving,
-      ExistentialQuantification,
-      ExplicitForAll,
-      FlexibleContexts,
-      FlexibleInstances,
-      GADTSyntax,
-      GeneralizedNewtypeDeriving,
-      HexFloatLiterals,
-      ImportQualifiedPost,
-      InstanceSigs,
-      KindSignatures,
-      MultiParamTypeClasses,
-      NamedFieldPuns,
-      NamedWildCards,
-      NumericUnderscores,
-      PolyKinds,
-      PostfixOperators,
-      RankNTypes,
-      ScopedTypeVariables,
-      StandaloneDeriving,
-      StandaloneKindSignatures,
-      TupleSections,
-      TypeApplications,
-      TypeOperators,
-      TypeSynonymInstances
+  default-language: Haskell2010
 
   ghc-options:
     -Wall
     -Wno-name-shadowing
     -Wno-type-defaults
     -Wno-unused-do-bind
-
 
 library
   import: common
@@ -79,11 +34,10 @@ library
     Devin.Utils
 
   build-depends:
-    base >= 4.14.3 && < 4.17,
+    base >= 4.13.0 && < 4.17,
     vector ^>= 0.12.3,
     parsec ^>= 3.1.14,
     extra ^>= 1.7.10
-
 
 test-suite devin-test
   import: common
@@ -105,7 +59,6 @@ test-suite devin-test
   build-tool-depends:
     hspec-discover:hspec-discover ^>= 2.9.4
 
-
 executable devin
   import: common
   hs-source-dirs: app
@@ -124,7 +77,7 @@ executable devin
     extra,
     devin,
     text ^>= 1.2.4,
-    containers ^>= 0.6.5,
+    containers ^>= 0.6.2,
     haskell-gi-overloading == 0.0,
     gi-gobject ^>= 2.0.27,
     gi-gio ^>= 2.0.29,

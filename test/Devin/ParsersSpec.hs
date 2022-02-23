@@ -7,7 +7,7 @@ module Devin.ParsersSpec (spec) where
 import Devin.Syntax
 import Devin.Parsec
 import Devin.Parsers (Parser)
-import Devin.Parsers qualified as Parsers
+import qualified Devin.Parsers as Parsers
 
 import Test.Hspec
 

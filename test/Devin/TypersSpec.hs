@@ -6,7 +6,7 @@ import Data.List
 
 import Devin.Display
 import Devin.Parsec
-import Devin.Parsers qualified as Parsers
+import qualified Devin.Parsers as Parsers
 import Devin.Typer
 import Devin.Typers
 

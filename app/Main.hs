@@ -2,8 +2,10 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main (main) where
 
@@ -28,20 +30,20 @@ import Devin.Evaluator
 import Devin.Evaluators
 import Devin.Interval
 import Devin.Parsec hiding (Error)
-import Devin.Parsers qualified as Parsers
+import qualified Devin.Parsers as Parsers
 import Devin.Syntax
 import Devin.Typer
 import Devin.Typers
 
 import Data.Text (Text)
-import Data.Text qualified as Text
+import qualified Data.Text as Text
 
-import GI.GObject qualified as G
-import GI.Gio qualified as G
-import Data.GI.Gtk qualified as Gtk
-import Data.GI.Gtk.BuildFn qualified as Gtk
-import Data.GI.Gtk.Threading qualified as Gtk
-import GI.GtkSource qualified as GtkSource
+import qualified GI.GObject as G
+import qualified GI.Gio as G
+import qualified Data.GI.Gtk as Gtk
+import qualified Data.GI.Gtk.BuildFn as Gtk
+import qualified Data.GI.Gtk.Threading as Gtk
+import qualified GI.GtkSource as GtkSource
 
 import Devin.Highlight
 import Devin.Highlight.Braces

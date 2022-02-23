@@ -2,6 +2,7 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Devin.Highlight.Syntax (
   highlightDevin,
@@ -17,7 +18,7 @@ import Control.Monad.Extra
 
 import Devin.Syntax
 
-import Data.GI.Gtk qualified as Gtk
+import qualified Data.GI.Gtk as Gtk
 
 import Devin.Highlight
 

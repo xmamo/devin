@@ -1,5 +1,9 @@
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Devin.Evaluator (
   Evaluator (..),
@@ -35,7 +39,7 @@ import Data.Int
 import Data.IORef
 
 import Data.Vector (Vector, (!))
-import Data.Vector qualified as Vector
+import qualified Data.Vector as Vector
 
 import Devin.Error
 import Devin.Syntax

@@ -1,6 +1,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Devin.Tree (
@@ -21,13 +22,13 @@ import Data.Traversable
 import Numeric
 
 import Data.Text (Text)
-import Data.Text qualified as Text
+import qualified Data.Text as Text
 
 import Data.Vector ((!))
-import Data.Vector qualified as Vector
+import qualified Data.Vector as Vector
 
 import Data.Tree (Tree)
-import Data.Tree qualified as Tree
+import qualified Data.Tree as Tree
 
 import Devin.Evaluator
 import Devin.Syntax

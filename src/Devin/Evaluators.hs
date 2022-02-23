@@ -1,6 +1,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Devin.Evaluators (
   evaluateDevin,
@@ -15,7 +16,7 @@ import Data.Traversable
 import Numeric
 
 import Data.Vector ((!), (!?))
-import Data.Vector qualified as Vector
+import qualified Data.Vector as Vector
 
 import Data.Foldable.Extra
 
@@ -23,7 +24,7 @@ import Devin.Error
 import Devin.Evaluator
 import Devin.Syntax
 import Devin.Type (Type, (<:))
-import Devin.Type qualified as Type
+import qualified Devin.Type as Type
 
 
 evaluateDevin :: Devin -> Evaluator ()

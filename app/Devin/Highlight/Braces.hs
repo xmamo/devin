@@ -1,6 +1,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Devin.Highlight.Braces (
   highlightDevinBraces,
@@ -16,7 +17,7 @@ import Control.Monad.Extra
 import Devin.Interval
 import Devin.Syntax
 
-import Data.GI.Gtk qualified as Gtk
+import qualified Data.GI.Gtk as Gtk
 
 import Devin.Highlight
 

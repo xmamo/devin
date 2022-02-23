@@ -7,7 +7,7 @@ import Devin.Display
 import Devin.Evaluator
 import Devin.Evaluators
 import Devin.Parsec
-import Devin.Parsers qualified as Parsers
+import qualified Devin.Parsers as Parsers
 
 import Test.Hspec
 
@@ -33,7 +33,7 @@ spec = do
         \    assert array1 == [4, 7, 1, 0];\n\
         \    assert array2 == [4, -2, 1, 0];\n\
         \}"
-    
+
     it "should succeed on program 3" $
       executionShouldSucceed
         "def main() {\n\
