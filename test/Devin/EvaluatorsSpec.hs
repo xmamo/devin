@@ -168,22 +168,22 @@ spec = do
     it "should succeed on program 12" $
       executionShouldSucceed
         "def main() -> Unit {\n\
-        \    var list = [9, 2, 1, 21, -2, 4];\n\
-        \    bubbleSort(list);\n\
-        \    assert list == [-2, 1, 2, 4, 9, 21];\n\
+        \    var array = [9, 2, 1, 21, -2, 4];\n\
+        \    bubbleSort(array);\n\
+        \    assert array == [-2, 1, 2, 4, 9, 21];\n\
         \}\n\
         \\n\
-        \def bubbleSort(ref list: [Int]) -> Unit {\n\
+        \def bubbleSort(ref array: [Int]) -> Unit {\n\
         \    var i = 0;\n\
         \\n\
-        \    while i < len list {\n\
+        \    while i < len array {\n\
         \        var j = i + 1;\n\
         \\n\
-        \        while j < len list {\n\
-        \            if list[i] > list[j] {\n\
-        \                var t = list[i];\n\
-        \                list[i] = list[j];\n\
-        \                list[j] = t;\n\
+        \        while j < len array {\n\
+        \            if array[i] > array[j] {\n\
+        \                var t = array[i];\n\
+        \                array[i] = array[j];\n\
+        \                array[j] = t;\n\
         \            }\n\
         \\n\
         \            j += 1;\n\
