@@ -180,6 +180,8 @@ checkExpression expression = case expression of
     indexT <- checkExpression index
 
     case (arrayT, indexT) of
+      (Unknown, Int) -> pure Unknown
+      (Unknown, _) -> report' (InvalidType index Int indexT)
       (Array t, Int) -> pure t
       (Array _, _) -> report' (InvalidType index Int indexT)
       (_, _) -> report' (InvalidType array (Array Unknown) arrayT)
