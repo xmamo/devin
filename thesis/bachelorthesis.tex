@@ -58,8 +58,6 @@
   % \section{a preliminaries section}
   % TBD
 
-  \part{Conceptual overview}
-
   \chapter{Parsing}
 
   The first phase of any compiler or interpreter is called \emph{parsing}. The purpose of this
@@ -123,7 +121,7 @@
   parenthesization can be discarded if the resulting syntax tree still represents the same order of
   operations.
 
-  \begin{figure}
+  \begin{figure}[h]
     \centering
 
     \begin{ttfamily}
@@ -260,7 +258,92 @@
 
   \chapter{The monadic interface}
 
+  \chapter{A first look at Devin}
 
+  In this thesis, I'll discuss the implementation of a simple imperative programming language which
+  I decided to call Devin. The name Devin is an homage to Duino, the city I'm currently living in;
+  its slovenian name is, in fact, Devin.
+
+  Alongside Devin, I developed a graphical text editor for the language. The editor features syntax
+  highlighting, error reporting, and a simple visual debugger.
+
+  \begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{2.png}
+    \caption{The graphical editor associated with Devin}
+    \label{ex1}
+  \end{figure}
+
+  \section{Language features}
+
+  Devin is an imperative procedural programming language with lexical variable scoping and support
+  for recursive function definitions. Syntactically, it is very similar to any C descendant; it
+  supports \texttt{while} loops, \texttt{do-while} loops and variable assignment. Two significant
+  differences from C-like languages are the syntax required to specify parameter types and the lack
+  of \texttt{for} loops. A more complex program example can be seen in figure \ref{ex1}.
+
+  The evaluation strategy of Devin is strict. Function arguments are passed by value by default;
+  with the \texttt{ref} keyword, they can be passed by reference instead. In any case, argument
+  evaluation always happens from left to right.
+
+  \begin{figure}[h]
+    \center
+
+    \begin{verbatim}
+def sum1(a: Int, b: Int) -> Int
+    return a + b;
+
+def sum2(a: Int, b: Int, ref into: Int) -> Unit
+    into = a + b;
+    \end{verbatim}
+
+    \caption{Two different ways of writing a procedure summing up two numbers}
+    \label{ex2}
+  \end{figure}
+
+  A peculiar feature of Devin is that of \emph{optional types}. With optional types, the semantic of
+  the language doesn't depend on the type system; instead, as Gilad Bracha proposed\cite{bracha}, a
+  type system can be plugged into the language at will. A notable example of an optionally typed
+  language is Python. In Devin, the type system is not pluggable per se, however it is independent
+  of the evaluator; thus, it but could be easily replaced by modifying its source code.
+
+  Type annotations can be omitted from Devin programs, as shown in figure \ref{ex3}. Type checking
+  is not performed on terms where type annotations are missing. Effectively, this makes Devin
+  statically typed only if \emph{all} terms are annotated; otherwise, it is dynamically typed to
+  varying degrees.
+
+  \begin{figure}[h]
+    \center
+
+    \begin{verbatim}
+def sum1(a, b)
+    return a + b;
+
+def sum2(a, b, ref into)
+    into = a + b;
+    \end{verbatim}
+
+    \caption{Two procedures summing up two numbers, written without type annotations}
+    \label{ex3}
+  \end{figure}
+
+  Another feature of Devin is that of type inference for variable declarations. Unlike in C, the
+  type of local variables has not to be specified.
+
+  \begin{figure}[h]
+    \center
+
+    \begin{verbatim}
+def swap(ref a: Int, ref b: Int) -> Unit {
+    var t = a;
+    a = b;
+    b = a;
+}
+    \end{verbatim}
+
+    \label{ex4}
+    \caption{TODO}
+  \end{figure}
 
   \backmatter
 
