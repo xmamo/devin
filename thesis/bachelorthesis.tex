@@ -7,6 +7,7 @@
 \usepackage{enumitem}
 \usepackage{forest}
 \usepackage{url}
+\usepackage{float}
 
 \forestset{
   default preamble = {
@@ -67,8 +68,8 @@
   \section{Languages and grammars}
 
   Consider a parser for arithmetic expressions. The input of the parser is any sequence of
-  characters. Invalid strings like \texttt{(1 +)} and \texttt{(3 * * 4)} get rejected. Valid
-  strings like \texttt{(2 * (3 + 4))} get accepted.
+  characters. Invalid strings like \verb$(1 +)$ and \verb$(3 * * 4)$ get rejected. Valid strings
+  like \verb$(2 * (3 + 4))$ get accepted.
 
   The \emph{language} accepted by a parser is the set of all possible inputs which the parser may
   accept. The set of rules to which the input has to conform to is called the \emph{grammar} of the
@@ -79,31 +80,31 @@
   \begin{itemize}[noitemsep,topsep=0pt]
     \item A sequence of characters representing a number is a \emph{literal expression}.
 
-    \item If $x$ is an expression, then \texttt{(}, followed by $x$, followed by \texttt{)} is a
+    \item If $x$ is an expression, then \verb$($, followed by $x$, followed by \verb$)$ is a
           \emph{parenthesized expression}.
 
     \item If $x$ is a literal or parenthesized expression, then $x$, preceded by a unary operator,
-          is a \emph{unary expression}. An unary operator is one of the following
-          characters: \texttt{+}, \texttt{-}.
+          is a \emph{unary expression}. An unary operator is one of the following characters:
+          \verb$+$, \verb$-$.
 
     \item If $x$ and $y$ are unary or parenthesized expressions, then $x$, followed by a
           multiplicative operator, followed by $y$, is a \emph{multiplicative expression}. A
-          multiplicative operator is one of the following characters: \texttt{*}, \texttt{/}.
+          multiplicative operator is one of the following characters: \verb$*$, \verb$/$.
 
     \item If $x$ and $y$ are multiplicative or parenthesized expressions, then $x$, followed by an
           additive operator, followed by $y$, is an \emph{additive expression}. An additive operator
-          is one of the following characters: \texttt{+}, \texttt{-}.
+          is one of the following characters: \verb$+$, \verb$-$.
   \end{itemize}
 
-  According to such rules, the string \texttt{(2 * (3 + 4))} is a valid arithmetic expression. By
+  According to such rules, the string \verb$(2 * (3 + 4))$ is a valid arithmetic expression. By
   definition:
 
   \begin{itemize}[noitemsep,topsep=0pt]
-    \item \texttt{2}, \texttt{3} and \texttt{4} are literals;
-    \item \texttt{3 + 4} is an additive expression;
-    \item \texttt{(3 + 4)} is a parenthesized expression;
-    \item \texttt{2 * (3 + 4)} is a multiplicative expression;
-    \item \texttt{(2 * (3 + 4))} is an expression.
+    \item \verb$2$, \verb$3$ and \verb$4$ are literals;
+    \item \verb$3 + 4$ is an additive expression;
+    \item \verb$(3 + 4)$ is a parenthesized expression;
+    \item \verb$2 * (3 + 4)$ is a multiplicative expression;
+    \item \verb$(2 * (3 + 4))$ is an expression.
   \end{itemize}
 
   \section{Syntax trees}
@@ -116,12 +117,12 @@
   (comments, for example), it is called an \emph{abstract} syntax tree.
 
   Consider the language of arithmetic expressions: we can think of at least two possible syntax
-  trees for the string \texttt{(2 + 3 * (4 + 5))}, depending on how much information has been kept.
+  trees for the string \verb$(2 + 3 * (4 + 5))$, depending on how much information has been kept.
   When information is thrown away, the semantic meaning stays the same: for instance, details about
   parenthesization can be discarded if the resulting syntax tree still represents the same order of
   operations.
 
-  \begin{figure}[h]
+  \begin{figure}[H]
     \centering
 
     \begin{ttfamily}
@@ -129,7 +130,7 @@
       \begin{forest}[( ) [+ [2] [* [3] [( ) [+ [4] [5]]]]]]\end{forest}
     \end{ttfamily}
 
-    \caption{Two semantically equivalent syntax trees for \texttt{(2 + 3 * (4 + 5))}}
+    \caption{Two semantically equivalent syntax trees for \mbox{\texttt{(2 + 3 * (4 + 5))}}}
   \end{figure}
 
   As we'll see later, the parser for Devin uses a single tree representation which retains enough
@@ -154,11 +155,11 @@
   The simplest functions parse the atoms (or \emph{tokens}) of the target language; examples of such
   functions are parsers for numbers and identifiers. By gluing together simpler functions, more
   complex parsers can be created: for example, a parser for two-dimensional coordinates
-  \texttt{($x$, $y$)} can be built by using the parsers for open-parenthesis, number, comma, number,
-  and close-parenthesis respectively. Finally, parsers can be combined recursively: a parser $P$
-  could depend on a parser $Q$, which in turn depends on $P$. Consider any language supporting
-  \texttt{while} statements: the body of the \texttt{while} is yet another statement, which in turn
-  could be a \texttt{while} statement.
+  \mbox{\texttt{($x$, $y$)}} can be built by using the parsers for open-parenthesis, number, comma,
+  number, and close-parenthesis respectively. Finally, parsers can be combined recursively: a parser
+  $P$ could depend on a parser $Q$, which in turn depends on $P$. Consider any language supporting
+  \verb$while$ statements: the body of the \verb$while$ is yet another statement, which in turn
+  could be a \verb$while$ statement.
 
   Recursive descent can be implemented in any imperative language; of course, a similar technique
   can be applied to functional programming as well. The functional approach lends itself perfectly
@@ -168,8 +169,8 @@
 
   The general interface employed by parser combinators is that of a function which takes some input
   string; the function returns either an error or some result together with the remaining input. For
-  instance, applying the function parsing an integer on the input string \texttt{21*2} yields the
-  pair $\left(21, \texttt{*2}\right)$.
+  instance, applying the function parsing an integer on the input string \verb$21*2$ yields the
+  pair \mbox{$\left(21, \texttt{*2}\right)$}.
 
   Some common parser combinators are:
 
@@ -256,7 +257,7 @@
 
   \section{Syntax highlighting}
 
-  \chapter{The monadic interface}
+  \section{The monadic interface}
 
   \chapter{A first look at Devin}
 
@@ -267,7 +268,7 @@
   Alongside Devin, I developed a graphical text editor for the language. The editor features syntax
   highlighting, error reporting, and a simple visual debugger.
 
-  \begin{figure}[h]
+  \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\linewidth]{2.png}
     \caption{The graphical editor associated with Devin}
@@ -278,15 +279,85 @@
 
   Devin is an imperative procedural programming language with lexical variable scoping and support
   for recursive function definitions. Syntactically, it is very similar to any C descendant; it
-  supports \texttt{while} loops, \texttt{do-while} loops and variable assignment. Two significant
+  supports \verb$while$ loops, \verb$do-while$ loops and variable assignment. Two significant
   differences from C-like languages are the syntax required to specify parameter types and the lack
-  of \texttt{for} loops. A more complex program example can be seen in figure \ref{ex1}.
+  of \verb$for$ loops. A more complex program example can be seen in figure \ref{ex1}.
 
-  The evaluation strategy of Devin is strict. Function arguments are passed by value by default;
+  \subsection{Built-in data types and expressions}
+
+  Devin supports the following data types:
+
+  \begin{itemize}[noitemsep,topsep=0pt]
+    \item \verb$Int$: 64-bit integers like \verb$11$, \verb$+12$ and \verb$-42$;
+
+    \item \verb$Float$: double-precision floating-point numbers like \verb$34.12$, \verb$+11.0$ and
+          \verb$-2.56$;
+
+    \item \verb$Bool$: the boolean values \verb$true$ and \verb$false$.
+  \end{itemize}
+
+  Like functional programming languages, Devin has a \emph{unit type} \verb$Unit$; it is inhabited
+  by one value only: \verb$unit$. Unit types can be used is in lieu of void types: when a
+  procedure has side effects only, it marked as returning \verb$Unit$. Unit types simplify language
+  development, as they remove the distinction between procedures which return some value
+  and those who don't.
+
+  The evaluation strategy of Devin is strict; function arguments are passed by value or by
+  reference, depending on the signature of the callee. In both cases, the syntax for function
+  application is the same.
+
+  Integers and floating-point numbers support the following set of operations:
+
+  \begin{itemize}[noitemsep,topsep=0pt]
+    \item \emph{Unary negation}: \mbox{\texttt{-$x$}};
+
+    \item \emph{Identity}: \mbox{\texttt{+$x$}};
+
+    \item \emph{Addition}: \mbox{\texttt{$x$ + $y$}};
+
+    \item \emph{Subtraction}: \mbox{\texttt{$x$ - $y$}};
+
+    \item \emph{Multiplication}: \mbox{\texttt{$x$ * $y$}};
+
+    \item \emph{Division}: \mbox{\texttt{$x$ / $y$}}. If $x$ and $y$ are integers, the result is
+          \mbox{$\lfloor\frac{x}{y}\rfloor$};
+
+    \item \emph{Modulo}: \mbox{\texttt{$x$ \% $y$}}. It is only defined if $x$ and $y$ are both
+          integers; it is \mbox{$x - y \lfloor\frac{x}{y}\rfloor$};
+
+    \item \emph{Comparison}: \mbox{\texttt{$x$ < $y$}}, \mbox{\texttt{$x$ <= $y$}},
+          \mbox{\texttt{$x$ > $y$}}, \mbox{\texttt{$x$ >= $y$}}.
+  \end{itemize}
+
+  Booleans support the following set of operations:
+
+  \begin{itemize}[noitemsep,topsep=0pt]
+    \item \emph{Unary negation}: \mbox{\texttt{not $x$}};
+    \item \emph{Logical conjunction}: \mbox{\texttt{$x$ and $y$}};
+    \item \emph{Logical disjunction}: \mbox{\texttt{$x$ or $y$}};
+    \item \emph{Exclusive disjunction}: \mbox{\texttt{$x$ xor $y$}}.
+  \end{itemize}
+
+  Comparison in the form of \mbox{\texttt{$x$ == $y$}} and \mbox{\texttt{$x$ != $y$}} is supported
+  between operands any type.
+  
+  Finally, all values can be reassigned with the \verb$=$ operator. Devin supports the following assignment
+  shorthands:
+
+  \begin{itemize}[noitemsep,topsep=0pt]
+    \item \mbox{\texttt{$x$ += $y$}}, which is the same as \mbox{\texttt{$x$ = $x$ + $y$}};
+    \item \mbox{\texttt{$x$ -= $y$}}, which is the same as \mbox{\texttt{$x$ = $x$ - $y$}};
+    \item \mbox{\texttt{$x$ *= $y$}}, which is the same as \mbox{\texttt{$x$ = $x$ * $y$}};
+    \item \mbox{\texttt{$x$ /= $y$}}, which is the same as \mbox{\texttt{$x$ = $x$ / $y$}};
+    \item \mbox{\texttt{$x$ \%= $y$}}, which is the same as \mbox{\texttt{$x$ = $x$ \% $y$}}.
+  \end{itemize}
+
+  TODO--
+
   with the \texttt{ref} keyword, they can be passed by reference instead. In any case, argument
   evaluation always happens from left to right.
 
-  \begin{figure}[h]
+  \begin{figure}[H]
     \center
 
     \begin{verbatim}
@@ -312,7 +383,7 @@ def sum2(a: Int, b: Int, ref into: Int) -> Unit
   statically typed only if \emph{all} terms are annotated; otherwise, it is dynamically typed to
   varying degrees.
 
-  \begin{figure}[h]
+  \begin{figure}[H]
     \center
 
     \begin{verbatim}
@@ -330,20 +401,51 @@ def sum2(a, b, ref into)
   Another feature of Devin is that of type inference for variable declarations. Unlike in C, the
   type of local variables has not to be specified.
 
-  \begin{figure}[h]
+  \begin{figure}[H]
     \center
 
     \begin{verbatim}
 def swap(ref a: Int, ref b: Int) -> Unit {
     var t = a;
     a = b;
-    b = a;
+    b = t;
 }
     \end{verbatim}
 
     \label{ex4}
     \caption{TODO}
   \end{figure}
+
+  \section{Editor features}
+
+  \begin{figure}[H]
+    \center
+    \includegraphics[width=0.9\linewidth]{3.png}
+    \caption{Syntax error reporting and highlighting}
+    \label{ex5}
+  \end{figure}
+
+  \begin{figure}[H]
+    \center
+    \includegraphics[width=0.9\linewidth]{4.png}
+    \caption{Semantic error reporting and highlighting}
+    \label{ex6}
+  \end{figure}
+
+  \begin{figure}[H]
+    \center
+    \includegraphics[width=0.9\linewidth]{6.png}
+    \caption{Runtime error reporting and highlighting}
+    \label{ex7}
+  \end{figure}
+
+  \begin{figure}[H]
+    \center
+    \includegraphics[width=0.9\linewidth]{5.png}
+    \caption{The debugger}
+    \label{ex8}
+  \end{figure}
+
 
   \backmatter
 
