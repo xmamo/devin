@@ -25,7 +25,7 @@ import Devin.Highlight
 highlightDevinBraces ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   Tags -> a -> Gtk.TextIter -> Devin -> m Bool
-highlightDevinBraces tag buffer insertIter Devin{declarations} =
+highlightDevinBraces tag buffer insertIter Devin {declarations} =
   anyM (highlightDeclarationBraces tag buffer insertIter) declarations
 
 

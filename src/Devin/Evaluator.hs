@@ -35,8 +35,8 @@ module Devin.Evaluator (
 import Control.Applicative
 import Control.Monad.IO.Class
 import Data.Data
-import Data.Int
 import Data.IORef
+import Data.Int
 
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as Vector

@@ -55,6 +55,6 @@ instance Display Type where
 
   displays (Function (parameterT : parameterTs) returnType) =
     showChar '(' . displays parameterT . go parameterTs
-      where
-        go [] = showString ") → " . displays returnType
-        go (parameterT : parameterTs) = showString ", " . displays parameterT . go parameterTs
+    where
+      go [] = showString ") → " . displays returnType
+      go (parameterT : parameterTs) = showString ", " . displays parameterT . go parameterTs

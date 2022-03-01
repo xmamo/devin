@@ -12,6 +12,7 @@ module Devin.Typers (
 
 import Control.Monad
 import Data.Foldable
+import Data.Functor
 import Data.Traversable
 
 import Devin.Error
@@ -139,7 +140,7 @@ checkStatement expectedT statement = case statement of
     foldlM (\doesReturn statement -> (doesReturn ||) <$> check statement) False statements
 
     where
-      check DeclarationStatement {declaration} = do {checkDeclaration2 declaration; pure False}
+      check DeclarationStatement {declaration} = checkDeclaration2 declaration $> False
       check statement = checkStatement expectedT statement
 
 
@@ -450,8 +451,7 @@ getType :: TypeId -> Typer Type
 getType = \case
   PlainTypeId {name, interval} ->
     lookupType name >>= \case
-      Just (t, _) -> do
-        pure t
+      Just (t, _) -> pure t
 
       Nothing -> do
         report' (UnknownType name interval)

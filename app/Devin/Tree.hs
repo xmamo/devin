@@ -60,6 +60,7 @@ declarationTree = \case
       maybe [] (\(arrow, typeId) -> [tokenTree "->" arrow, typeIdTree typeId]) returnInfo,
       [statementTree body]
     ]
+
     where
       go ps [] = concatMap parameterTree ps
       go [] cs = map (tokenTree ",") cs
@@ -135,7 +136,7 @@ statementTree = \case
       tokenTree "return" returnKeyword,
       tokenTree ";" semicolon
     ]
-  
+
   DebugStatement {debugKeyword, semicolon} ->
     Tree.Node ("DebugStatement", "") [
       tokenTree "debug" debugKeyword,

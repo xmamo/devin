@@ -415,11 +415,12 @@ getColumn iter = do
   iter' <- Gtk.textIterCopy iter
   Gtk.textIterSetLineOffset iter' 0
   go iter' 1
+
   where
     go iter' column = do
       result <- Gtk.textIterCompare iter' iter
 
-      if result >= 0 then do
+      if result >= 0 then
         pure column
       else do
         Gtk.textIterForwardCursorPosition iter'
