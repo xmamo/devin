@@ -6,8 +6,11 @@
 \usepackage[T1]{fontenc}
 \usepackage{enumitem}
 \usepackage{forest}
-\usepackage{url}
 \usepackage{float}
+\usepackage{fontawesome}
+
+\usepackage{biblatex}
+\addbibresource{biblio.bib}
 
 \forestset{
   default preamble = {
@@ -80,19 +83,20 @@
   \begin{itemize}[noitemsep,topsep=0pt]
     \item A sequence of characters representing a number is a \emph{literal expression}.
 
-    \item If $x$ is an expression, then \verb$($, followed by $x$, followed by \verb$)$ is a
-          \emph{parenthesized expression}.
+    \item Let $x$ be an expression. Then \mbox{\texttt{($x$)}} is a \emph{parenthesized expression}.
 
-    \item If $x$ is a literal or parenthesized expression, then $x$, preceded by a unary operator,
-          is a \emph{unary expression}. A unary operator is either \verb$+$ or \verb$-$.
+    \item Let $x$ be a literal or parenthesized expression. Then \mbox{\texttt{+$x$}} and
+          \mbox{\texttt{-$x$}} are \emph{unary expressions}.
 
-    \item If $x$ and $y$ are unary or parenthesized expressions, then $x$, followed by a
-          multiplicative operator, followed by $y$, is a \emph{multiplicative expression}. A
-          multiplicative operator is either \verb$*$ or \verb$/$.
+    \item Let $x$ and $y$ be unary or parenthesized expressions. Then \mbox{\texttt{$x$*$y$}} and
+          \mbox{\texttt{$x$/$y$}} are \emph{multiplicative expressions}. Additionally, $x$ is
+          allowed to be a multiplicative expression as well.
 
-    \item If $x$ and $y$ are multiplicative or parenthesized expressions, then $x$, followed by an
-          additive operator, followed by $y$, is an \emph{additive expression}. An additive operator
-          is either \verb$+$ or \verb$-$.
+    \item Let $x$ and $y$ be multiplicative or parenthesized expressions. Then
+          \mbox{\texttt{$x$+$y$}} and \mbox{\texttt{$x$-$y$}} are \emph{additive expressions}.
+          Additionally, $x$ is allowed to be an additive expression as well.
+
+    \item An \emph{expression} is any of the previous items.
   \end{itemize}
 
   According to such rules, the string \verb$2*(3+4)$ is a valid arithmetic expression. By
@@ -366,7 +370,8 @@
   \subsection{Statements}
 
   As most imperative programming languages, Devin supports variable definitions. They have the form
-  \mbox{\texttt{var $x$ = $y$}}, where $x$ is an identifier and $y$ is an expression.
+  \mbox{\texttt{var $x$ = $y$}}, where $x$ is an identifier and $y$ is an expression. Variables can
+  be defined at any point, whether globally or as function locals.
 
   Devin is \emph{block-structured}: it allows for the creation of blocks, including blocks nested
   within other blocks. Variables are lexically scoped: they can't be accessed to from outside the
@@ -385,12 +390,13 @@
   Like in C, statements are always terminated with semicolons (\verb$;$). Empty statements are
   disallowed: in other words, a semicolon on its own is not a valid statement.
 
-  \subsection{Function declarations}
+  \subsection{Function definitions}
 
-  TODO--
+  Functions can be defined globally or within other functions. The entry point for Devin programs is
+  the \verb$main$ function; it takes no arguments, and its return value is discarded.
 
-  with the \texttt{ref} keyword, they can be passed by reference instead. In any case, argument
-  evaluation always happens from left to right.
+  Arguments are passed by value; with the \texttt{ref} keyword, they can be passed by reference
+  instead. In any case, argument evaluation always happens from left to right.
 
   \begin{figure}[H]
     \center
@@ -410,7 +416,7 @@ def sum2(a: Int, b: Int, ref into: Int) -> Unit
   the language doesn't depend on the type system; instead, as Gilad Bracha proposed\cite{bracha}, a
   type system can be plugged into the language at will. A notable example of an optionally typed
   language is Python. In Devin, the type system is not pluggable per se, however it is independent
-  of the evaluator; thus, it but could be easily replaced by modifying its source code.
+  of the evaluator; thus, it but could be easily replaced by modifying the source code.
 
   Type annotations can be omitted from Devin programs. Type checking is not performed on terms where
   type annotations are missing. Effectively, this makes Devin statically typed only if \emph{all}
@@ -430,30 +436,20 @@ def sum2(a, b, ref into)
     \caption{Two procedures summing up two numbers, written without type annotations}
   \end{figure}
 
-  Another feature of Devin is that of type inference for variable declarations. Unlike in C, the
-  type of local variables has not to be specified.
-
-  \begin{figure}[H]
-    \center
-
-    \begin{verbatim}
-def swap(ref a: Int, ref b: Int) -> Unit {
-    var t = a;
-    a = b;
-    b = t;
-}
-    \end{verbatim}
-
-    \caption{TODO}
-  \end{figure}
-
   \section{Editor features}
 
-  \begin{figure}[H]
-    \center
-    \includegraphics[width=0.9\linewidth]{3.png}
-    \caption{Syntax error reporting and highlighting}
-  \end{figure}
+  Devin is accompanied by a code editing UI built upon GTK+, a popular library for creating
+  graphical user interfaces. GTK+ works on Windows, macOS, and many UNIX-like platforms\cite{gtk+}.
+  The code editor is supported by GtkSourceView, a library that extends the GTK+ framework for text
+  editing and support for configurable syntax highlighting\cite{gtksourceview}.
+
+  GtkSourceView is powerful enough to automatically perform syntax highlighting if an appropriate
+  language definition is provided. Devin's UI doesn't use this feature: if the library's automatic
+  syntax highlighting was to be used, much care would have to be taken in order to keep
+  GtkSourceView's language definition and Devin's parser in sync.
+
+  Other than syntax highlighting, Devin's editor features error reporting: both syntactic and
+  semantic errors are displayed according to their position within the source code.
 
   \begin{figure}[H]
     \center
@@ -461,18 +457,45 @@ def swap(ref a: Int, ref b: Int) -> Unit {
     \caption{Semantic error reporting and highlighting}
   \end{figure}
 
+  Once a valid program has been written, it can be run by clicking the {\faPlay} button. The state
+  of execution can be observed with debug statements; these signal the evaluator to pause execution
+  and display the values currently stored in the \emph{run-time stack}, data structure which maps
+  values to variables and function arguments. Each time a function gets called, a new \emph{stack
+  frame} is pushed onto the stack; the new frame contains associations between argument names and
+  argument values. Variable definitions within the called function will add new associations to the
+  newly pushed frame. When the called function returns, the topmost stack frame is popped off the
+  stack and execution continues normally.
+
+  Devin has been designed with simplicity of implementation in mind. In particular, Devin's call
+  stack exhibits two uncommon properties:
+
+  \begin{itemize}
+    \item Each block pushes a new frame onto the stack: this allows treating nested scopes with the
+          same mechanism as function calls. The debugger skips visualization of empty blocks, as
+          they occur somewhat frequently.
+
+    \item Execution always starts with a non-empty stack containing a single frame. This frame binds
+          the names \verb$true$ to the truth value, \verb$false$ to \verb$not true$, and \verb$unit$
+          to the unit value. In practice, this means that \verb$true$, \verb$false$ and \verb$unit$
+          are not special keywords or constants; instead, they are ordinary variables. This is a
+          deliberate design decision.
+  \end{itemize}
+
+  \begin{figure}[H]
+    \center
+    \includegraphics[width=0.9\linewidth]{5.png}
+    \caption{The debugger displaying the current state of the stack}
+  \end{figure}
+
+  Runtime errors are handled as well. When an error occurs, the offending code fragment is
+  highlighted and a message dialog describing the problem ish shown to the user. Runtime errors
+  include, but are not limited to, index out of bounds errors and division by zero.
+
   \begin{figure}[H]
     \center
     \includegraphics[width=0.9\linewidth]{6.png}
     \caption{Runtime error reporting and highlighting}
   \end{figure}
-
-  \begin{figure}[H]
-    \center
-    \includegraphics[width=0.9\linewidth]{5.png}
-    \caption{The debugger}
-  \end{figure}
-
 
   \backmatter
 
@@ -489,8 +512,7 @@ def swap(ref a: Int, ref b: Int) -> Unit {
 
   \backmatter
 
-  \bibliographystyle{plain}
-  \bibliography{biblio}
+  \printbibliography
 
   % \printindex  % use makeindex to generate the index
 \end{document}
