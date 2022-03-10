@@ -136,9 +136,9 @@
   \end{figure}
 
   As we'll see later, the parser for Devin uses a single tree representation which retains enough
-  information for syntax highlighting, but also discards whitespace. For our purposes, the
-  distinction between abstract and concrete syntax tree isn't necessary: for this reason, from now
-  on I'll just use the term \emph{syntax tree}.
+  information for syntax highlighting, but also discards whitespace and comments. For our purposes,
+  the distinction between abstract and concrete syntax tree isn't necessary: for this reason, from
+  now on I'll just use the term \emph{syntax tree}.
 
   \section{Parser combinators}
 
@@ -345,10 +345,13 @@
   Arrays support the following operations:
 
   \begin{itemize}[noitemsep,topsep=0pt]
-    \item \emph{element access}. Such operation is written as \mbox{\texttt{$a$[$i$]}}, where $a$
+    \item \emph{Element access}. Such operation is written as \mbox{\texttt{$a$[$i$]}}, where $a$
           denotes an array and $i$ denotes an integer index. The expression retrieves the $i$-th
           element of the array; like in most programming languages, the first element of the array
           has index $0$.
+
+    \item \emph{Length information}, denoted by \mbox{\texttt{len $a$}}. The expression returns the
+          number of elements contained in the array $a$.
   \end{itemize}
 
   Comparison in the form of \mbox{\texttt{$x$ == $y$}} and \mbox{\texttt{$x$ != $y$}} is supported
@@ -496,6 +499,44 @@ def sum2(a, b, ref into)
     \includegraphics[width=0.9\linewidth]{6.png}
     \caption{Runtime error reporting and highlighting}
   \end{figure}
+
+  \chapter{Devin's design choices}
+
+  \section{Operations between numeric types}
+
+  \section{Lack of constants}
+
+  \section{Independence between evaluator and type checker}
+
+  \chapter{Implementing Devin}
+
+  \section{The syntax tree}
+
+  \section{The parser}
+
+  \subsection{Parsing expressions}
+
+  \subsection{Parsing statements}
+
+  \subsection{Parsing declarations}
+
+  \section{The type checker}
+
+  \subsection{Type checking expressions}
+
+  \subsection{Type checking statements}
+
+  \subsection{Type checking declarations}
+
+  \section{The evaluator}
+
+  \subsection{Evaluating expressions}
+
+  \subsection{Evaluating statements}
+
+  \subsection{Evaluating declarations}
+
+  \section{The UI}
 
   \backmatter
 
