@@ -406,13 +406,13 @@
   \begin{figure}[H]
     \center
 
-    \begin{verbatim}
+\begin{verbatim}
 def sum1(a: Int, b: Int) -> Int
     return a + b;
 
 def sum2(a: Int, b: Int, ref into: Int) -> Unit
     into = a + b;
-    \end{verbatim}
+\end{verbatim}
 
     \caption{Two different ways of writing a procedure summing up two numbers}
   \end{figure}
@@ -430,13 +430,13 @@ def sum2(a: Int, b: Int, ref into: Int) -> Unit
   \begin{figure}[H]
     \center
 
-    \begin{verbatim}
+\begin{verbatim}
 def sum1(a, b)
     return a + b;
 
 def sum2(a, b, ref into)
     into = a + b;
-    \end{verbatim}
+\end{verbatim}
 
     \caption{Two procedures summing up two numbers, written without type annotations}
   \end{figure}
@@ -549,30 +549,30 @@ def sum2(a, b, ref into)
   vanilla Haskell2010; such behavior can be enabled with the \mbox{\texttt{DuplicateRecordFields}}
   extension}:
 
-  \begin{verbatim}
+\begin{verbatim}
 data SymbolId = SymbolId {name :: String, interval :: (Int, Int)}
 data Token = Token {interval :: (Int, Int)}
-  \end{verbatim}
+\end{verbatim}
 
   \subsection{Representing expressions}
 
   Devin supports 4 unary operators: \verb$+$, \verb$-$, \verb$not$, \verb$len$. Unary operators are
   represented by the algebraic data type \verb$UnaryOperator$, defined as follows:
 
-  \begin{verbatim}
+\begin{verbatim}
 data UnaryOperator
   = PlusOperator {interval :: (Int, Int)}
   | MinusOperator {interval :: (Int, Int)}
   | NotOperator {interval :: (Int, Int)}
   | LenOperator {interval :: (Int, Int)}
-  \end{verbatim}
+\end{verbatim}
 
   Devin has 20 binary operators: \verb$+$, \verb$-$, \verb$*$, \verb$/$, \verb$%$, \verb$==$,
   \verb$!=$, \verb$<$, \verb$<=$, \verb$>$, \verb$>=$, \verb$and$, \verb$or$, \verb$xor$, \verb$=$,
   \verb$+=$, \verb$-=$, \verb$*=$, \verb$/=$, \verb$%=$. Binary operators are represented by the
   type \verb$BinaryOperator$:
 
-  \begin{verbatim}
+\begin{verbatim}
 data BinaryOperator
   = AddOperator {interval :: (Int, Int)}
   | SubtractOperator {interval :: (Int, Int)}
@@ -594,7 +594,7 @@ data BinaryOperator
   | MultiplyAssignOperator {interval :: (Int, Int)}
   | DivideAssignOperator {interval :: (Int, Int)}
   | ModuloAssignOperator {interval :: (Int, Int)}
-  \end{verbatim}
+\end{verbatim}
 
   Expressions are where things get interesting. There are literals for numeric expressions and
   variables: these are leaf expressions. More complex expressions can be built from simpler ones:
@@ -619,7 +619,7 @@ data BinaryOperator
   and curly braces. As a convention, parentheses are always identified by the \verb$open$ and
   \verb$close$ fields, regardless of the specific kind.
 
-  \begin{verbatim}
+\begin{verbatim}
 data Expression where
   VariableExpression :: {
     variableName :: String,
@@ -674,7 +674,7 @@ data Expression where
     inner :: Expression,
     close :: Token
   } -> Expression
-  \end{verbatim}
+\end{verbatim}
 
   \section{The parser}
 
