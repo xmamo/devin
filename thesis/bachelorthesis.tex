@@ -18,6 +18,8 @@
   }
 }
 
+\raggedbottom
+
 \author{Matteo Morena}
 \email{morena.matteo@gmail.com}
 \supervisor{Marco Comini}
@@ -472,7 +474,7 @@ def sum2(a, b, ref into)
   Devin has been designed with simplicity of implementation in mind. In particular, Devin's call
   stack exhibits two uncommon properties:
 
-  \begin{itemize}
+  \begin{itemize}[noitemsep,topsep=0pt]
     \item Each block pushes a new frame onto the stack: this allows treating nested scopes with the
           same mechanism as function calls. The debugger skips visualization of empty blocks, as
           they occur somewhat frequently.
@@ -504,13 +506,175 @@ def sum2(a, b, ref into)
 
   \section{Operations between numeric types}
 
-  \section{Lack of constants}
-
   \section{Independence between evaluator and type checker}
+
+  \section{Optional types}
 
   \chapter{Implementing Devin}
 
+  Devin's implementation spans approximately 4500 lines of code. Knowledge about programming in
+  Haskell or a ML derived language is required for understanding this chapter. It will be assumed
+  that the reader is at least somewhat familiar with functional programming, in particular with the
+  concepts of pure functions and higher order functions; more advanced concepts like functors and
+  monads are not required: they'll be introduced informally, as needed.
+
+  Devin is written entirely in Haskell, a purely functional programming language. Within Haskell,
+  purity boils down to the language being \emph{referentially transparent}: every expression can
+  be replaced with the value would evaluates to, without changing the program's semantics. In
+  practice, that means that no functions perform side-effects.
+
+  Haskell's approach to encoding effects---reading files, modifying environment variables, printing
+  to console---is straight forward. There are no procedures executing I/O actions; instead, there
+  is a collection of functions returning \emph{fragments of code} which, when run, perform the
+  actual computation. For instance, there's no procedure which reads from console and returns a
+  string; there's a function which evaluates to a code fragment which reads from console and yields
+  a string. Haskell's signature this function is \verb$Handle -> IO String$: given a handle
+  (\verb$stdin$, in our case), this function evaluates to an \verb$IO$ action computing a
+  \verb$String$. Multiple \verb$IO$ actions can be easily combined together using a combination of
+  syntactic sugar and functions from Haskell's base library.
+
   \section{The syntax tree}
+
+  Devin's syntax tree retains all the necessary information to perform syntax highlighting. Given a
+  node in the tree, it is always possible to determine its \emph{position} within the parsed source
+  code. Leaf nodes store their positions directly; for non-leaf nodes, this value can be computed
+  instead.
+
+  Two essential leaf nodes are \verb$SymbolId$ and \verb$Token$. They store information about
+  identifiers (e.g. \verb$list$, \verb$x$, \verb$Int$) and tokens (e.g. \verb${$, \verb$}$, \verb$->$)
+  respectively. As tokens are only used for syntax highlighting, only their position is stored.
+  Leaf nodes store both their starting and ending position in a tuple. As such, \verb$SymbolId$ and
+  \verb$Token$ are defined as follows\footnote{As Haskellers will notice, the definition of
+  \mbox{\texttt{interval}} is duplicated across two different data types. This is not allowed in
+  vanilla Haskell2010; such behavior can be enabled with the \mbox{\texttt{DuplicateRecordFields}}
+  extension}:
+
+  \begin{verbatim}
+data SymbolId = SymbolId {name :: String, interval :: (Int, Int)}
+data Token = Token {interval :: (Int, Int)}
+  \end{verbatim}
+
+  \subsection{Representing expressions}
+
+  Devin supports 4 unary operators: \verb$+$, \verb$-$, \verb$not$, \verb$len$. Unary operators are
+  represented by the algebraic data type \verb$UnaryOperator$, defined as follows:
+
+  \begin{verbatim}
+data UnaryOperator
+  = PlusOperator {interval :: (Int, Int)}
+  | MinusOperator {interval :: (Int, Int)}
+  | NotOperator {interval :: (Int, Int)}
+  | LenOperator {interval :: (Int, Int)}
+  \end{verbatim}
+
+  Devin has 20 binary operators: \verb$+$, \verb$-$, \verb$*$, \verb$/$, \verb$%$, \verb$==$,
+  \verb$!=$, \verb$<$, \verb$<=$, \verb$>$, \verb$>=$, \verb$and$, \verb$or$, \verb$xor$, \verb$=$,
+  \verb$+=$, \verb$-=$, \verb$*=$, \verb$/=$, \verb$%=$. Binary operators are represented by the
+  type \verb$BinaryOperator$:
+
+  \begin{verbatim}
+data BinaryOperator
+  = AddOperator {interval :: (Int, Int)}
+  | SubtractOperator {interval :: (Int, Int)}
+  | MultiplyOperator {interval :: (Int, Int)}
+  | DivideOperator {interval :: (Int, Int)}
+  | ModuloOperator {interval :: (Int, Int)}
+  | EqualOperator {interval :: (Int, Int)}
+  | NotEqualOperator {interval :: (Int, Int)}
+  | LessOperator {interval :: (Int, Int)}
+  | LessOrEqualOperator {interval :: (Int, Int)}
+  | GreaterOperator {interval :: (Int, Int)}
+  | GreaterOrEqualOperator {interval :: (Int, Int)}
+  | AndOperator {interval :: (Int, Int)}
+  | OrOperator {interval :: (Int, Int)}
+  | XorOperator {interval :: (Int, Int)}
+  | PlainAssignOperator {interval :: (Int, Int)}
+  | AddAssignOperator {interval :: (Int, Int)}
+  | SubtractAssignOperator {interval :: (Int, Int)}
+  | MultiplyAssignOperator {interval :: (Int, Int)}
+  | DivideAssignOperator {interval :: (Int, Int)}
+  | ModuloAssignOperator {interval :: (Int, Int)}
+  \end{verbatim}
+
+  Expressions are where things get interesting. There are literals for numeric expressions and
+  variables: these are leaf expressions. More complex expressions can be built from simpler ones:
+  for example, a binary expression is constructed by two other expressions and a binary operator.
+
+  Expressions are described by a single algebraic data type: \verb$Expression$. The following items
+  qualify as expressions:
+
+  \begin{itemize}[noitemsep,topsep=0pt]
+    \item \emph{Variables}, e.g. \verb$list$, \verb$x$;
+    \item \emph{Integer literals}, e.g. \verb$42$;
+    \item \emph{Rational literals}, e.g. \verb$3.14$;
+    \item \emph{Array literals}, e.g. \verb$[22, 23, 24]$;
+    \item \emph{Array accesses}, e.g. \verb$x[2]$, \verb$f(y)[3]$;
+    \item \emph{Function calls}, e.g. \verb$f(x)$, \verb$g(x, y)$;
+    \item \emph{Unary expressions}, e.g. \verb$not x$;
+    \item \emph{Binary expressions}, e.g. \verb$x + y$;
+    \item \emph{Parenthesized expressions}, e.g. \verb$(x - y)$.
+  \end{itemize}
+
+  Opening and closing parentheses are stored in the syntax tree. Parentheses include round, square
+  and curly braces. As a convention, parentheses are always identified by the \verb$open$ and
+  \verb$close$ fields, regardless of the specific kind.
+
+  \begin{verbatim}
+data Expression where
+  VariableExpression :: {
+    variableName :: String,
+    interval :: (Int, Int)
+  } -> Expression
+
+  IntegerExpression :: {
+    integer :: Integer,
+    interval :: (Int, Int)
+  } -> Expression
+
+  RationalExpression :: {
+    rational :: Rational,
+    interval :: (Int, Int)
+  } -> Expression
+
+  ArrayExpression :: {
+    open :: Token,
+    elements :: [Expression],
+    commas :: [Token],
+    close :: Token
+  } -> Expression
+
+  AccessExpression :: {
+    array :: Expression,
+    open :: Token,
+    index :: Expression,
+    close :: Token
+  } -> Expression
+
+  CallExpression :: {
+    functionId :: SymbolId,
+    open :: Token,
+    arguments :: [Expression],
+    commas :: [Token],
+    close :: Token
+  } -> Expression
+
+  UnaryExpression :: {
+    unary :: UnaryOperator,
+    operand :: Expression
+  } -> Expression
+
+  BinaryExpression :: {
+    left :: Expression,
+    binary :: BinaryOperator,
+    right :: Expression
+  } -> Expression
+
+  ParenthesizedExpression :: {
+    open :: Token,
+    inner :: Expression,
+    close :: Token
+  } -> Expression
+  \end{verbatim}
 
   \section{The parser}
 
