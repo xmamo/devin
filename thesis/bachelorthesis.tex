@@ -302,15 +302,15 @@
           \verb$[[2.1, 2.2], [4.2, 5.1]]$, \verb$[]$.
   \end{itemize}
 
-  Like functional programming languages, Devin has a \emph{unit type} \verb$Unit$; it is inhabited
-  by one value only: \verb$unit$. Unit types can be used is in lieu of void types: when a
-  procedure has side effects only, it marked as returning \verb$Unit$.
+  Devin has a \emph{unit type} \verb$Unit$; it is inhabited by one value only: \verb$unit$. Unit
+  types can be used is in lieu of void types: when a procedure has side effects only, it marked as
+  returning \verb$Unit$.
 
   The evaluation strategy of Devin is strict; function arguments are passed by value or by
   reference, depending on the signature of the callee. In both cases, the syntax for procedure
   calls is the same: \mbox{\texttt{$f$()}} calls $f$ with zero arguments, \mbox{\texttt{$g$($x$)}}
   calls $g$ with a single argument, \mbox{\texttt{$h$($x$, $y$)}} calls $h$ with two
-  arguments, \ldots
+  arguments, etc.
 
   Booleans support the following set of operations:
 
@@ -335,10 +335,10 @@
     \item \emph{Multiplication}: \mbox{\texttt{$x$ * $y$}};
 
     \item \emph{Division}: \mbox{\texttt{$x$ / $y$}}. If $x$ and $y$ are integers, the result is
-          \mbox{$\lfloor\frac{x}{y}\rfloor$};
+          \mbox{$\left\lfloor\frac{x}{y}\right\rfloor$};
 
     \item \emph{Modulo}: \mbox{\texttt{$n$ \% $m$}}. Both $n$ and $m$ need to be integers; its value
-          is \mbox{$n - m \lfloor\frac{n}{m}\rfloor$};
+          is \mbox{$n - m \left\lfloor\frac{n}{m}\right\rfloor$};
 
     \item \emph{Comparison}: \mbox{\texttt{$x$ < $y$}}, \mbox{\texttt{$x$ <= $y$}},
           \mbox{\texttt{$x$ > $y$}}, \mbox{\texttt{$x$ >= $y$}}.
@@ -354,6 +354,13 @@
 
     \item \emph{Length information}, denoted by \mbox{\texttt{len $a$}}. The expression returns the
           number of elements contained in the array $a$.
+    
+    \item \emph{Concatenation}: \mbox{\texttt{$a$ + $b$}}, where $a$ and $b$ are arrays. The
+          expression yields a new array containing the elements of $a$ concatenated with the
+          elements of $b$;
+    
+    \item \emph{Repetition}: \mbox{\texttt{$n$ * $a$}} or \mbox{\texttt{$a$ * $n$}}. This is
+          equivalent to adding $a$ to itself $n$ times.
   \end{itemize}
 
   Comparison in the form of \mbox{\texttt{$x$ == $y$}} and \mbox{\texttt{$x$ != $y$}} is supported
@@ -675,6 +682,12 @@ data Expression where
     close :: Token
   } -> Expression
 \end{verbatim}
+
+  \subsection{Representing statements}
+
+
+
+  \subsection{Representing declarations}
 
   \section{The parser}
 
