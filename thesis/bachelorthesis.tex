@@ -66,14 +66,14 @@
 
   \chapter{Parsing}
 
-  The first phase of any compiler or interpreter is called \emph{parsing}. The purpose of this
-  phase is to analyze an input string and determine if it conforms to some set of rules; if it
-  does, a logical representation of the input is constructed.
+  The first phase of any compiler or interpreter is called \emph{parsing}. Given an input string, it
+  is determined if it conforms to some set of rules; if it does, a logical representation of the
+  input is constructed.
 
   \section{Languages and grammars}
 
   Consider a parser for arithmetic expressions. The input of the parser is any sequence of
-  characters. Invalid strings like \verb$1+$ and \verb$3**4$ get rejected. Valid strings like
+  characters. Invalid strings like \verb$1+$ and \verb$3//4$ get rejected. Valid strings like
   \verb$2*(3+4)$ get accepted.
 
   The \emph{language} accepted by a parser is the set of all possible inputs which the parser may
@@ -83,20 +83,20 @@
   As an example, we could define the grammar for arithmetic expressions as follows:
 
   \begin{itemize}[noitemsep,topsep=0pt]
-    \item A sequence of characters representing a number is a \emph{literal expression}.
+    \item Any sequence of characters representing a number is a \emph{literal expression};
 
-    \item Let $x$ be an expression. Then \mbox{\texttt{($x$)}} is a \emph{parenthesized expression}.
+    \item \mbox{\texttt{($x$)}} is a \emph{parenthesized expression} if $x$ is an expression;
 
-    \item Let $x$ be a literal or parenthesized expression. Then \mbox{\texttt{+$x$}} and
-          \mbox{\texttt{-$x$}} are \emph{unary expressions}.
+    \item \mbox{\texttt{+$x$}} and \mbox{\texttt{-$x$}} are \emph{unary expressions} if $x$ is a
+    literal or parenthesized expression;
 
-    \item Let $x$ and $y$ be unary or parenthesized expressions. Then \mbox{\texttt{$x$*$y$}} and
-          \mbox{\texttt{$x$/$y$}} are \emph{multiplicative expressions}. Additionally, $x$ is
-          allowed to be a multiplicative expression as well.
+    \item \mbox{\texttt{$x$*$y$}} and \mbox{\texttt{$x$/$y$}} are \emph{multiplicative expressions}
+    if $y$ is a unary or parenthesized expression and $x$ is a unary or parenthesized or
+    multiplicative expression;
 
-    \item Let $x$ and $y$ be multiplicative or parenthesized expressions. Then
-          \mbox{\texttt{$x$+$y$}} and \mbox{\texttt{$x$-$y$}} are \emph{additive expressions}.
-          Additionally, $x$ is allowed to be an additive expression as well.
+    \item \mbox{\texttt{$x$+$y$}} and \mbox{\texttt{$x$-$y$}} are \emph{additive expressions}
+    if $y$ is a multiplicative or parenthesized expression and $x$ is a multiplicative or
+    parenthesized or additive expression;
 
     \item An \emph{expression} is any of the previous items.
   \end{itemize}
@@ -116,12 +116,14 @@
   A \emph{syntax tree} is the representation of a string accepted by the parser; this data
   structure stores the syntactic structure of the input.
 
-  A syntax tree may retain all information necessary to reconstruct the input; in this case, it is
-  called a \emph{concrete} syntax tree. If some information about the source is discarded
-  (comments, for example), it is called an \emph{abstract} syntax tree.
+  A syntax tree may retain all information necessary to reconstruct the input, in which case it is
+  called a \emph{concrete} syntax tree. Such a tree can be further processed by either adding or
+  discarding some information; nodes within the tree can be rearranged. When there's not a
+  one-to-one correspondence between the input and the produced tree, the syntax tree is said to be
+  \emph{abstract}.
 
   Consider the language of arithmetic expressions: we can think of at least two possible syntax
-  trees for the string \verb$2+3*(4+5)$, depending on how much information has been kept. When
+  trees for the string \verb$2+3*(4+5)$, depending on how much information we want to keep. When
   information is thrown away, the semantic meaning stays the same: for instance, details about
   parenthesization can be discarded if the resulting syntax tree still represents the same order of
   operations.
@@ -147,7 +149,7 @@
   There are many ways to recognize some input and generate an associated syntax tree. There has been
   much academic research, and it is trivial to find so-called \emph{parser generators}: these are
   tools which, given a grammar, automatically generate code for parsing the language in question.
-  Such tools build upon well-known algorithms, such as LL, LR, LALR, just to throw a few names
+  These tools build upon well-known algorithms, such as LL, LR, LALR, just to throw a few names
   around. These tools are great and very performant; however, they're kind of magical.
 
   In this section, we'll see how there's no fundamental need for any generators; although such tools
@@ -166,102 +168,91 @@
   statement.
 
   Recursive descent can be implemented in any imperative language; of course, a similar technique
-  can be applied to functional programming as well. The functional approach lends itself perfectly
+  can be applied in functional programming as well. The functional approach lends itself perfectly
   for this kind of task; in particular, higher order functions abstract the boilerplate necessary to
   glue together different parsing functions. These higher order functions are called \emph{parser
   combinators}, as they combine simpler parsers into more complex ones.
 
   The general interface employed by parser combinators is that of a function which takes some input
-  string; the function returns either an error or some result together with the remaining input. For
-  instance, applying the function parsing an integer on the input string \verb$21*2$ yields the
-  pair \mbox{$\left(21, \texttt{*2}\right)$}.
+  string and returns either an error or some result together with the remaining input. For instance,
+  applying the function parsing an integer on the input string \verb$21*2$ yields the pair
+  \mbox{$\left(21, \texttt{*2}\right)$}.
 
-  Some common parser combinators are:
+  While it would be somewhat trivial to implement simple parser combinators from scratch, there is a
+  huge amount of libraries which provide such functionality for free. Some common parser combinators
+  are:
 
   \begin{itemize}[noitemsep,topsep=0pt]
     \item The \emph{sequence combinator}. Informally, this combinator runs two parsers in succession
-          and combines their results.
+    and combines their results.
 
-          Let $P$ and $Q$ be two parsers. The sequence combinator runs $P$; if it succeeds, then $Q$
-          is run on the remaining input. If $Q$ also succeeds, the combinator succeeds with the
-          combined results of $P$ and $Q$. If $P$ or $Q$ fail, then the combinator also fails.
+    Let $P$ and $Q$ be two parsers. The sequence combinator runs $P$; if it succeeds, then $Q$ is
+    run on the remaining input. If $Q$ also succeeds, the combinator succeeds with the combined
+    results of $P$ and $Q$. If $P$ or $Q$ fail, then the combinator also fails.
 
-    \item The \emph{alternative combinator}. Informally, this combinator implements choice.
+    \item The \emph{alternative combinator}. This combinator implements choice.
 
-          Let $P$ and $Q$ be two parsers. The alternative combinator runs $P$ and $Q$ on the same
-          input. If $P$ succeeds, the combinator succeeds with the same result as $P$ did; if $Q$
-          succeeds, the combinator succeeds with the same result as $Q$ did. If both $P$ and $Q$
-          fail, then the combinator also fails.
+    Let $P$ and $Q$ be two parsers. The alternative combinator runs $P$ and $Q$ on the same input.
+    If $P$ succeeds, the combinator succeeds with the same result as $P$ did; if $Q$ succeeds, the
+    combinator succeeds with the same result as $Q$ did. If both $P$ and $Q$ fail, then the
+    combinator also fails.
 
-    \item The \emph{option combinator}. Informally, this combinator runs a parser zero or one time.
+    \item The \emph{option combinator}. This combinator runs a parser zero or one time.
 
-          Let $P$ be a parser. The option combinator tries to run $P$. If $P$ succeeds, the
-          combinator succeeds with the same result as $P$ did. If $P$ fails, the combinator succeeds
-          with an empty result.
+    Let $P$ be a parser. The option combinator tries to run $P$. If $P$ succeeds, the combinator
+    succeeds with the same result as $P$ did. If $P$ fails, the combinator succeeds with an empty
+    result.
 
-    \item The \emph{repetition combinator}. Informally, this combinator runs a parser many times.
+    \item The \emph{repetition combinator}. This combinator runs a zero or more times.
 
-          Let $P$ be a parser. The repetition combinator tries to run $P$ as many times as possible,
-          until $P$ fails. Each time $P$ succeeds, the remaining input is fed back into the next
-          application of $P$ itself. This combinator succeeds with the accumulated results of all
-          successful runs.
+    Let $P$ be a parser. The repetition combinator tries to run $P$ as many times as possible, until
+    $P$ fails. Each time $P$ succeeds, the remaining input is fed back into the next application of
+    $P$ itself. This combinator succeeds with the accumulated results of all successful runs.
 
-    \item The \emph{bind combinator}. Informally, this combinator allows one parser to depend on the
-          result of another parser. As we will see, this is the most powerful combinator of them
-          all. All others could be expressed in terms of the bind combinator.
+    \item The \emph{bind combinator}. This combinator allows one parser to depend on the result of
+    another parser. This is the most powerful combinator of them all: other combinators could be
+    expressed in terms of bind.
 
-          Let $P$ be a parser and $f$ a one-parameter function yielding
-          another parser. The bind combinator tries to run $P$; if it succeeds, it applies $f$ on
-          the result of $P$, running the resulting parser on the remaining input. If $P$ fails, this
-          combinator also fails.
+    Let $P$ be a parser and $f$ a one-parameter function yielding another parser. The bind
+    combinator tries to run $P$; if it succeeds, it applies $f$ on the result of $P$, running the
+    resulting parser on the remaining input. If $P$ fails, this combinator also fails.
   \end{itemize}
 
   \chapter{Tree traversal}
 
-  Once a syntax tree has been constructed by the parser, the tree can be traversed in a multitude of
-  ways. In general, syntax trees can not only represent the structure of a programming languages,
-  but also the structure of markup languages or other kinds of structured languages. For the
-  purposes of this thesis, I'll discuss the processing of programming languages only.
+  The syntax tree constructed by the parser can be traversed in a multitude of ways. In general,
+  syntax trees can not only represent the structure of a programming languages, but also the
+  structure of markup languages or other kinds of languages. For the purposes of this thesis, I'll
+  discuss the processing of programming languages only.
 
   It is important to note the grammar of a language only describes its \emph{syntax}: on its own,
-  it only defines which inputs strings are valid, and which are not. Similarly, a parser only
-  transforms syntactically valid input strings into trees: it is the role of other components to
-  give \emph{semantic meaning} to such trees.
+  it only defines which inputs strings are valid and which are not. Similarly, a parser only
+  maps syntactically valid input strings into trees: it is the role of other components to give
+  \emph{semantic meaning} to such trees.
 
   \begin{itemize}[noitemsep,topsep=0pt]
     \item An \emph{evaluator} would associate the nodes of a syntax tree with actions to execute.
-          Examples of such actions are performing arithmetic calculations, conditionally executing
-          other nodes, and assigning or retrieving values from variables.
+    Examples of such actions are performing arithmetic calculations, conditionally executing
+    subtrees, and assigning or retrieving values from variables.
 
     \item A \emph{compiler} would translate a syntax tree into some other form. For instance, the
-          GCC compiler produces object files from valid C syntax; in turn, object files can be
-          parsed by the system's linker, which translates a collection of such files into a runnable
-          executable.
+    GCC compiler produces object files from valid C syntax; in turn, object files can be parsed by
+    the system's linker, which translates a collection of such files into a runnable executable.
 
     \item On languages where the semantics involve static types, a \emph{type checker} would verify
-          that no type errors would be produced by evaluation or compilation. In such systems, the
-          type checker coexists with an evaluator or compiler (or both); it is fundamental that all
-          components obey to the same semantics. Often, the evaluator or compiler depends on some
-          additional information provided by the type checker: this won't be the case for Devin.
+    that no type errors would be produced by evaluation/compilation. In such systems, the type
+    checker coexists with the evaluator/compiler; it is fundamental that all components obey to the
+    same semantics.
 
-    \item Similarly to type checking, a \emph{linter} would analyze the syntax tree as well.
-          Contrary to the type checking, the linter may not depend on static types (if any);
-          furthermore, successful compilation or execution doesn't depend on linting. Rather, the
-          linter suggests how the original source could be improved. Like with the type checker, all
-          components must obey to the same semantics.
+    \item A \emph{linter} would analyze the syntax tree, suggesting how to improve the original
+    source code. Contrary to the type checking, linting may not depend on static types (if any);
+    furthermore, successful compilation/execution doesn't depend on the linter. As it is the case
+    for the type checker, all components must obey to the same semantics.
 
     \item A \emph{syntax highlighter} would use the information stored in a syntax tree to perform
-          syntax highlighting. Such a syntax tree would be rather concrete, as each node would be
-          associated with a position in the parser's input string.
+    syntax highlighting. Such a syntax tree would be rather concrete, as each node would be
+    associated with a position in the parser's input string.
   \end{itemize}
-
-  \section{Evaluation}
-
-  \section{Type checking}
-
-  \section{Syntax highlighting}
-
-  \section{The monadic interface}
 
   \chapter{A first look at Devin}
 
@@ -281,12 +272,13 @@
 
   \section{Language features}
 
-  Devin is an imperative procedural programming language with lexical variable scoping and support
-  for recursive function definitions. Syntactically, it is very similar to any C descendant; it
-  supports while loops, do-while loops and variable assignment. Two significant differences from C
-  is the syntax required to specify parameter types and the lack of for loops.
+  Devin is an imperative programming language with lexical variable scoping and support for
+  recursive function definitions. Syntactically, it is very similar to any C descendant; among
+  others, it supports variable definition and assignment, while loops, do-while loops, and
+  branching. Two significant differences from C are the syntax required to specify parameter types
+  and the lack of for loops.
 
-  \subsection{Built-in data types and expressions}
+  \subsection{Data types}
 
   Devin supports the following data types:
 
@@ -296,23 +288,27 @@
     \item \verb$Int$, for 64-bit integers like \verb$11$, \verb$+12$, \verb$-42$;
 
     \item \verb$Float$, for double-precision floating-point numbers like \verb$34.12$, \verb$+11.0$,
-          \verb$-2.56$;
+    \verb$-2.56$;
 
     \item \mbox{\texttt{[$T$]}}, for arrays like \verb$[22, 23, 24]$, \verb$[true]$,
-          \verb$[[2.1, 2.2], [4.2, 5.1]]$, \verb$[]$.
+    \verb$[[2.1, 2.2], [4.2, 5.1]]$, \verb$[]$.
   \end{itemize}
 
-  Devin has a \emph{unit type} \verb$Unit$; it is inhabited by one value only: \verb$unit$. Unit
-  types can be used is in lieu of void types: when a procedure has side effects only, it marked as
-  returning \verb$Unit$.
+  In addition to the items above, Devin has a \emph{unit type} named \verb$Unit$; it is inhabited by
+  one value only: \verb$unit$. Unit types can be used in lieu of void types: when a procedure has
+  side effects only, it marked as returning \verb$Unit$.
 
-  The evaluation strategy of Devin is strict; function arguments are passed by value or by
-  reference, depending on the signature of the callee. In both cases, the syntax for procedure
-  calls is the same: \mbox{\texttt{$f$()}} calls $f$ with zero arguments, \mbox{\texttt{$g$($x$)}}
-  calls $g$ with a single argument, \mbox{\texttt{$h$($x$, $y$)}} calls $h$ with two
-  arguments, etc.
+  One of the advantages of unit types is the uniform treatment of function calls, as there's no need
+  to distinguish between procedures which return a value and those which return no value. While unit
+  types are traditionally used in functional programming languages, some recent imperative languages
+  like Rust incorporate this feature as well.
 
-  Booleans support the following set of operations:
+  Operands of any type can be compared via \mbox{\texttt{$x$ == $y$}} and
+  \mbox{\texttt{$x$ != $y$}}.
+
+  \subsection{Operations on booleans}
+
+  Let $p$ and $q$ denote booleans. The following operations are supported:
 
   \begin{itemize}[noitemsep,topsep=0pt]
     \item \emph{Boolean negation}: \mbox{\texttt{not $p$}};
@@ -321,7 +317,12 @@
     \item \emph{Exclusive disjunction}: \mbox{\texttt{$p$ xor $q$}}.
   \end{itemize}
 
-  Numbers support the following operations:
+  Conjunction and disjunction have the same semantic as in C: if the left operand already determines
+  the truthfulness of the whole expression, then the right operand isn't evaluated.
+
+  \subsection{Operations on numbers}
+
+  Integers and floating-point numbers support the following set of operations:
 
   \begin{itemize}[noitemsep,topsep=0pt]
     \item \emph{Negation}: \mbox{\texttt{-$x$}};
@@ -334,42 +335,43 @@
 
     \item \emph{Multiplication}: \mbox{\texttt{$x$ * $y$}};
 
-    \item \emph{Division}: \mbox{\texttt{$x$ / $y$}}. If $x$ and $y$ are integers, the result is
-          \mbox{$\left\lfloor\frac{x}{y}\right\rfloor$};
+    \item \emph{Division}: \mbox{\texttt{$x$ / $y$}}. If $x$ and $y$ are integers, its value is
+    \mbox{$\left\lfloor\frac{x}{y}\right\rfloor$};
 
-    \item \emph{Modulo}: \mbox{\texttt{$n$ \% $m$}}. Both $n$ and $m$ need to be integers; its value
-          is \mbox{$n - m \left\lfloor\frac{n}{m}\right\rfloor$};
+    \item \emph{Modulo}: \mbox{\texttt{$n$ \% $m$}}. Both $n$ and $m$ need to be integers; the
+    result is \mbox{$n - m \left\lfloor\frac{n}{m}\right\rfloor$};
 
     \item \emph{Comparison}: \mbox{\texttt{$x$ < $y$}}, \mbox{\texttt{$x$ <= $y$}},
-          \mbox{\texttt{$x$ > $y$}}, \mbox{\texttt{$x$ >= $y$}}.
+    \mbox{\texttt{$x$ > $y$}}, \mbox{\texttt{$x$ >= $y$}}. Yields a boolean.
   \end{itemize}
+
+  Binary operations require both operands to be of the same type: there are no implicit type
+  conversions like in C, as Devin is a \emph{strongly typed} programming language. The rationale
+  behind Devin's design decisions is discussed later.
+
+  \subsection{Operations on arrays}
 
   Arrays support the following operations:
 
   \begin{itemize}[noitemsep,topsep=0pt]
-    \item \emph{Element access}. Such operation is written as \mbox{\texttt{$a$[$i$]}}, where $a$
-          denotes an array and $i$ denotes an integer index. The expression retrieves the $i$-th
-          element of the array; like in most programming languages, the first element of the array
-          has index $0$.
+    \item \emph{Element access}: \mbox{\texttt{$a$[$i$]}}, where $a$ denotes an array and $i$
+    denotes an integer index. The expression retrieves the $i$-th element of the array. Like in most
+    programming languages, the first element of the array has index $0$.
 
-    \item \emph{Length information}, denoted by \mbox{\texttt{len $a$}}. The expression returns the
-          number of elements contained in the array $a$.
-    
-    \item \emph{Concatenation}: \mbox{\texttt{$a$ + $b$}}, where $a$ and $b$ are arrays. The
-          expression yields a new array containing the elements of $a$ concatenated with the
-          elements of $b$;
-    
-    \item \emph{Repetition}: \mbox{\texttt{$n$ * $a$}} or \mbox{\texttt{$a$ * $n$}}. This is
-          equivalent to adding $a$ to itself $n$ times.
+    \item \emph{Length information}: \mbox{\texttt{len $a$}}. The expression returns the number of
+    elements contained in the array $a$.
+
+    \item \emph{Concatenation}: \mbox{\texttt{$a$ + $b$}}. The expression yields a new array
+    containing the elements of $a$ concatenated with the elements of $b$;
+
+    \item \emph{Repetition}: \mbox{\texttt{$n$ * $a$}} or \mbox{\texttt{$a$ * $n$}}. Equivalent to
+    concatenating $a$ to itself $n$ times.
   \end{itemize}
 
-  Comparison in the form of \mbox{\texttt{$x$ == $y$}} and \mbox{\texttt{$x$ != $y$}} is supported
-  between operands any type. Binary arithmetic operations require both operands to be of the same
-  type: there are no implicit type conversions, as Devin is a \emph{strongly typed} programming
-  language.
+  \subsection{Assignment}
 
   Variables and array elements can be assigned to with the \verb$=$ operator. Devin supports the
-  following assignment shorthands:
+  following shorthands:
 
   \begin{itemize}[noitemsep,topsep=0pt]
     \item \mbox{\texttt{$x$ += $y$}}, which is the same as \mbox{\texttt{$x$ = $x$ + $y$}};
@@ -379,36 +381,54 @@
     \item \mbox{\texttt{$x$ \%= $y$}}, which is the same as \mbox{\texttt{$x$ = $x$ \% $y$}}.
   \end{itemize}
 
-  \subsection{Statements}
+  \subsection{Variable definitions and scoping}
 
   As most imperative programming languages, Devin supports variable definitions. They have the form
   \mbox{\texttt{var $x$ = $y$}}, where $x$ is an identifier and $y$ is an expression. Variables can
   be defined at any point, whether globally or as function locals.
 
   Devin is \emph{block-structured}: it allows for the creation of blocks, including blocks nested
-  within other blocks. Variables are lexically scoped: they can't be accessed to from outside the
-  block they are defined in.
+  within other blocks. Variables are lexically scoped: they can't be accessed from outside the block
+  they are defined in. Like in C, blocks consist of a sequence of statements wrapped in a pair of
+  curly braces (\verb${$, \verb$}$).
+
+  Statements are always terminated with semicolons. Empty statements are disallowed: in other words,
+  a semicolon on its own is not a valid statement.
+
+  \subsection{Looping mechanisms}
 
   The following two looping constructs are supported:
 
   \begin{itemize}[noitemsep,topsep=0pt]
     \item \emph{While loops} in the form \mbox{\texttt{while $p$ $s$}}. This construct runs the
-          statement $s$ as long as $p$ is true;
+    statement $s$ as long as the expression $p$ is true;
 
     \item \emph{Do-while loops} in the form \mbox{\texttt{do $s$ while $p$}}. This construct runs
-          $s$ once; then, it re-runs $s$ as long as $p$ is true.
+    $s$ once; then, it re-runs $s$ as long as $p$ is true.
   \end{itemize}
 
-  Like in C, statements are always terminated with semicolons (\verb$;$). Empty statements are
-  disallowed: in other words, a semicolon on its own is not a valid statement.
+  \subsection{Assertions}
 
-  \subsection{Function definitions}
+  Devin provides a mechanism for asserting that predicates evaluate to \verb$true$ at runtime.
+  Assertions can be used to check internal assumptions or to guard against violation of function
+  contracts, among other things.
 
-  Functions can be defined globally or within other functions. The entry point for Devin programs is
-  the \verb$main$ function; it takes no arguments, and its return value is discarded.
+  For example, the assertion  \mbox{\texttt{assert $n$ >= 0}} can be used as the first statement of
+  a function calculating the factorial of $n$, as the result not defined if \mbox{$n < 0$}.
 
-  Arguments are passed by value; with the \texttt{ref} keyword, they can be passed by reference
-  instead. In any case, argument evaluation always happens from left to right.
+  \subsection{Procedure definition and application}
+
+  Procedures can be defined either globally or within other procedures. Procedures obey to the same
+  scoping rules as variables. The entry point for Devin programs is a global procedure named
+  \verb$main$; it must take no arguments.
+
+  By default, procedure arguments are passed by value; with the \texttt{ref} keyword, they can be
+  passed by reference instead.
+
+  The syntax for calling procedures is the same as in C: \mbox{\texttt{$f$()}} calls $f$ with zero
+  arguments, \mbox{\texttt{$g$($x$)}} calls $g$ with a single argument,
+  \mbox{\texttt{$h$($x$, $y$)}} calls $h$ with two arguments. The evaluation strategy of Devin is
+  strict; arguments are evaluated from left to right.
 
   \begin{figure}[H]
     \center
@@ -424,41 +444,41 @@ def sum2(a: Int, b: Int, ref into: Int) -> Unit
     \caption{Two different ways of writing a procedure summing up two numbers}
   \end{figure}
 
-  A peculiar feature of Devin is that of \emph{optional types}. With optional types, the semantic of
-  the language doesn't depend on the type system; instead, as Gilad Bracha proposed\cite{bracha}, a
-  type system can be plugged into the language at will. A notable example of an optionally typed
-  language is Python. In Devin, the type system is not pluggable per se, however it is independent
-  of the evaluator; thus, it but could be easily replaced by modifying the source code.
+  \subsection{Optional types}
 
-  Type annotations can be omitted from Devin programs. Type checking is not performed on terms where
+  A peculiar feature of Devin is that of \emph{optional types}. With optional types, the semantic of
+  the language doesn't depend on a static type system\cite{bracha}. A notable example of an
+  optionally typed language is Python.
+
+  Type annotations may be omitted from Devin programs. Type checking is not performed on terms where
   type annotations are missing. Effectively, this makes Devin statically typed only if \emph{all}
-  terms are annotated; otherwise, it is dynamically typed to varying degrees.
+  terms are annotated; if \emph{no} type annotations are provided, Devin becomes dynamically typed.
 
   \begin{figure}[H]
     \center
 
 \begin{verbatim}
-def sum1(a, b)
+def sum1(a, b: Int)
     return a + b;
 
-def sum2(a, b, ref into)
+def sum2(a, b, ref into) -> Unit
     into = a + b;
 \end{verbatim}
 
-    \caption{Two procedures summing up two numbers, written without type annotations}
+    \caption{Two procedures written without some type annotations}
   \end{figure}
 
   \section{Editor features}
 
-  Devin is accompanied by a code editing UI built upon GTK+, a popular library for creating
-  graphical user interfaces. GTK+ works on Windows, macOS, and many UNIX-like platforms\cite{gtk+}.
-  The code editor is supported by GtkSourceView, a library that extends the GTK+ framework for text
-  editing and support for configurable syntax highlighting\cite{gtksourceview}.
+  Devin is bundled with a code editing UI built upon GTK+, a popular library for creating graphical
+  user interfaces. GTK+ works on Windows, macOS, and many UNIX-like platforms\cite{gtk+}. The code
+  editor is supported by GtkSourceView, a library that extends the GTK+ framework for text editing
+  and support for configurable syntax highlighting\cite{gtksourceview}.
 
   GtkSourceView is powerful enough to automatically perform syntax highlighting if an appropriate
-  language definition is provided. Devin's UI doesn't use this feature: if the library's automatic
+  language definition is provided. Devin doesn't use this feature: if the library's automatic
   syntax highlighting was to be used, much care would have to be taken in order to keep
-  GtkSourceView's language definition and Devin's parser in sync.
+  GtkSourceView's language definition and Devin's manually written parser in sync.
 
   Other than syntax highlighting, Devin's editor features error reporting: both syntactic and
   semantic errors are displayed according to their position within the source code.
@@ -471,26 +491,26 @@ def sum2(a, b, ref into)
 
   Once a valid program has been written, it can be run by clicking the {\faPlay} button. The state
   of execution can be observed with debug statements; these signal the evaluator to pause execution
-  and display the values currently stored in the \emph{run-time stack}, data structure which maps
-  values to variables and function arguments. Each time a function gets called, a new \emph{stack
-  frame} is pushed onto the stack; the new frame contains associations between argument names and
-  argument values. Variable definitions within the called function will add new associations to the
-  newly pushed frame. When the called function returns, the topmost stack frame is popped off the
-  stack and execution continues normally.
+  and display the values currently stored in the \emph{run-time stack}---the data structure which
+  maps values to variables and function arguments. Each time a function gets called, a new
+  \emph{stack frame} is pushed onto the stack; the new frame contains associations between argument
+  names and values. Variable definitions within the called function will add new associations to the
+  newly pushed frame. When the called function returns, the topmost frame is popped off the stack
+  and execution continues normally.
 
   Devin has been designed with simplicity of implementation in mind. In particular, Devin's call
   stack exhibits two uncommon properties:
 
   \begin{itemize}[noitemsep,topsep=0pt]
     \item Each block pushes a new frame onto the stack: this allows treating nested scopes with the
-          same mechanism as function calls. The debugger skips visualization of empty blocks, as
-          they occur somewhat frequently.
+    same mechanism as function calls. The debugger skips visualization of empty blocks, as they
+    occur somewhat frequently.
 
     \item Execution always starts with a non-empty stack containing a single frame. This frame binds
-          the names \verb$true$ to the truth value, \verb$false$ to \verb$not true$, and \verb$unit$
-          to the unit value. In practice, this means that \verb$true$, \verb$false$ and \verb$unit$
-          are not special keywords or constants; instead, they are ordinary variables. This is a
-          deliberate design decision.
+    the names \verb$true$ to the truth value, \verb$false$ to \verb$not true$, and \verb$unit$ to
+    the unit value. In practice, this means that \verb$true$, \verb$false$ and \verb$unit$ are not
+    special keywords or constants; instead, they are ordinary variables. This is a deliberate design
+    decision.
   \end{itemize}
 
   \begin{figure}[H]
@@ -500,8 +520,8 @@ def sum2(a, b, ref into)
   \end{figure}
 
   Runtime errors are handled as well. When an error occurs, the offending code fragment is
-  highlighted and a message dialog describing the problem ish shown to the user. Runtime errors
-  include, but are not limited to, index out of bounds errors and division by zero.
+  highlighted and a message dialog describing the problem is shown to the user. Runtime errors
+  include, but are not limited to, index out of bounds errors, division by zero, assertion errors.
 
   \begin{figure}[H]
     \center
@@ -520,15 +540,15 @@ def sum2(a, b, ref into)
   \chapter{Implementing Devin}
 
   Devin's implementation spans approximately 4500 lines of code. Knowledge about programming in
-  Haskell or a ML derived language is required for understanding this chapter. It will be assumed
+  Haskell or any ML derived language is required for understanding this chapter. It will be assumed
   that the reader is at least somewhat familiar with functional programming, in particular with the
   concepts of pure functions and higher order functions; more advanced concepts like functors and
   monads are not required: they'll be introduced informally, as needed.
 
   Devin is written entirely in Haskell, a purely functional programming language. Within Haskell,
   purity boils down to the language being \emph{referentially transparent}: every expression can
-  be replaced with the value would evaluates to, without changing the program's semantics. In
-  practice, that means that no functions perform side-effects.
+  be replaced with the value would evaluate to, without changing the program's semantics. In
+  practice: no functions perform side-effects.
 
   Haskell's approach to encoding effects---reading files, modifying environment variables, printing
   to console---is straight forward. There are no procedures executing I/O actions; instead, there
@@ -618,8 +638,8 @@ data BinaryOperator
     \item \emph{Array accesses}, e.g. \verb$x[2]$, \verb$f(y)[3]$;
     \item \emph{Function calls}, e.g. \verb$f(x)$, \verb$g(x, y)$;
     \item \emph{Unary expressions}, e.g. \verb$not x$;
-    \item \emph{Binary expressions}, e.g. \verb$x + y$;
-    \item \emph{Parenthesized expressions}, e.g. \verb$(x - y)$.
+    \item \emph{Binary expressions}, e.g. \verb$x + 2$;
+    \item \emph{Parenthesized expressions}, e.g. \verb$(x - 3)$.
   \end{itemize}
 
   Opening and closing parentheses are stored in the syntax tree. Parentheses include round, square
@@ -685,9 +705,92 @@ data Expression where
 
   \subsection{Representing statements}
 
+\begin{verbatim}
+data Statement where
+  DeclarationStatement :: {
+    declaration :: Declaration
+  } -> Statement
 
+  ExpressionStatement :: {
+    value :: Expression,
+    semicolon :: Token
+  } -> Statement
+
+  IfStatement :: {
+    ifKeyword :: Token,
+    predicate :: Expression,
+    trueBranch :: Statement
+  } -> Statement
+
+  IfElseStatement :: {
+    ifKeyword :: Token,
+    predicate :: Expression,
+    trueBranch :: Statement,
+    elseKeyword :: Token,
+    falseBranch :: Statement
+  } -> Statement
+
+  WhileStatement :: {
+    whileKeyword :: Token,
+    predicate :: Expression,
+    body :: Statement
+  } -> Statement
+
+  DoWhileStatement :: {
+    doKeyword :: Token,
+    body :: Statement,
+    whileKeyword :: Token,
+    predicate :: Expression,
+    semicolon :: Token
+  } -> Statement
+
+  ReturnStatement :: {
+    returnKeyword :: Token,
+    result :: Maybe Expression,
+    semicolon :: Token
+  } -> Statement
+
+  AssertStatement :: {
+    assertKeyword :: Token,
+    predicate :: Expression,
+    semicolon :: Token
+  } -> Statement
+
+  DebugStatement :: {
+    debugKeyword :: Token,
+    semicolon :: Token
+  } -> Statement
+
+  BlockStatement :: {
+    open :: Token,
+    statements :: [Statement],
+    close :: Token
+  } -> Statement
+\end{verbatim}
 
   \subsection{Representing declarations}
+
+\begin{verbatim}
+data Declaration where
+  VariableDeclaration :: {
+    varKeyword :: Token,
+    variableId :: SymbolId,
+    equalSign :: Token,
+    value :: Expression,
+    semicolon :: Token
+  } -> Declaration
+
+  FunctionDeclaration :: {
+    defKeyword :: Token,
+    functionId :: SymbolId,
+    open :: Token,
+    parameters :: [(Maybe Token, SymbolId, Maybe (Token, TypeId))],
+    commas :: [Token],
+    close :: Token,
+    returnInfo :: Maybe (Token, TypeId),
+    body :: Statement
+  } -> Declaration
+\end{verbatim}
 
   \section{The parser}
 
