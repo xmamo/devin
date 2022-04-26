@@ -304,12 +304,12 @@ integerExpression = flip label "number" $ try $ syntax $ do
   sign <- (char '+' $> 1) <|> (char '-' $> -1) <|> pure 1
   digits <- many1 (satisfy isDigit)
   let magnitude = foldl (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
-  parserReturn (IntegerExpression (sign * magnitude))
+  pure (IntegerExpression (sign * magnitude))
 
 
 rationalExpression :: Stream s m Char => ParserT s m Expression
 rationalExpression = flip label "number" $ try $ syntax $ do
-  sign <- (char '+' $> 1) <|> (char '-' $> -1) <|> parserReturn 1
+  sign <- (char '+' $> 1) <|> (char '-' $> -1) <|> pure 1
   digits1 <- many1 (satisfy isDigit)
   digits2 <- char '.' *> many1 (satisfy isDigit)
   let digits = digits1 ++ digits2
@@ -427,7 +427,7 @@ comment :: Stream s m Char => ParserT s m Token
 comment = flip label "comment" $ do
   token <- syntax $ do
     text "//"
-    skipMany (noneOf ['\n', '\v', '\r', '\x85', '\x2028', '\x2029'])
+    skipMany (noneOf "\n\v\r\x85\x2028\x2029")
     pure Token
 
   modifyState (++ [token])
@@ -456,7 +456,7 @@ token literal = syntax $ do
 
 
 text :: Stream s m Char => String -> ParserT s m String
-text literal = try (string literal) <?> "“" ++ literal ++ "”"
+text literal = try (string literal) <?> ("“" ++ literal ++ "”")
 
 
 -- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
