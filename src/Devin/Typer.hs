@@ -122,8 +122,8 @@ lookupVariableType name = Typer (\environment -> (go 0 environment, environment,
 
 withNewScope :: Typer a -> Typer a
 withNewScope mx = Typer $ \environment ->
-  let (x, _, errors) = runTyper mx environment
-   in (x, environment, errors)
+  let (x, environment', errors) = runTyper mx (Scope [] [] [] : environment)
+   in (x, tail environment', errors)
 
 
 report :: Error -> Typer ()
