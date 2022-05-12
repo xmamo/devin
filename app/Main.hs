@@ -5,7 +5,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Main (main) where
 
@@ -70,19 +69,24 @@ onActivate application = do
   stateStore <- Gtk.forestStoreNew []
   logStore <- Gtk.seqStoreNew []
 
+  let stopIconName = "media-playback-stop-symbolic"
+  let playIconName = "media-playback-start-symbolic"
+  let noTextTagTable = Nothing :: Maybe Gtk.TextTagTable
+  let noAdjustment = Nothing :: Maybe Gtk.Adjustment
+
   -- Build the UI:
 
-  stopButton <- Gtk.buttonNewFromIconName (Just "media-playback-stop-symbolic") 2
+  stopButton <- Gtk.buttonNewFromIconName (Just stopIconName) 2
   Gtk.widgetSetSensitive stopButton False
 
-  playButton <- Gtk.buttonNewFromIconName (Just "media-playback-start-symbolic") 2
+  playButton <- Gtk.buttonNewFromIconName (Just playIconName) 2
   Gtk.widgetSetSensitive playButton False
 
   actionBar <- Gtk.actionBarNew
   Gtk.actionBarPackStart actionBar stopButton
   Gtk.actionBarPackStart actionBar playButton
 
-  codeBuffer <- GtkSource.bufferNew (Nothing @Gtk.TextTagTable)
+  codeBuffer <- GtkSource.bufferNew noTextTagTable
   GtkSource.bufferSetHighlightSyntax codeBuffer False
   GtkSource.bufferSetHighlightMatchingBrackets codeBuffer False
 
@@ -110,13 +114,13 @@ onActivate application = do
   Gtk.treeViewSetEnableSearch logView False
   setUpTwoColumns logStore logView
 
-  scrolledWindow1 <- Gtk.scrolledWindowNew (Nothing @Gtk.Adjustment) (Nothing @Gtk.Adjustment)
+  scrolledWindow1 <- Gtk.scrolledWindowNew noAdjustment noAdjustment
   Gtk.containerAdd scrolledWindow1 codeTextView
 
-  scrolledWindow2 <- Gtk.scrolledWindowNew (Nothing @Gtk.Adjustment) (Nothing @Gtk.Adjustment)
+  scrolledWindow2 <- Gtk.scrolledWindowNew noAdjustment noAdjustment
   Gtk.containerAdd scrolledWindow2 syntaxTreeView
 
-  scrolledWindow3 <- Gtk.scrolledWindowNew (Nothing @Gtk.Adjustment) (Nothing @Gtk.Adjustment)
+  scrolledWindow3 <- Gtk.scrolledWindowNew noAdjustment noAdjustment
   Gtk.containerAdd scrolledWindow3 logView
 
   paned1 <- Gtk.panedNew Gtk.OrientationHorizontal
@@ -154,8 +158,8 @@ onActivate application = do
   -- The callback takes care of syntax highlighting.
 
   Gtk.onTextBufferChanged codeBuffer $ do
-    -- The newly inserted code might be syntactically invalid.
-    -- Preemptively discard the old syntax tree (if any) and disable the "play" button.
+    -- The newly inserted code might be syntactically invalid. Preemptively
+    -- discard the old syntax tree (if any) and disable the "play" button.
     atomicWriteIORef syntaxTreeRef Nothing
     Gtk.widgetSetSensitive playButton False
 
@@ -168,7 +172,9 @@ onActivate application = do
     typerThreadId <- readIORef typerThreadIdRef
     killThread typerThreadId
 
-    parserThread <- forkIO $ runParserT (liftA2 (,) Parsers.devin getState) [] "" (0, text) >>= \case
+    let parser = liftA2 (,) Parsers.devin getState
+
+    parserThread <- forkIO $ runParserT parser [] "" (0, text) >>= \case
       -- Parser failure:
       Left parseError -> do
         let offset = toOffset (errorPos parseError) text
@@ -179,19 +185,20 @@ onActivate application = do
           (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
           Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
-          -- Highlight as "error", starting from the parseError offset to the end
+          -- Highlight as "error", starting from the parseError offset
           startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
           Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
           -- Update the error log; clear the syntax tree preview
           (line, column) <- getLineColumn startIter
+          let datum = (showLineColumn (line, column), showMessages messages)
           Gtk.seqStoreClear logStore
-          Gtk.seqStoreAppend logStore (showLineColumn (line, column), showMessages messages)
+          Gtk.seqStoreAppend logStore datum
           Gtk.forestStoreClear syntaxTreeStore
 
       -- Parser success:
       Right (devin, comments) -> do
-        let Devin {declarations} = devin
+        let Devin {definitions} = devin
         atomicWriteIORef syntaxTreeRef (Just devin)
 
         Gtk.postGUIASync $ do
@@ -200,8 +207,8 @@ onActivate application = do
           Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
           Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
           Gtk.textBufferRemoveTag codeBuffer (keywordTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (variableIdTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (functionIdTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (varIdTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (funIdTag tags) startIter endIter
           Gtk.textBufferRemoveTag codeBuffer (typeTag tags) startIter endIter
           Gtk.textBufferRemoveTag codeBuffer (numberTag tags) startIter endIter
           Gtk.textBufferRemoveTag codeBuffer (operatorTag tags) startIter endIter
@@ -218,25 +225,28 @@ onActivate application = do
           highlightDevinBraces tags codeBuffer insertIter devin
 
           -- Update the syntax tree preview
+          let syntaxTree = map definitionTree definitions
           rootPath <- Gtk.treePathNew
           Gtk.forestStoreClear syntaxTreeStore
-          Gtk.forestStoreInsertForest syntaxTreeStore rootPath 0 (map declarationTree declarations)
+          Gtk.forestStoreInsertForest syntaxTreeStore rootPath 0 syntaxTree
           Gtk.treeViewExpandAll syntaxTreeView
 
         typerThreadId <- readIORef typerThreadIdRef
         killThread typerThreadId
 
-        typerThreadId <- forkIO $ pure (runTyper (checkDevin devin) predefinedEnvironment) >>= \case
+        let typer = checkDevin devin
+
+        typerThreadId <- forkIO $ pure (runTyper typer predefinedEnv) >>= \case
           -- Typer success:
-          ((), environment, []) -> do
-            let (hasMain, _, _) = runTyper checkHasMain environment
+          ((), env, []) -> do
+            let (hasMain, _, _) = runTyper checkHasMain env
 
             Gtk.postGUIASync $ do
               Gtk.widgetSetSensitive playButton hasMain
               Gtk.seqStoreClear logStore
 
             where
-              checkHasMain = lookupFunctionSignature "main" >>= \case
+              checkHasMain = lookupFunSignature "main" >>= \case
                 Just (([], _), _) -> pure True
                 _ -> pure False
 
@@ -252,7 +262,8 @@ onActivate application = do
 
               -- Append the error description to the log
               (line, column) <- getLineColumn startIter
-              Gtk.seqStoreAppend logStore (showLineColumn (line, column), Text.pack (display error))
+              let datum = (showLineColumn (line, column), Text.pack (display error))
+              Gtk.seqStoreAppend logStore datum
 
         atomicWriteIORef typerThreadIdRef typerThreadId
 
@@ -273,7 +284,7 @@ onActivate application = do
 
   -- The play button exhibits different behavior depending on context:
   -- 1. Initially, its function is to start the evaluation process;
-  -- 2. Pressing the button again will advance the evaluation until the next debug statement.
+  -- 2. Pressing it again will advance evaluation to the next debug statement.
   -- initialPlayButtonCallback holds the action corresponding to (1).
 
   let initialPlayButtonCallback = whenJustM (readIORef syntaxTreeRef) $ \devin -> do
@@ -285,7 +296,7 @@ onActivate application = do
         Gtk.widgetShowAll scrolledWindow2
 
         state <- makePredefinedState
-        evaluatorThreadId <- forkIO (go (evaluateDevin devin) state)
+        evaluatorThreadId <- forkIO (go (evalDevin devin) state)
         atomicWriteIORef evaluatorThreadIdVar evaluatorThreadId
 
       go evaluator state = do
@@ -321,9 +332,10 @@ onActivate application = do
             Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
             -- Display the error message.
-            -- gi-gtk doesn't provide bindings for gtk_message_dialog_new() and related functions.
-            -- To get around this limitation, we use GtkBuilder to load the MessageDialog from an
-            -- XML string. This is ugly, but it works.
+            -- gi-gtk doesn't provide bindings for gtk_message_dialog_new() and
+            -- related functions. To get around this limitation, we use
+            -- GtkBuilder to load the MessageDialog from an XML string. This is
+            -- ugly, but it works.
 
             (line, column) <- getLineColumn startIter
             let s = showsLineColumn (line, column) (showChar ' ' (display error))
@@ -343,7 +355,8 @@ onActivate application = do
                   \</interface>"
 
             builder <- Gtk.builderNewFromString string -1
-            dialog <- Gtk.buildWithBuilder (Gtk.getObject Gtk.MessageDialog "dialog") builder
+            let buildFn = Gtk.getObject Gtk.MessageDialog "dialog"
+            dialog <- Gtk.buildWithBuilder buildFn builder
             Gtk.windowSetTransientFor dialog (Just window)
             Gtk.dialogRun dialog
             Gtk.widgetDestroy dialog
@@ -389,10 +402,10 @@ setUpTwoColumns model treeView = for_ [fst, snd] $ \f -> do
   cellRenderer <- Gtk.cellRendererTextNew
   Gtk.setCellRendererTextFamily cellRenderer "monospace"
 
-  let g x = Gtk.setCellRendererTextText cellRenderer (f x)
+  let g = Gtk.setCellRendererTextText cellRenderer . f
   treeViewColumn <- Gtk.treeViewColumnNew
-  Gtk.cellLayoutSetDataFunction treeViewColumn cellRenderer model g
   Gtk.cellLayoutPackStart treeViewColumn cellRenderer True
+  Gtk.cellLayoutSetDataFunction treeViewColumn cellRenderer model g
 
   Gtk.treeViewAppendColumn treeView treeViewColumn
 
@@ -438,13 +451,15 @@ showsLineColumn (line, column) =
 
 showMessages :: IsString a => [Message] -> a
 showMessages messages =
-  case showErrorMessages "or" "Unknown parse error" "Expecting" "Unexpected" "end of input" m of
-    ('\n' : string) -> fromString string
-    string -> fromString string
-
+  let s1 = "or"
+      s2 = "Unknown parse error"
+      s3 = "Expecting"
+      s4 = "Unexpected"
+      s5 = "end of input"
+   in case showErrorMessages s1 s2 s3 s4 s5 (filter f messages) of
+        ('\n' : string) -> fromString string
+        string -> fromString string
   where
-    m = filter f messages
-
     f (Expect _) = True
     f (Message _) = True
     f _ = False

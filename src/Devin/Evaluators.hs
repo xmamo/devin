@@ -4,10 +4,10 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 module Devin.Evaluators (
-  evaluateDevin,
-  evaluateDeclaration,
-  evaluateStatement,
-  evaluateExpression
+  evalDevin,
+  evalDefinition,
+  evalStatement,
+  evalExpression
 ) where
 
 import Data.Bits
@@ -27,49 +27,55 @@ import Devin.Type (Type, (<:))
 import qualified Devin.Type as Type
 
 
-evaluateDevin :: Devin -> Evaluator ()
-evaluateDevin Devin {declarations} = do
-  for_ declarations $ \declaration -> case declaration of
-    VariableDeclaration {} -> pure ()
-    FunctionDeclaration {} -> evaluateDeclaration declaration
-
-  Just (UserDefined FunctionDeclaration {parameters = [], body}, depth) <- lookupFunction "main"
-
-  for_ declarations $ \declaration -> case declaration of
-    VariableDeclaration {} -> evaluateDeclaration declaration
-    FunctionDeclaration {} -> pure ()
-
-  withNewFrame (depth + 1) (evaluateStatement body)
+evalDevin :: Devin -> Evaluator ()
+evalDevin Devin {definitions} = do
+  for_ definitions evalDefinition1
+  for_ definitions evalDefinition2
+  Just (UserDefined FunDefinition {params = [], body}, depth) <- lookupFun "main"
+  withNewFrame (depth + 1) (evalStatement body)
   pure ()
 
 
-evaluateDeclaration :: Declaration -> Evaluator ()
-evaluateDeclaration declaration = case declaration of
-  VariableDeclaration {variableId = SymbolId {name}, value} -> do
-    r <- evaluateExpression value
-    r' <- cloneReference r
-    defineVariable name r'
-
-  FunctionDeclaration {functionId = SymbolId {name}} ->
-    defineFunction name (UserDefined declaration)
+evalDefinition :: Definition -> Evaluator ()
+evalDefinition definition = do
+  evalDefinition1 definition
+  evalDefinition2 definition
 
 
-evaluateStatement :: Statement -> Evaluator (Maybe Reference)
-evaluateStatement statement = case statement of
-  DeclarationStatement {declaration} -> do
-    evaluateDeclaration declaration
+evalDefinition1 :: Definition -> Evaluator ()
+evalDefinition1 definition = case definition of
+  VarDefinition {} -> pure ()
+
+  FunDefinition {funId = SymbolId {name}} ->
+    defineFun name (UserDefined definition)
+
+
+evalDefinition2 :: Definition -> Evaluator ()
+evalDefinition2 = \case
+  VarDefinition {varId = SymbolId {name}, value} -> do
+    r <- evalExpression value
+    r' <- cloneRef r
+    defineVar name r'
+
+  FunDefinition {} -> pure ()
+
+
+evalStatement :: Statement -> Evaluator (Maybe Reference)
+evalStatement statement = case statement of
+  DefinitionStatement {definition} -> do
+    evalDefinition definition
     pure Nothing
 
   ExpressionStatement {value} -> do
-    evaluateExpression value
+    evalExpression value
     pure Nothing
 
   IfStatement {predicate, trueBranch} -> do
-    r <- evaluateExpression predicate
-    v <- readReference r
+    r <- evalExpression predicate
+    v <- readRef r
 
     case v of
-      Bool True -> withNewFrame 1 (evaluateStatement trueBranch)
+      Bool True -> withNewFrame 1 (evalStatement trueBranch)
       Bool False -> pure Nothing
 
       _ -> do
@@ -77,58 +83,57 @@ evaluateStatement statement = case statement of
         raise (InvalidType predicate Type.Bool t)
 
   IfElseStatement {predicate, trueBranch, falseBranch} -> do
-    r <- evaluateExpression predicate
-    v <- readReference r
+    r <- evalExpression predicate
+    v <- readRef r
 
     case v of
-      Bool True -> withNewFrame 1 (evaluateStatement trueBranch)
-      Bool False -> withNewFrame 1 (evaluateStatement falseBranch)
+      Bool True -> withNewFrame 1 (evalStatement trueBranch)
+      Bool False -> withNewFrame 1 (evalStatement falseBranch)
 
       _ -> do
         t <- getType v
         raise (InvalidType predicate Type.Bool t)
 
   WhileStatement {predicate, body} -> do
-    r <- evaluateExpression predicate
-    v <- readReference r
+    r <- evalExpression predicate
+    v <- readRef r
 
     case v of
       Bool False -> pure Nothing
 
-      Bool True ->
-        withNewFrame 1 (evaluateStatement body) >>= \case
-          Just r -> pure (Just r)
-          Nothing -> evaluateStatement statement
+      Bool True -> withNewFrame 1 (evalStatement body) >>= \case
+        Just r -> pure (Just r)
+        Nothing -> evalStatement statement
 
       _ -> do
         t <- getType v
         raise (InvalidType predicate Type.Bool t)
 
   DoWhileStatement {body, predicate} ->
-    withNewFrame 1 (evaluateStatement body) >>= \case
+    withNewFrame 1 (evalStatement body) >>= \case
       Just r -> pure (Just r)
 
       Nothing -> do
-        r <- evaluateExpression predicate
-        v <- readReference r
+        r <- evalExpression predicate
+        v <- readRef r
 
         case v of
           Bool False -> pure Nothing
-          Bool True -> evaluateStatement statement
+          Bool True -> evalStatement statement
 
           _ -> do
             t <- getType v
             raise (InvalidType predicate Type.Bool t)
 
   ReturnStatement {result = Just result} -> do
-    r <- evaluateExpression result
+    r <- evalExpression result
     pure (Just r)
 
   ReturnStatement {result = Nothing} -> pure Nothing
 
   AssertStatement {predicate} -> do
-    r <- evaluateExpression predicate
-    v <- readReference r
+    r <- evalExpression predicate
+    v <- readRef r
 
     case v of
       Bool False -> raise (AssertionFailed statement)
@@ -144,52 +149,54 @@ evaluateStatement statement = case statement of
 
   BlockStatement {statements} -> withNewFrame 1 $ do
     for_ statements $ \case
-      DeclarationStatement {declaration} | FunctionDeclaration {} <- declaration ->
-        evaluateDeclaration declaration
-
+      DefinitionStatement {definition} -> evalDefinition1 definition
       _ -> pure ()
 
-    let evaluate DeclarationStatement {declaration = FunctionDeclaration {}} = pure Nothing
-        evaluate statement = evaluateStatement statement
+    firstJustM eval statements
 
-    firstJustM evaluate statements
+    where
+      eval DefinitionStatement {definition} = do
+        evalDefinition2 definition
+        pure Nothing
+
+      eval statement = evalStatement statement
 
 
-evaluateExpression :: Expression -> Evaluator Reference
-evaluateExpression expression = case expression of
-  IntegerExpression {integer} | Just x <- toIntegralSized integer -> newReference (Int x)
-  IntegerExpression {} -> raise (IntegerOverflow expression)
+evalExpression :: Expression -> Evaluator Reference
+evalExpression expression = case expression of
+  IntegerExpression {integer} -> case toIntegralSized integer of
+    Just x -> newRef (Int x)
+    Nothing -> raise (IntegerOverflow expression)
 
-  RationalExpression {rational} -> newReference (Float (fromRat rational))
+  RationalExpression {rational} -> newRef (Float (fromRat rational))
 
-  VariableExpression {variableName, interval} ->
-    lookupVariable variableName >>= \case
-      Just (r, _) -> pure r
-      Nothing -> raise (UnknownVariable variableName interval)
+  VarExpression {varName, interval} -> lookupVar varName >>= \case
+    Just (r, _) -> pure r
+    Nothing -> raise (UnknownVar varName interval)
 
-  ArrayExpression {elements} -> do
-    rs <- Vector.unfoldrM f elements
-    newReference (Array rs)
+  ArrayExpression {elems} -> do
+    rs <- Vector.unfoldrM f elems
+    newRef (Array rs)
 
     where
       f [] = pure Nothing
 
-      f (element : elements) = do
-        r <- evaluateExpression element
-        r' <- cloneReference r
-        pure (Just (r', elements))
+      f (elem : elems) = do
+        r <- evalExpression elem
+        r' <- cloneRef r
+        pure (Just (r', elems))
 
   AccessExpression {array, index} -> do
-    arrayR <- evaluateExpression array
-    arrayV <- readReference arrayR
+    arrayR <- evalExpression array
+    arrayV <- readRef arrayR
 
-    indexR <- evaluateExpression index
-    indexV <- readReference indexR
+    indexR <- evalExpression index
+    indexV <- readRef indexR
 
     case (arrayV, indexV) of
-      (Array rs, Int y) | Just y' <- toIntegralSized y, Just r <- rs !? y' -> pure r
-
-      (Array _, Int y) -> raise (IndexOutOfBounds index y)
+      (Array rs, Int x) -> case toIntegralSized x of
+        Just n | Just r <- rs !? n -> pure r
+        _ -> raise (IndexOutOfBounds index x)
 
       (Array _, _) -> do
         indexT <- getType indexV
@@ -199,123 +206,121 @@ evaluateExpression expression = case expression of
         arrayT <- getType arrayV
         raise (InvalidType array (Type.Array Type.Unknown) arrayT)
 
-  CallExpression {functionId = SymbolId {name, interval}, arguments} -> do
-    argumentRs <- for arguments evaluateExpression
+  CallExpression {funId = SymbolId {name, interval}, args} -> do
+    argRs <- for args evalExpression
 
-    lookupFunction name >>= \case
-      Just (UserDefined FunctionDeclaration {parameters, body}, depth) ->
-        withNewFrame (depth + 1) (go 0 parameters argumentRs)
+    lookupFun name >>= \case
+      Just (UserDefined FunDefinition {params, body}, depth) ->
+        withNewFrame (depth + 1) (go 0 params argRs)
         where
-          go _ [] [] = evaluateStatement body >>= \case
-            Just r -> cloneReference r
-            Nothing -> newReference Unit
-
           -- Pass by value
-          go n ((Nothing, SymbolId {name}, _) : parameters) (argumentR : argumentRs) = do
-            argumentR' <- cloneReference argumentR
-            defineVariable name argumentR'
-            go (n + 1) parameters argumentRs
+          go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do
+            argR' <- cloneRef argR
+            defineVar name argR'
+            go (n + 1) params argRs
 
           -- Pass by reference
-          go n ((Just _, SymbolId {name}, _) : parameters) (argumentR : argumentRs) = do
-            defineVariable name argumentR
-            go (n + 1) parameters argumentRs
+          go n ((Just _, SymbolId {name}, _) : params) (argR : argRs) = do
+            defineVar name argR
+            go (n + 1) params argRs
 
-          go n parameters argumentRs =
-            raise (InvalidArgumentCount expression (n + length parameters) (n + length argumentRs))
+          go _ [] [] = evalStatement body >>= \case
+            Just r -> cloneRef r
+            Nothing -> newRef Unit
 
-      Just (BuiltinToInt, depth) -> withNewFrame (depth + 1) $ case argumentRs of
-        [] -> raise (InvalidArgumentCount expression 1 0)
+          go n params argRs = do
+            let expected = n + length params
+            let actual = n + length argRs
+            raise (InvalidArgCount expression expected actual)
 
-        argumentR : argumentRs -> do
-          argumentV <- readReference argumentR
+      Just (BuiltinToInt, depth) -> withNewFrame (depth + 1) $ case argRs of
+        [argR] -> do
+          argV <- readRef argR
 
-          case (argumentV, argumentRs) of
-            (Float x, []) -> newReference (Int (round x))
+          case argV of
+            Float x -> newRef (Int (round x))
 
-            (_, []) -> do
-              argumentT <- getType argumentV
-              raise (InvalidType (head arguments) Type.Float argumentT)
+            _ -> do
+              argT <- getType argV
+              raise (InvalidType (head args) Type.Float argT)
 
-            (_, _) -> raise (InvalidArgumentCount expression 1 (1 + length argumentRs))
+        _ -> raise (InvalidArgCount expression 1 (length argRs))
 
-      Just (BuiltinToFloat, depth) -> withNewFrame (depth + 1) $ case argumentRs of
-        [] -> raise (InvalidArgumentCount expression 1 0)
+      Just (BuiltinToFloat, depth) -> withNewFrame (depth + 1) $ case argRs of
+        [argR] -> do
+          argV <- readRef argR
 
-        argumentR : argumentRs -> do
-          argumentV <- readReference argumentR
+          case argV of
+            Int x -> newRef (Float (fromIntegral x))
 
-          case (argumentV, argumentRs) of
-            (Int x, []) -> newReference (Float (fromIntegral x))
+            _ -> do
+              argT <- getType argV
+              raise (InvalidType (head args) Type.Int argT)
 
-            (_, []) -> do
-              argumentT <- getType argumentV
-              raise (InvalidType (head arguments) Type.Int argumentT)
+        _ -> raise (InvalidArgCount expression 1 (length argRs))
 
-            (_, _) -> raise (InvalidArgumentCount expression 1 (1 + length argumentRs))
-
-      _ -> raise (UnknownFunction name interval)
+      _ -> raise (UnknownFun name interval)
 
   UnaryExpression {unary, operand} | PlusOperator {} <- unary -> do
-    operandR <- evaluateExpression operand
-    operandV <- readReference operandR
+    operandR <- evalExpression operand
+    operandV <- readRef operandR
 
     case operandV of
-      Int x -> newReference (Int x)
-      Float x -> newReference (Float x)
+      Int x -> newRef (Int x)
+      Float x -> newRef (Float x)
 
       _ -> do
         operandT <- getType operandV
         raise (InvalidUnary unary operandT)
 
   UnaryExpression {unary, operand} | MinusOperator {} <- unary -> do
-    operandR <- evaluateExpression operand
-    operandV <- readReference operandR
+    operandR <- evalExpression operand
+    operandV <- readRef operandR
 
     case operandV of
-      Int x | Just y <- safeUnary negate x -> newReference (Int y)
+      Int x | Just y <- safeUnary negate x -> newRef (Int y)
       Int _ -> raise (IntegerOverflow expression)
 
-      Float x -> newReference (Float (negate x))
+      Float x -> newRef (Float (negate x))
 
       _ -> do
         operandT <- getType operandV
         raise (InvalidUnary unary operandT)
 
   UnaryExpression {unary, operand} | NotOperator {} <- unary -> do
-    operandR <- evaluateExpression operand
-    operandV <- readReference operandR
+    operandR <- evalExpression operand
+    operandV <- readRef operandR
 
     case operandV of
-      Bool x -> newReference (Bool (not x))
+      Bool x -> newRef (Bool (not x))
 
       _ -> do
         operandT <- getType operandV
         raise (InvalidUnary unary operandT)
 
   UnaryExpression {unary, operand} | LenOperator {} <- unary -> do
-    operandR <- evaluateExpression operand
-    operandV <- readReference operandR
+    operandR <- evalExpression operand
+    operandV <- readRef operandR
 
     case operandV of
-      Array rs -> newReference (Int (fromIntegral (length rs)))
+      Array rs -> newRef (Int (fromIntegral (length rs)))
 
       _ -> do
         operandT <- getType operandV
         raise (InvalidUnary unary operandT)
 
   BinaryExpression {left, binary, right} | AddOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (+) x y -> newReference (Int z)
+      (Int x, Int y) | Just z <- safeBinary (+) x y -> newRef (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> newReference (Float (x + y))
+      (Float x, Float y) -> newRef (Float (x + y))
 
       (Array rs1, Array rs2) -> do
         let n1 = Vector.length rs1
@@ -325,9 +330,9 @@ evaluateExpression expression = case expression of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n3 -> do
-            let f i = cloneReference (if i < n1 then rs1 ! i else rs2 ! (i - n1))
+            let f i = cloneRef (if i < n1 then rs1 ! i else rs2 ! (i - n1))
             rs3 <- Vector.generateM n3 f
-            newReference (Array rs3)
+            newRef (Array rs3)
 
       (_, _) -> do
         leftT <- getType leftV
@@ -335,17 +340,17 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | SubtractOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (-) x y -> newReference (Int z)
+      (Int x, Int y) | Just z <- safeBinary (-) x y -> newRef (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> newReference (Float (x - y))
+      (Float x, Float y) -> newRef (Float (x - y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -353,20 +358,20 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | MultiplyOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (*) x y -> newReference (Int z)
+      (Int x, Int y) | Just z <- safeBinary (*) x y -> newRef (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> newReference (Float (x * y))
+      (Float x, Float y) -> newRef (Float (x * y))
 
-      (Int x, Array _) | x <= 0 -> newReference (Array Vector.empty)
-      (Array _, Int y) | y <= 0 -> newReference (Array Vector.empty)
+      (Int x, Array _) | x <= 0 -> newRef (Array Vector.empty)
+      (Array _, Int y) | y <= 0 -> newRef (Array Vector.empty)
 
       (Int x, Array rs) -> do
         let n = Vector.length rs
@@ -375,8 +380,8 @@ evaluateExpression expression = case expression of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n' -> do
-            rs' <- Vector.generateM n' (\i -> cloneReference (rs ! (i `mod` n)))
-            newReference (Array rs')
+            rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
+            newRef (Array rs')
 
       (Array rs, Int y) -> do
         let n = Vector.length rs
@@ -385,8 +390,8 @@ evaluateExpression expression = case expression of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n' -> do
-            rs' <- Vector.generateM n' (\i -> cloneReference (rs ! (i `mod` n)))
-            newReference (Array rs')
+            rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
+            newRef (Array rs')
 
       (_, _) -> do
         leftT <- getType leftV
@@ -394,18 +399,18 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | DivideOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary div x y -> newReference (Int z)
+      (Int x, Int y) | Just z <- safeBinary div x y -> newRef (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> newReference (Float (x / y))
+      (Float x, Float y) -> newRef (Float (x / y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -413,15 +418,15 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | ModuloOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary mod x y -> newReference (Int z)
+      (Int x, Int y) | Just z <- safeBinary mod x y -> newRef (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
       (_, _) -> do
@@ -430,27 +435,27 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary = EqualOperator {}, right} -> do
-    leftR <- evaluateExpression left
-    rightR <- evaluateExpression right
-    x <- compareReferences leftR rightR
-    newReference (Bool x)
+    leftR <- evalExpression left
+    rightR <- evalExpression right
+    x <- compareRefs leftR rightR
+    newRef (Bool x)
 
   BinaryExpression {left, binary = NotEqualOperator {}, right} -> do
-    leftR <- evaluateExpression left
-    rightR <- evaluateExpression right
-    x <- compareReferences leftR rightR
-    newReference (Bool (not x))
+    leftR <- evalExpression left
+    rightR <- evalExpression right
+    x <- compareRefs leftR rightR
+    newRef (Bool (not x))
 
   BinaryExpression {left, binary, right} | LessOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) -> newReference (Bool (x < y))
-      (Float x, Float y) -> newReference (Bool (x < y))
+      (Int x, Int y) -> newRef (Bool (x < y))
+      (Float x, Float y) -> newRef (Bool (x < y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -458,15 +463,15 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | LessOrEqualOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) -> newReference (Bool (x <= y))
-      (Float x, Float y) -> newReference (Bool (x <= y))
+      (Int x, Int y) -> newRef (Bool (x <= y))
+      (Float x, Float y) -> newRef (Bool (x <= y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -474,15 +479,15 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | GreaterOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) -> newReference (Bool (x > y))
-      (Float x, Float y) -> newReference (Bool (x > y))
+      (Int x, Int y) -> newRef (Bool (x > y))
+      (Float x, Float y) -> newRef (Bool (x > y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -490,15 +495,15 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | GreaterOrEqualOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) -> newReference (Bool (x >= y))
-      (Float x, Float y) -> newReference (Bool (x >= y))
+      (Int x, Int y) -> newRef (Bool (x >= y))
+      (Float x, Float y) -> newRef (Bool (x >= y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -506,18 +511,18 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | AndOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
     case leftV of
-      Bool False -> newReference (Bool False)
+      Bool False -> newRef (Bool False)
 
       _ -> do
-        rightR <- evaluateExpression right
-        rightV <- readReference rightR
+        rightR <- evalExpression right
+        rightV <- readRef rightR
 
         case (leftV, rightV) of
-          (Bool x, Bool y) -> newReference (Bool (x && y))
+          (Bool x, Bool y) -> newRef (Bool (x && y))
 
           (_, _) -> do
             leftT <- getType leftV
@@ -525,18 +530,18 @@ evaluateExpression expression = case expression of
             raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | OrOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
     case leftV of
-      Bool True -> newReference (Bool True)
+      Bool True -> newRef (Bool True)
 
       _ -> do
-        rightR <- evaluateExpression right
-        rightV <- readReference rightR
+        rightR <- evalExpression right
+        rightV <- readRef rightR
 
         case (leftV, rightV) of
-          (Bool x, Bool y) -> newReference (Bool (x || y))
+          (Bool x, Bool y) -> newRef (Bool (x || y))
 
           (_, _) -> do
             leftT <- getType leftV
@@ -544,14 +549,14 @@ evaluateExpression expression = case expression of
             raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | XorOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Bool x, Bool y) -> newReference (Bool (x /= y))
+      (Bool x, Bool y) -> newRef (Bool (x /= y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -559,26 +564,26 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary = PlainAssignOperator {}, right} -> do
-    leftR <- evaluateExpression left
+    leftR <- evalExpression left
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
-    rightV' <- cloneValue rightV
+    rightR <- evalExpression right
+    rightV <- readRef rightR
+    rightV' <- cloneVal rightV
 
-    writeReference' leftR rightV'
+    writeRef' leftR rightV'
 
   BinaryExpression {left, binary, right} | AddAssignOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (+) x y -> writeReference' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary (+) x y -> writeRef' leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeReference' leftR (Float (x + y))
+      (Float x, Float y) -> writeRef' leftR (Float (x + y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -586,17 +591,17 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | SubtractAssignOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (-) x y -> writeReference' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary (-) x y -> writeRef' leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeReference' leftR (Float (x - y))
+      (Float x, Float y) -> writeRef' leftR (Float (x - y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -604,17 +609,17 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | MultiplyAssignOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (*) x y -> writeReference' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary (*) x y -> writeRef' leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeReference' leftR (Float (x * y))
+      (Float x, Float y) -> writeRef' leftR (Float (x * y))
 
       (Array rs, Int y) -> do
         let n = Vector.length rs
@@ -623,8 +628,8 @@ evaluateExpression expression = case expression of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n' -> do
-            rs' <- Vector.generateM n' (\i -> cloneReference (rs ! (i `mod` n)))
-            writeReference' leftR (Array rs')
+            rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
+            writeRef' leftR (Array rs')
 
       (_, _) -> do
         leftT <- getType leftV
@@ -632,18 +637,18 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | DivideAssignOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary div x y -> writeReference' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary div x y -> writeRef' leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeReference' leftR (Float (x / y))
+      (Float x, Float y) -> writeRef' leftR (Float (x / y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -651,15 +656,15 @@ evaluateExpression expression = case expression of
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | ModuloAssignOperator {} <- binary -> do
-    leftR <- evaluateExpression left
-    leftV <- readReference leftR
+    leftR <- evalExpression left
+    leftV <- readRef leftR
 
-    rightR <- evaluateExpression right
-    rightV <- readReference rightR
+    rightR <- evalExpression right
+    rightV <- readRef rightR
 
     case (leftV, rightV) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary mod x y -> writeReference' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary mod x y -> writeRef' leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
       (_, _) -> do
@@ -667,7 +672,7 @@ evaluateExpression expression = case expression of
         rightT <- getType rightV
         raise (InvalidBinary binary leftT rightT)
 
-  ParenthesizedExpression {inner} -> evaluateExpression inner
+  ParenthesizedExpression {inner} -> evalExpression inner
 
   where
     safeUnary op x = toIntegralSized (toInteger (op x))
@@ -684,15 +689,17 @@ getType = \case
   Array rs | Vector.null rs -> pure (Type.Array Type.Unknown)
 
   Array rs -> do
-    r <- readReference (Vector.head rs)
+    r <- readRef (Vector.head rs)
     t <- getType r
 
-    let f Type.Unknown = False; f t' = t' <: t
-    ok <- allM (\r -> f <$> (getType =<< readReference r)) rs
+    let f Type.Unknown = False
+        f t' = t' <: t
+
+    ok <- allM (\r -> f <$> (getType =<< readRef r)) rs
     pure (Type.Array (if ok then t else Type.Unknown))
 
 
-writeReference' :: Reference -> Value -> Evaluator Reference
-writeReference' r v = do
-  writeReference r v
+writeRef' :: Reference -> Value -> Evaluator Reference
+writeRef' r v = do
+  writeRef r v
   pure r

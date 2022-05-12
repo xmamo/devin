@@ -1,11 +1,12 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
 module Devin.Highlight.Braces (
   highlightDevinBraces,
-  highlightDeclarationBraces,
+  highlightDefinitionBraces,
   highlightStatementBraces,
   highlightExpressionBraces
 ) where
@@ -25,18 +26,18 @@ import Devin.Highlight
 highlightDevinBraces ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   Tags -> a -> Gtk.TextIter -> Devin -> m Bool
-highlightDevinBraces tag buffer insertIter Devin {declarations} =
-  anyM (highlightDeclarationBraces tag buffer insertIter) declarations
+highlightDevinBraces tag buffer insertIter Devin {definitions} =
+  anyM (highlightDefinitionBraces tag buffer insertIter) definitions
 
 
-highlightDeclarationBraces ::
+highlightDefinitionBraces ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  Tags -> a -> Gtk.TextIter -> Declaration -> m Bool
-highlightDeclarationBraces tag buffer insertIter declaration = case declaration of
-  VariableDeclaration {value} ->
+  Tags -> a -> Gtk.TextIter -> Definition -> m Bool
+highlightDefinitionBraces tag buffer insertIter = \case
+  VarDefinition {value} ->
     highlightExpressionBraces tag buffer insertIter value
 
-  FunctionDeclaration {open, close, body} ->
+  FunDefinition {open, close, body} ->
     orM [
       highlightBraces tag buffer insertIter open close,
       highlightStatementBraces tag buffer insertIter body
@@ -46,12 +47,15 @@ highlightDeclarationBraces tag buffer insertIter declaration = case declaration 
 highlightStatementBraces ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   Tags -> a -> Gtk.TextIter -> Statement -> m Bool
-highlightStatementBraces tag buffer insertIter statement = case statement of
+highlightStatementBraces tag buffer insertIter = \case
+  ReturnStatement {result = Nothing} -> pure False
+  DebugStatement {} -> pure False
+
   ExpressionStatement {value} ->
     highlightExpressionBraces tag buffer insertIter value
 
-  DeclarationStatement {declaration} ->
-    highlightDeclarationBraces tag buffer insertIter declaration
+  DefinitionStatement {definition} ->
+    highlightDefinitionBraces tag buffer insertIter definition
 
   IfStatement {predicate, trueBranch} ->
     orM [
@@ -78,17 +82,11 @@ highlightStatementBraces tag buffer insertIter statement = case statement of
       highlightExpressionBraces tag buffer insertIter predicate
     ]
 
-  ReturnStatement {result = Nothing} ->
-    pure False
-
   ReturnStatement {result = Just result} ->
     highlightExpressionBraces tag buffer insertIter result
 
   AssertStatement {predicate} ->
     highlightExpressionBraces tag buffer insertIter predicate
-
-  DebugStatement {} ->
-    pure False
 
   BlockStatement {open, statements, close} ->
     orM [
@@ -100,14 +98,14 @@ highlightStatementBraces tag buffer insertIter statement = case statement of
 highlightExpressionBraces ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   Tags -> a -> Gtk.TextIter -> Expression -> m Bool
-highlightExpressionBraces tag buffer insertIter expression = case expression of
+highlightExpressionBraces tag buffer insertIter = \case
   IntegerExpression {} -> pure False
   RationalExpression {} -> pure False
-  VariableExpression {} -> pure False
+  VarExpression {} -> pure False
 
-  ArrayExpression {open, elements, close} ->
+  ArrayExpression {open, elems, close} ->
     orM [
-      anyM (highlightExpressionBraces tag buffer insertIter) elements,
+      anyM (highlightExpressionBraces tag buffer insertIter) elems,
       highlightBraces tag buffer insertIter open close
     ]
 
@@ -118,9 +116,9 @@ highlightExpressionBraces tag buffer insertIter expression = case expression of
       highlightBraces tag buffer insertIter open close
     ]
 
-  CallExpression {open, arguments, close} ->
+  CallExpression {open, args, close} ->
     orM [
-      anyM (highlightExpressionBraces tag buffer insertIter) arguments,
+      anyM (highlightExpressionBraces tag buffer insertIter) args,
       highlightBraces tag buffer insertIter open close
     ]
 

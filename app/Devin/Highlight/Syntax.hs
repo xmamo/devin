@@ -6,7 +6,7 @@
 
 module Devin.Highlight.Syntax (
   highlightDevin,
-  highlightDeclaration,
+  highlightDefinition,
   highlightStatement,
   highlightExpression,
 ) where
@@ -24,34 +24,38 @@ import Devin.Highlight
 
 
 highlightDevin :: (Gtk.IsTextBuffer a, MonadIO m) => Tags -> a -> Devin -> m ()
-highlightDevin tags buffer Devin {declarations} =
-  for_ declarations (highlightDeclaration tags buffer)
+highlightDevin tags buffer Devin {definitions} =
+  for_ definitions (highlightDefinition tags buffer)
 
 
-highlightDeclaration :: (Gtk.IsTextBuffer a, MonadIO m) => Tags -> a -> Declaration -> m ()
-highlightDeclaration tags buffer declaration = case declaration of
-  VariableDeclaration {varKeyword, variableId, value} -> do
+highlightDefinition ::
+  (Gtk.IsTextBuffer a, MonadIO m) =>
+  Tags -> a -> Definition -> m ()
+highlightDefinition tags buffer = \case
+  VarDefinition {varKeyword, varId, value} -> do
     highlightInterval (keywordTag tags) buffer varKeyword
-    highlightInterval (variableIdTag tags) buffer variableId
+    highlightInterval (varIdTag tags) buffer varId
     highlightExpression tags buffer value
 
-  FunctionDeclaration {defKeyword, functionId, parameters, returnInfo, body} -> do
+  FunDefinition {defKeyword, funId, params, returnInfo, body} -> do
     highlightInterval (keywordTag tags) buffer defKeyword
-    highlightInterval (functionIdTag tags) buffer functionId
+    highlightInterval (funIdTag tags) buffer funId
 
-    for_ parameters $ \(refKeyword, parameterId, parameterInfo) -> do
+    for_ params $ \(refKeyword, paramId, paramInfo) -> do
       whenJust refKeyword (highlightInterval (keywordTag tags) buffer)
-      highlightInterval (variableIdTag tags) buffer parameterId
-      whenJust parameterInfo (\(_, typeId) -> highlightInterval (typeTag tags) buffer typeId)
+      highlightInterval (varIdTag tags) buffer paramId
+      whenJust paramInfo $ \(_, id) -> highlightInterval (typeTag tags) buffer id
 
-    whenJust returnInfo (\(_, typeId) -> highlightInterval (typeTag tags) buffer typeId)
+    whenJust returnInfo $ \(_, id) -> highlightInterval (typeTag tags) buffer id
     highlightStatement tags buffer body
 
 
-highlightStatement :: (Gtk.IsTextBuffer a, MonadIO m) => Tags -> a -> Statement -> m ()
+highlightStatement ::
+  (Gtk.IsTextBuffer a, MonadIO m) =>
+  Tags -> a -> Statement -> m ()
 highlightStatement tags buffer = \case
-  DeclarationStatement {declaration} ->
-    highlightDeclaration tags buffer declaration
+  DefinitionStatement {definition} ->
+    highlightDefinition tags buffer definition
 
   ExpressionStatement {value} ->
     highlightExpression tags buffer value
@@ -94,7 +98,9 @@ highlightStatement tags buffer = \case
     for_ statements (highlightStatement tags buffer)
 
 
-highlightExpression :: (Gtk.IsTextBuffer a, MonadIO m) => Tags -> a -> Expression -> m ()
+highlightExpression ::
+  (Gtk.IsTextBuffer a, MonadIO m) =>
+  Tags -> a -> Expression -> m ()
 highlightExpression tags buffer expression = case expression of
   IntegerExpression {} ->
     highlightInterval (numberTag tags) buffer expression
@@ -102,19 +108,19 @@ highlightExpression tags buffer expression = case expression of
   RationalExpression {} ->
     highlightInterval (numberTag tags) buffer expression
 
-  VariableExpression {} ->
-    highlightInterval (variableIdTag tags) buffer expression
+  VarExpression {} ->
+    highlightInterval (varIdTag tags) buffer expression
 
-  ArrayExpression {elements} ->
-    for_ elements (highlightExpression tags buffer)
+  ArrayExpression {elems} ->
+    for_ elems (highlightExpression tags buffer)
 
   AccessExpression {array, index} -> do
     highlightExpression tags buffer array
     highlightExpression tags buffer index
 
-  CallExpression {functionId, arguments} -> do
-    highlightInterval (functionIdTag tags) buffer functionId
-    for_ arguments (highlightExpression tags buffer)
+  CallExpression {funId, args} -> do
+    highlightInterval (funIdTag tags) buffer funId
+    for_ args (highlightExpression tags buffer)
 
   UnaryExpression {unary, operand} -> do
     highlightInterval (operatorTag tags) buffer unary

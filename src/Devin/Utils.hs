@@ -15,7 +15,10 @@ showsRatio ratio =
     (d, m) = num `divMod` den
 
     go 0 = showChar '0'
-    go m = let (d', m') = (10 * m) `divMod` den in shows d' . (if m' /= 0 then go m' else id)
+
+    go m =
+      let (d', m') = (10 * m) `divMod` den
+       in shows d' . (if m' /= 0 then go m' else id)
 
 
 showRatio :: (Integral a, Show a) => Ratio a -> String

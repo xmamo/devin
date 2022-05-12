@@ -47,7 +47,7 @@ spec = do
 
     it "should accept fragment 3" $
       shouldParse Parsers.expression "a+ -2.1= f (x, y ,z ) *=88 " BinaryExpression {
-        left = VariableExpression "a" (0, 1),
+        left = VarExpression "a" (0, 1),
 
         binary = AddOperator (1, 2),
 
@@ -58,14 +58,14 @@ spec = do
 
           right = BinaryExpression {
             left = CallExpression {
-              functionId = SymbolId "f" (9, 10),
+              funId = SymbolId "f" (9, 10),
 
               open = Token (11, 12),
 
-              arguments = [
-                VariableExpression "x" (12, 13),
-                VariableExpression "y" (15, 16),
-                VariableExpression "z" (18, 19)
+              args = [
+                VarExpression "x" (12, 13),
+                VarExpression "y" (15, 16),
+                VarExpression "z" (18, 19)
               ],
 
               commas = [

@@ -3,17 +3,18 @@
 
 module Devin.Type (
   Type (..),
-  (<:)
+  (<:),
+  merge
 ) where
 
 import Data.Data
+import Data.Maybe
 
 import Devin.Display
 
 
 data Type
   = Unknown
-  | Any
   | Unit
   | Bool
   | Int
@@ -24,22 +25,24 @@ data Type
 
 
 (<:) :: Type -> Type -> Bool
-Unknown <: _ = True
-_ <: Unknown = True
-_ <: Any = True
-Unit <: Unit = True
-Bool <: Bool = True
-Int <: Int = True
-Float <: Float = True
-Array t1 <: Array t2 = t1 <: t2
-Placeholder name1 <: Placeholder name2 = name1 == name2
-_ <: _ = False
+t1 <: t2 = isJust (merge t1 t2)
+
+
+merge :: Type -> Type -> Maybe Type
+merge Unknown _ = Just Unknown
+merge _ Unknown = Just Unknown
+merge Unit Unit = Just Unit
+merge Bool Bool = Just Bool
+merge Int Int = Just Int
+merge Float Float = Just Float
+merge (Array t1) (Array t2) = Array <$> merge t1 t2
+merge (Placeholder n1) (Placeholder n2) | n1 == n2 = Just (Placeholder n1)
+merge _ _ = Nothing
 
 
 instance Display Type where
   displays :: Type -> ShowS
   displays Unknown = showChar '?'
-  displays Any = showChar '∗'
   displays Unit = showString "Unit"
   displays Bool = showString "Bool"
   displays Int = showString "Int"

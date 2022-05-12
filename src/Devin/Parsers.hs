@@ -9,7 +9,7 @@ module Devin.Parsers (
   ParserT,
   Parser,
   devin,
-  declaration,
+  definition,
   statement,
   expression,
   unaryOperator,
@@ -29,7 +29,7 @@ import Devin.Parsec hiding (token)
 #if __GLASGOW_HASKELL__ >= 902
 import Devin.Syntax
 #else
-import Devin.Syntax hiding (declaration)
+import Devin.Syntax hiding (definition)
 #endif
 
 
@@ -39,35 +39,35 @@ type Parser s a = Parsec (Int, s) [Token] a
 
 devin :: Stream s m Char => ParserT s m Devin
 devin = syntax $ do
-  declarations <- s *> many (declaration <* s) <* eof
-  pure (Devin declarations)
+  definitions <- s *> many (definition <* s) <* eof
+  pure (Devin definitions)
 
 
-declaration :: Stream s m Char => ParserT s m Declaration
-declaration = variableDeclaration <|> functionDeclaration
+definition :: Stream s m Char => ParserT s m Definition
+definition = varDefinition <|> funDefinition
 
 
-variableDeclaration :: Stream s m Char => ParserT s m Declaration
-variableDeclaration = do
+varDefinition :: Stream s m Char => ParserT s m Definition
+varDefinition = do
   varKeyword <- keyword "var"
-  variableId <- s *> symbolId
+  varId <- s *> symbolId
   equalSign <- s *> token "="
   value <- s *> expression
   semicolon <- s *> token ";"
-  pure (VariableDeclaration varKeyword variableId equalSign value semicolon)
+  pure (VarDefinition varKeyword varId equalSign value semicolon)
 
 
-functionDeclaration :: Stream s m Char => ParserT s m Declaration
-functionDeclaration = do
+funDefinition :: Stream s m Char => ParserT s m Definition
+funDefinition = do
   defKeyword <- keyword "def"
-  functionId <- s *> symbolId
+  funId <- s *> symbolId
   open <- s *> token "("
 
-  (parameters, commas) <- s *> optionMaybe parameter >>= \case
+  (params, commas) <- s *> optionMaybe param >>= \case
     Nothing -> pure ([], [])
 
     Just first -> do
-      rest <- many (liftA2 (,) (try (s *> token ",")) (s *> parameter))
+      rest <- many (liftA2 (,) (try (s *> token ",")) (s *> param))
       pure (first : map snd rest, map fst rest)
 
   close <- s *> token ")"
@@ -80,36 +80,36 @@ functionDeclaration = do
       pure (Just (arrow, returnTypeId))
 
   body <- s *> statement
-  pure (FunctionDeclaration defKeyword functionId open parameters commas close returnInfo body)
+  pure (FunDefinition defKeyword funId open params commas close returnInfo body)
 
   where
-    parameter = do
-      (refKeyword, parameterId) <- choice
+    param = do
+      (refKeyword, paramId) <- choice
         [
           try $ do
             token <- keyword "ref"
-            parameterId <- s *> symbolId
-            pure (Just token, parameterId),
+            paramId <- s *> symbolId
+            pure (Just token, paramId),
 
           do
-            parameterId <- symbolId
-            pure (Nothing, parameterId)
+            paramId <- symbolId
+            pure (Nothing, paramId)
         ]
 
-      parameterInfo <- optionMaybe (try (s *> token ":")) >>= \case
+      paramInfo <- optionMaybe (try (s *> token ":")) >>= \case
         Nothing -> pure Nothing
 
         Just colon -> do
-          parameterTypeId <- s *> typeId
-          pure (Just (colon, parameterTypeId))
+          paramTypeId <- s *> typeId
+          pure (Just (colon, paramTypeId))
 
-      pure (refKeyword, parameterId, parameterInfo)
+      pure (refKeyword, paramId, paramInfo)
 
 
 statement :: Stream s m Char => ParserT s m Statement
 statement = choice
   [
-    declarationStatement,
+    definitionStatement,
     ifStatement,
     whileStatement,
     doWhileStatement,
@@ -128,8 +128,8 @@ expressionStatement = do
   pure (ExpressionStatement value semicolon)
 
 
-declarationStatement :: Stream s m Char => ParserT s m Statement
-declarationStatement = DeclarationStatement <$> declaration
+definitionStatement :: Stream s m Char => ParserT s m Statement
+definitionStatement = DefinitionStatement <$> definition
 
 
 ifStatement :: Stream s m Char => ParserT s m Statement
@@ -266,7 +266,7 @@ expression6 = do
       integerExpression,
       arrayExpression,
       unaryExpression,
-      callOrVariableExpression,
+      callOrVarExpression,
       parenthesizedExpression
     ]
 
@@ -321,7 +321,7 @@ arrayExpression :: Stream s m Char => ParserT s m Expression
 arrayExpression = do
   open <- token "["
 
-  (elements, commas) <- s *> optionMaybe expression >>= \case
+  (elems, commas) <- s *> optionMaybe expression >>= \case
     Nothing -> pure ([], [])
 
     Just first -> do
@@ -329,18 +329,18 @@ arrayExpression = do
       pure (first : map snd rest, map fst rest)
 
   close <- s *> token "]"
-  pure (ArrayExpression open elements commas close)
+  pure (ArrayExpression open elems commas close)
 
 
-callOrVariableExpression :: Stream s m Char => ParserT s m Expression
-callOrVariableExpression = do
+callOrVarExpression :: Stream s m Char => ParserT s m Expression
+callOrVarExpression = do
   SymbolId {name, interval} <- symbolId
 
   optionMaybe (try (s *> token "(")) >>= \case
-    Nothing -> pure (VariableExpression name interval)
+    Nothing -> pure (VarExpression name interval)
 
     Just open -> do
-      (arguments, commas) <- s *> optionMaybe expression >>= \case
+      (args, commas) <- s *> optionMaybe expression >>= \case
         Nothing -> pure ([], [])
 
         Just first -> do
@@ -348,7 +348,7 @@ callOrVariableExpression = do
           pure (first : map snd rest, map fst rest)
 
       close <- s *> token ")"
-      pure (CallExpression (SymbolId name interval) open arguments commas close)
+      pure (CallExpression (SymbolId name interval) open args commas close)
 
 
 unaryExpression :: Stream s m Char => ParserT s m Expression

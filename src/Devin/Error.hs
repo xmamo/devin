@@ -22,13 +22,13 @@ import Devin.Type
 
 
 data Error where
-  UnknownVariable :: {
-    variableName :: String,
+  UnknownVar :: {
+    varName :: String,
     interval :: (Int, Int)
   } -> Error
 
-  UnknownFunction :: {
-    functionName :: String,
+  UnknownFun :: {
+    funName :: String,
     interval :: (Int, Int)
   } -> Error
 
@@ -54,7 +54,7 @@ data Error where
     actualT :: Type
   } -> Error
 
-  -- Type checking errors:
+  -- Static errors:
 
   MissingReturnValue :: {
     statement :: Statement,
@@ -62,7 +62,7 @@ data Error where
   } -> Error
 
   MissingReturnStatement :: {
-    functionId :: SymbolId
+    funId :: SymbolId
   } -> Error
 
   -- Runtime errors:
@@ -80,7 +80,7 @@ data Error where
     value :: Int64
   } -> Error
 
-  InvalidArgumentCount :: {
+  InvalidArgCount :: {
     expression :: Expression,
     expected :: Int,
     actual :: Int
@@ -95,47 +95,47 @@ data Error where
 
 instance Interval Error where
   start :: Num a => Error -> a
-  start UnknownVariable {interval} = start interval
-  start UnknownFunction {interval} = start interval
+  start UnknownVar {interval} = start interval
+  start UnknownFun {interval} = start interval
   start UnknownType {interval} = start interval
   start InvalidUnary {unary} = start unary
   start InvalidBinary {binary} = start binary
   start InvalidType {expression} = start expression
   start MissingReturnValue {statement} = start statement
-  start MissingReturnStatement {functionId} = start functionId
+  start MissingReturnStatement {funId} = start funId
   start IntegerOverflow {expression} = start expression
   start DivisionByZero {expression} = start expression
   start IndexOutOfBounds {expression} = start expression
-  start InvalidArgumentCount {expression} = start expression
+  start InvalidArgCount {expression} = start expression
   start AssertionFailed {statement} = start statement
 
 
   end :: Num a => Error -> a
-  end UnknownVariable {interval} = end interval
-  end UnknownFunction {interval} = end interval
+  end UnknownVar {interval} = end interval
+  end UnknownFun {interval} = end interval
   end UnknownType {interval} = end interval
   end InvalidUnary {unary} = end unary
   end InvalidBinary {binary} = end binary
   end InvalidType {expression} = end expression
   end MissingReturnValue {statement} = end statement
-  end MissingReturnStatement {functionId} = end functionId
+  end MissingReturnStatement {funId} = end funId
   end IntegerOverflow {expression} = end expression
   end DivisionByZero {expression} = end expression
   end IndexOutOfBounds {expression} = end expression
-  end InvalidArgumentCount {expression} = end expression
+  end InvalidArgCount {expression} = end expression
   end AssertionFailed {statement} = end statement
 
 
 instance Display Error where
   displays :: Error -> ShowS
   displays = \case
-    UnknownVariable {variableName} ->
+    UnknownVar {varName} ->
       showString "Unknown variable: " .
-      showString variableName
+      showString varName
 
-    UnknownFunction {functionName} ->
+    UnknownFun {funName} ->
       showString "Unknown function: " .
-      showString functionName
+      showString funName
 
     UnknownType {typeName} ->
       showString "Unknown type: " .
@@ -177,7 +177,7 @@ instance Display Error where
       showString "Index out of bounds: " .
       shows value
 
-    InvalidArgumentCount {expected, actual} ->
+    InvalidArgCount {expected, actual} ->
       showString "Invalid argument count: expected " .
       shows expected .
       showString " arguments, but got " .

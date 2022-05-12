@@ -13,20 +13,20 @@ module Devin.Evaluator (
   Function (..),
   Value (..),
   Reference,
-  makePredefinedState,
   runEvaluatorStep,
   runEvaluator,
-  newReference,
-  readReference,
-  writeReference,
-  cloneReference,
-  compareReferences,
-  cloneValue,
-  compareValues,
-  defineFunction,
-  lookupFunction,
-  defineVariable,
-  lookupVariable,
+  makePredefinedState,
+  cloneVal,
+  compareVals,
+  newRef,
+  readRef,
+  writeRef,
+  cloneRef,
+  compareRefs,
+  defineFun,
+  lookupFun,
+  defineVar,
+  lookupVar,
   withNewFrame,
   debug,
   raise
@@ -40,6 +40,8 @@ import Data.Int
 
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as Vector
+
+import Control.Monad.Extra
 
 import Devin.Error
 import Devin.Syntax
@@ -61,13 +63,13 @@ type State = [Frame]
 
 data Frame = Frame {
   offset :: Int,  -- Access link / static link
-  functions :: [(String, Function)],
-  variables :: [(String, Reference)]
+  funs :: [(String, Function)],
+  vars :: [(String, Reference)]
 }
 
 
 data Function
-  = UserDefined Declaration
+  = UserDefined Definition
   | BuiltinToInt
   | BuiltinToFloat
   deriving (Eq, Show, Read, Data)
@@ -122,16 +124,6 @@ instance MonadFail Evaluator where
   fail message = liftIO (fail message)
 
 
-makePredefinedState :: MonadIO m => m State
-makePredefinedState = liftIO $ do
-  true <- newReference (Bool True)
-  false <- newReference (Bool False)
-  unit <- newReference Unit
-  let functions = [("toInt", BuiltinToInt), ("toFloat", BuiltinToFloat)]
-  let variables = [("true", true), ("false", false), ("unit", unit)]
-  pure [Frame 0 functions variables]
-
-
 runEvaluatorStep :: MonadIO m => Evaluator a -> State -> m (Result a, State)
 runEvaluatorStep (Evaluator f) state = liftIO (f state)
 
@@ -146,48 +138,30 @@ runEvaluator mx state = do
     Error error -> pure (Left error, state')
 
 
-newReference :: MonadIO m => Value -> m Reference
-newReference x = liftIO $ do
-  ref <- newIORef x
-  pure (Reference ref)
+makePredefinedState :: MonadIO m => m State
+makePredefinedState = liftIO $ do
+  trueR <- newRef (Bool True)
+  falseR <- newRef (Bool False)
+  unitR <- newRef Unit
+  let funs = [("toInt", BuiltinToInt), ("toFloat", BuiltinToFloat)]
+  let vars = [("true", trueR), ("false", falseR), ("unit", unitR)]
+  pure [Frame 0 funs vars]
 
 
-readReference :: MonadIO m => Reference -> m Value
-readReference (Reference ref) = liftIO (readIORef ref)
-
-
-writeReference :: MonadIO m => Reference -> Value -> m ()
-writeReference (Reference ref) v = liftIO (writeIORef ref v)
-
-
-cloneReference :: MonadIO m => Reference -> m Reference
-cloneReference r = do
-  v <- readReference r
-  v' <- cloneValue v
-  newReference v'
-
-
-compareReferences :: MonadIO m => Reference -> Reference -> m Bool
-compareReferences r1 r2 = liftIO $ do
-  v1 <- readReference r1
-  v2 <- readReference r2
-  compareValues v1 v2
-
-
-cloneValue :: MonadIO m => Value -> m Value
-cloneValue = \case
+cloneVal :: MonadIO m => Value -> m Value
+cloneVal = \case
   Unit -> pure Unit
   Bool x -> pure (Bool x)
   Int x -> pure (Int x)
   Float x -> pure (Float x)
 
   Array rs -> do
-    rs' <- Vector.forM rs cloneReference
+    rs' <- Vector.forM rs cloneRef
     pure (Array rs')
 
 
-compareValues :: MonadIO m => Value -> Value -> m Bool
-compareValues v1 v2 = case (v1, v2) of
+compareVals :: MonadIO m => Value -> Value -> m Bool
+compareVals v1 v2 = case (v1, v2) of
   (Unit, Unit) -> pure True
   (Bool x, Bool y) -> pure (x == y)
   (Int x, Int y) -> pure (x == y)
@@ -196,64 +170,83 @@ compareValues v1 v2 = case (v1, v2) of
   (Array rs1, Array rs2) -> do
     let n1 = Vector.length rs1
     let n2 = Vector.length rs2
-
-    if n1 /= n2 then
-      pure False
-    else
-      go n1 0
+    if n1 /= n2 then pure False else go n1 0
 
     where
       go n i | i >= n = pure True
 
       go n i = do
-        x <- readReference (rs1 ! i)
-        y <- readReference (rs2 ! i)
-        z <- x `compareValues` y
-
-        if z then
-          go n (i + 1)
-        else
-          pure False
+        x <- readRef (rs1 ! i)
+        y <- readRef (rs2 ! i)
+        ifM (compareVals x y) (go n (i + 1)) (pure False)
 
   (_, _) -> pure False
 
 
-defineFunction :: String -> Function -> Evaluator ()
-defineFunction name function = Evaluator $ \case
-  [] ->
-    pure (Done (), [Frame 0 [(name, function)] []])
-
-  frame : parents ->
-    pure (Done (), frame {functions = (name, function) : functions frame} : parents)
+newRef :: MonadIO m => Value -> m Reference
+newRef x = liftIO $ do
+  ref <- newIORef x
+  pure (Reference ref)
 
 
-lookupFunction :: String -> Evaluator (Maybe (Function, Int))
-lookupFunction name = Evaluator (\state -> pure (Done (go 0 state), state))
+readRef :: MonadIO m => Reference -> m Value
+readRef (Reference ref) = liftIO (readIORef ref)
+
+
+writeRef :: MonadIO m => Reference -> Value -> m ()
+writeRef (Reference ref) v = liftIO (writeIORef ref v)
+
+
+cloneRef :: MonadIO m => Reference -> m Reference
+cloneRef r = do
+  v <- readRef r
+  v' <- cloneVal v
+  newRef v'
+
+
+compareRefs :: MonadIO m => Reference -> Reference -> m Bool
+compareRefs r1 r2 = liftIO $ do
+  v1 <- readRef r1
+  v2 <- readRef r2
+  compareVals v1 v2
+
+
+defineFun :: String -> Function -> Evaluator ()
+defineFun name fun = Evaluator $ \case
+  [] -> pure (Done (), [Frame 0 [(name, fun)] []])
+
+  frame : parents -> do
+    let funs' = (name, fun) : funs frame
+    pure (Done (), frame {funs = funs'} : parents)
+
+
+lookupFun :: String -> Evaluator (Maybe (Function, Int))
+lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
   where
     go _ [] = Nothing
 
-    go depth (Frame {offset, functions} : parents) = case lookup name functions of
-      Just function -> Just (function, depth)
-      Nothing -> go (depth + max 1 offset) (drop (offset - 1) parents)
+    go depth (Frame {offset, funs} : parents) = case lookup name funs of
+      Just fun -> Just (fun, depth)
+      Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
 
 
-defineVariable :: String -> Reference -> Evaluator ()
-defineVariable name r = Evaluator $ \case
-  [] ->
-    pure (Done (), [Frame 0 [] [(name, r)]])
+defineVar :: String -> Reference -> Evaluator ()
+defineVar name r = Evaluator $ \case
+  [] -> pure (Done (), [Frame 0 [] [(name, r)]])
 
-  frame : parents ->
-    pure (Done (), frame {variables = (name, r) : variables frame} : parents)
+  frame : parents -> do
+    let vars' = (name, r) : vars frame
+    pure (Done (), frame {vars = vars'} : parents)
 
 
-lookupVariable :: String -> Evaluator (Maybe (Reference, Int))
-lookupVariable name = Evaluator (\state -> pure (Done (go 0 state), state))
+lookupVar :: String -> Evaluator (Maybe (Reference, Int))
+lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
   where
     go _ [] = Nothing
 
-    go depth (Frame {offset, variables} : parents) = case lookup name variables of
+    go depth (Frame {offset, vars} : parents) = case lookup name vars of
       Just ref -> Just (ref, depth)
-      Nothing -> go (depth + max 1 offset) (drop (offset - 1) parents)
+      Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
 
 
 withNewFrame :: Int -> Evaluator a -> Evaluator a

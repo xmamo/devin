@@ -12,7 +12,7 @@
 
 module Devin.Syntax (
   Devin (..),
-  Declaration (..),
+  Definition (..),
   Statement (..),
   Expression (..),
   UnaryOperator (..),
@@ -29,36 +29,36 @@ import Devin.Interval
 import Devin.Utils
 
 
-data Devin = Devin {declarations :: [Declaration], interval :: (Int, Int)}
+data Devin = Devin {definitions :: [Definition], interval :: (Int, Int)}
   deriving (Eq, Show, Read, Data)
 
 
-data Declaration where
-  VariableDeclaration :: {
+data Definition where
+  VarDefinition :: {
     varKeyword :: Token,
-    variableId :: SymbolId,
+    varId :: SymbolId,
     equalSign :: Token,
     value :: Expression,
     semicolon :: Token
-  } -> Declaration
+  } -> Definition
 
-  FunctionDeclaration :: {
+  FunDefinition :: {
     defKeyword :: Token,
-    functionId :: SymbolId,
+    funId :: SymbolId,
     open :: Token,
-    parameters :: [(Maybe Token, SymbolId, Maybe (Token, TypeId))],
+    params :: [(Maybe Token, SymbolId, Maybe (Token, TypeId))],
     commas :: [Token],
     close :: Token,
     returnInfo :: Maybe (Token, TypeId),
     body :: Statement
-  } -> Declaration
+  } -> Definition
 
   deriving (Eq, Show, Read, Data)
 
 
 data Statement where
-  DeclarationStatement :: {
-    declaration :: Declaration
+  DefinitionStatement :: {
+    definition :: Definition
   } -> Statement
 
   ExpressionStatement :: {
@@ -121,8 +121,8 @@ data Statement where
 
 
 data Expression where
-  VariableExpression :: {
-    variableName :: String,
+  VarExpression :: {
+    varName :: String,
     interval :: (Int, Int)
   } -> Expression
 
@@ -138,7 +138,7 @@ data Expression where
 
   ArrayExpression :: {
     open :: Token,
-    elements :: [Expression],
+    elems :: [Expression],
     commas :: [Token],
     close :: Token
   } -> Expression
@@ -151,9 +151,9 @@ data Expression where
   } -> Expression
 
   CallExpression :: {
-    functionId :: SymbolId,
+    funId :: SymbolId,
     open :: Token,
-    arguments :: [Expression],
+    args :: [Expression],
     commas :: [Token],
     close :: Token
   } -> Expression
@@ -233,20 +233,20 @@ instance Interval Devin where
   end Devin {interval} = end interval
 
 
-instance Interval Declaration where
-  start :: Num a => Declaration -> a
-  start VariableDeclaration {varKeyword} = start varKeyword
-  start FunctionDeclaration {defKeyword} = start defKeyword
+instance Interval Definition where
+  start :: Num a => Definition -> a
+  start VarDefinition {varKeyword} = start varKeyword
+  start FunDefinition {defKeyword} = start defKeyword
 
 
-  end :: Num a => Declaration -> a
-  end VariableDeclaration {semicolon} = end semicolon
-  end FunctionDeclaration {body} = end body
+  end :: Num a => Definition -> a
+  end VarDefinition {semicolon} = end semicolon
+  end FunDefinition {body} = end body
 
 
 instance Interval Statement where
   start :: Num a => Statement -> a
-  start DeclarationStatement {declaration} = start declaration
+  start DefinitionStatement {definition} = start definition
   start ExpressionStatement {value} = start value
   start IfStatement {ifKeyword} = start ifKeyword
   start IfElseStatement {ifKeyword} = start ifKeyword
@@ -259,7 +259,7 @@ instance Interval Statement where
 
 
   end :: Num a => Statement -> a
-  end DeclarationStatement {declaration} = end declaration
+  end DefinitionStatement {definition} = end definition
   end ExpressionStatement {semicolon} = end semicolon
   end IfStatement {trueBranch} = end trueBranch
   end IfElseStatement {falseBranch} = end falseBranch
@@ -273,19 +273,19 @@ instance Interval Statement where
 
 instance Interval Expression where
   start :: Num a => Expression -> a
-  start VariableExpression {interval} = start interval
+  start VarExpression {interval} = start interval
   start IntegerExpression {interval} = start interval
   start RationalExpression {interval} = start interval
   start ArrayExpression {open} = start open
   start AccessExpression {array} = start array
-  start CallExpression {functionId} = start functionId
+  start CallExpression {funId} = start funId
   start UnaryExpression {unary} = start unary
   start BinaryExpression {left} = start left
   start ParenthesizedExpression {open} = start open
 
 
   end :: Num a => Expression -> a
-  end VariableExpression {interval} = end interval
+  end VarExpression {interval} = end interval
   end IntegerExpression {interval} = end interval
   end RationalExpression {interval} = end interval
   end ArrayExpression {close} = end close
@@ -390,36 +390,72 @@ instance Interval Token where
 instance Display Expression where
   displays :: Expression -> ShowS
   displays = \case
-    VariableExpression {variableName} -> showString variableName
-    IntegerExpression {integer} -> shows integer
-    RationalExpression {rational} -> showsRatio rational
-    AccessExpression {array, index} -> displays array . showChar '[' . displays index . showChar ']'
-    ParenthesizedExpression {inner} -> showChar '(' . displays inner . showChar ')'
+    VarExpression {varName} ->
+      showString varName
 
-    UnaryExpression {unary = PlusOperator {}, operand} -> showChar '+' . displays operand
-    UnaryExpression {unary = MinusOperator {}, operand} -> showChar '-' . displays operand
-    UnaryExpression {unary = NotOperator {}, operand} -> showString "not " . displays operand
-    UnaryExpression {unary = LenOperator {}, operand} -> showString "len " . displays operand
+    IntegerExpression {integer} ->
+      shows integer
+
+    RationalExpression {rational} ->
+      showsRatio rational
+
+    AccessExpression {array, index} ->
+      displays array .
+      showChar '[' .
+      displays index .
+      showChar ']'
+
+    ParenthesizedExpression {inner} ->
+      showChar '(' .
+      displays inner .
+      showChar ')'
+
+    UnaryExpression {unary = PlusOperator {}, operand} ->
+      showChar '+' .
+      displays operand
+
+    UnaryExpression {unary = MinusOperator {}, operand} ->
+      showChar '-' .
+      displays operand
+
+    UnaryExpression {unary = NotOperator {}, operand} ->
+      showString "not " .
+      displays operand
+
+    UnaryExpression {unary = LenOperator {}, operand} ->
+      showString "len " .
+      displays operand
 
     BinaryExpression {left, binary, right} ->
-      displays left . showChar ' ' . displays binary . showChar ' ' . displays right
+      displays left .
+      showChar ' ' .
+      displays binary .
+      showChar ' ' .
+      displays right
 
-    ArrayExpression {elements = []} -> showString "[]"
+    ArrayExpression {elems = []} ->
+      showString "[]"
 
-    ArrayExpression {elements = element : elements} ->
-      showChar '[' . displays element . go elements
+    ArrayExpression {elems = elem : elems} ->
+      showChar '[' .
+      displays elem .
+      go elems
       where
         go [] = showChar ']'
-        go (element : elements) = showString ", " . displays element . go elements
+        go (elem : elems) = showString ", " . displays elem . go elems
 
-    CallExpression {functionId = SymbolId {name}, arguments = []} ->
-      showString name . showString "()"
+    CallExpression {funId = SymbolId {name}, args = []} ->
+      showString name .
+      showString "()"
 
-    CallExpression {functionId = SymbolId {name}, arguments = argument : arguments} ->
-      showString name . showChar '(' . displays argument . go arguments
+    CallExpression {funId = SymbolId {name}, args = arg : args} ->
+      showString name .
+      showChar '(' .
+      displays arg .
+      go args
       where
         go [] = showChar ')'
-        go (argument : arguments) = showString ", " . displays argument . go arguments
+        go (arg : args) = showString ", " . displays arg . go args
 
 
 instance Display UnaryOperator where

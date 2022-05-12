@@ -14,7 +14,7 @@ import Test.Hspec
 
 spec :: Spec
 spec = do
-  describe "evaluateDevin" $ do
+  describe "evalDevin" $ do
     it "should succeed on program 1" $
       executionShouldSucceed
         "def main() {\n\
@@ -201,6 +201,6 @@ executionShouldSucceed source = case runParser Parsers.devin [] "" (0, source) o
   Right devin -> do
     state <- makePredefinedState
 
-    runEvaluator (evaluateDevin devin) state >>= \case
+    runEvaluator (evalDevin devin) state >>= \case
       (Left error, _) -> expectationFailure (display error)
       (Right _, _) -> pure ()

@@ -74,7 +74,7 @@ typeCheckingShouldSucceed :: String -> Expectation
 typeCheckingShouldSucceed source = case runParser Parsers.devin [] "" (0, source) of
   Left parseError -> expectationFailure (show parseError)
 
-  Right devin -> case runTyper (checkDevin devin) predefinedEnvironment of
+  Right devin -> case runTyper (checkDevin devin) predefinedEnv of
     (_, _, []) -> pure ()
     (_, _, errors) -> expectationFailure (intercalate "\n" (map display errors))
 
@@ -83,6 +83,6 @@ typeCheckingShouldFail :: String -> Expectation
 typeCheckingShouldFail source = case runParser Parsers.devin [] "" (0, source) of
   Left parseError -> expectationFailure (show parseError)
 
-  Right devin -> case runTyper (checkDevin devin) predefinedEnvironment of
+  Right devin -> case runTyper (checkDevin devin) predefinedEnv of
     (_, _, []) -> expectationFailure "Expected type checking to fail, but it succeeded"
     (_, _, _) -> pure ()

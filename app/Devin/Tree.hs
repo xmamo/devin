@@ -7,7 +7,7 @@
 module Devin.Tree (
   Tree,
   devinTree,
-  declarationTree,
+  definitionTree,
   statementTree,
   expressionTree,
   unaryOperatorTree,
@@ -36,48 +36,49 @@ import Devin.Utils
 
 
 devinTree :: Devin -> Tree (Text, Text)
-devinTree Devin {declarations} = Tree.Node ("Devin", "") (map declarationTree declarations)
+devinTree Devin {definitions} =
+  Tree.Node ("Devin", "") (map definitionTree definitions)
 
 
-declarationTree :: Declaration -> Tree (Text, Text)
-declarationTree = \case
-  VariableDeclaration {varKeyword, variableId, equalSign, value, semicolon} ->
-    Tree.Node ("VariableDeclaration", "") [
+definitionTree :: Definition -> Tree (Text, Text)
+definitionTree = \case
+  VarDefinition {varKeyword, varId, equalSign, value, semicolon} ->
+    Tree.Node ("VarDefinition", "") [
       tokenTree "var" varKeyword,
-      symbolIdTree variableId,
+      symbolIdTree varId,
       tokenTree "=" equalSign,
       expressionTree value,
       tokenTree ";" semicolon
     ]
 
-  FunctionDeclaration {defKeyword, functionId, open, parameters, commas, close, returnInfo, body} ->
-    Tree.Node ("FunctionDeclaration", "") $ concat [
+  FunDefinition {defKeyword, funId, open, params, commas, close, returnInfo, body} ->
+    Tree.Node ("FunDefinition", "") $ concat [
       [tokenTree "def" defKeyword],
-      [symbolIdTree functionId],
+      [symbolIdTree funId],
       [tokenTree "(" open],
-      go parameters commas,
+      go params commas,
       [tokenTree ")" close],
-      maybe [] (\(arrow, typeId) -> [tokenTree "->" arrow, typeIdTree typeId]) returnInfo,
+      maybe [] (\(arrow, id) -> [tokenTree "->" arrow, typeIdTree id]) returnInfo,
       [statementTree body]
     ]
 
     where
-      go ps [] = concatMap parameterTree ps
+      go ps [] = concatMap paramTree ps
       go [] cs = map (tokenTree ",") cs
-      go (p : ps) (c : cs) = parameterTree p ++ [tokenTree "," c] ++ go ps cs
+      go (p : ps) (c : cs) = paramTree p ++ [tokenTree "," c] ++ go ps cs
 
-      parameterTree (refKeyword, parameterId, parameterInfo) =
+      paramTree (refKeyword, paramId, paramInfo) =
         concat [
           maybe [] (\token -> [tokenTree "ref" token]) refKeyword,
-          [symbolIdTree parameterId],
-          maybe [] (\(colon, t) -> [tokenTree ":" colon, typeIdTree t]) parameterInfo
+          [symbolIdTree paramId],
+          maybe [] (\(colon, t) -> [tokenTree ":" colon, typeIdTree t]) paramInfo
         ]
 
 
 statementTree :: Statement -> Tree (Text, Text)
 statementTree = \case
-  DeclarationStatement {declaration} ->
-    Tree.Node ("DeclarationStatement", "") [declarationTree declaration]
+  DefinitionStatement {definition} ->
+    Tree.Node ("DefinitionStatement", "") [definitionTree definition]
 
   ExpressionStatement {value, semicolon} ->
     Tree.Node ("ExpressionStatement", "") [
@@ -159,11 +160,15 @@ expressionTree = \case
   RationalExpression {rational} ->
     Tree.Node ("RationalExpression", Text.pack (showRatio rational)) []
 
-  VariableExpression {variableName} ->
-    Tree.Node ("VariableExpression", Text.pack variableName) []
+  VarExpression {varName} ->
+    Tree.Node ("VarExpression", Text.pack varName) []
 
-  ArrayExpression {open, elements = es, commas = cs, close} ->
-    Tree.Node ("ArrayExpression", "") ([tokenTree "[" open] ++ go es cs ++ [tokenTree "]" close])
+  ArrayExpression {open, elems = es, commas = cs, close} ->
+    Tree.Node ("ArrayExpression", "") $ concat [
+      [tokenTree "[" open],
+      go es cs,
+      [tokenTree "]" close]
+    ]
     where
       go es [] = map expressionTree es
       go [] cs = map (tokenTree ",") cs
@@ -177,9 +182,9 @@ expressionTree = \case
       tokenTree "]" close
     ]
 
-  CallExpression {functionId, open, arguments = as, commas = cs, close} ->
+  CallExpression {funId, open, args = as, commas = cs, close} ->
     Tree.Node ("CallExpression", "") $ concat [
-      [symbolIdTree functionId, tokenTree "(" open],
+      [symbolIdTree funId, tokenTree "(" open],
       go as cs,
       [tokenTree ")" close]
     ]
@@ -217,26 +222,27 @@ unaryOperatorTree LenOperator {} = Tree.Node ("LenOperator", "len") []
 
 
 binaryOperatorTree :: BinaryOperator -> Tree (Text, Text)
-binaryOperatorTree AddOperator {} = Tree.Node ("AddOperator", "+") []
-binaryOperatorTree SubtractOperator {} = Tree.Node ("SubtractOperator", "-") []
-binaryOperatorTree MultiplyOperator {} = Tree.Node ("MultiplyOperator", "*") []
-binaryOperatorTree DivideOperator {} = Tree.Node ("DivideOperator", "/") []
-binaryOperatorTree ModuloOperator {} = Tree.Node ("ModuloOperator", "%") []
-binaryOperatorTree EqualOperator {} = Tree.Node ("EqualOperator", "==") []
-binaryOperatorTree NotEqualOperator {} = Tree.Node ("NotEqualOperator", "!=") []
-binaryOperatorTree LessOperator {} = Tree.Node ("LessOperator", "<") []
-binaryOperatorTree LessOrEqualOperator {} = Tree.Node ("LessOrEqualOperator", "<=") []
-binaryOperatorTree GreaterOperator {} = Tree.Node ("GreaterOperator", ">") []
-binaryOperatorTree GreaterOrEqualOperator {} = Tree.Node ("GreaterOrEqualOperator", ">=") []
-binaryOperatorTree AndOperator {} = Tree.Node ("AndOperator", "and") []
-binaryOperatorTree OrOperator {} = Tree.Node ("OrOperator", "or") []
-binaryOperatorTree XorOperator {} = Tree.Node ("XorOperator", "xor") []
-binaryOperatorTree PlainAssignOperator {} = Tree.Node ("PlainAssignOperator", "=") []
-binaryOperatorTree AddAssignOperator {} = Tree.Node ("AddAssignOperator", "+=") []
-binaryOperatorTree SubtractAssignOperator {} = Tree.Node ("SubtractAssignOperator", "-=") []
-binaryOperatorTree MultiplyAssignOperator {} = Tree.Node ("MultiplyAssignOperator", "*=") []
-binaryOperatorTree DivideAssignOperator {} = Tree.Node ("DivideAssignOperator", "/=") []
-binaryOperatorTree ModuloAssignOperator {} = Tree.Node ("ModuloAssignOperator", "%=") []
+binaryOperatorTree = \case
+  AddOperator {} -> Tree.Node ("AddOperator", "+") []
+  SubtractOperator {} -> Tree.Node ("SubtractOperator", "-") []
+  MultiplyOperator {} -> Tree.Node ("MultiplyOperator", "*") []
+  DivideOperator {} -> Tree.Node ("DivideOperator", "/") []
+  ModuloOperator {} -> Tree.Node ("ModuloOperator", "%") []
+  EqualOperator {} -> Tree.Node ("EqualOperator", "==") []
+  NotEqualOperator {} -> Tree.Node ("NotEqualOperator", "!=") []
+  LessOperator {} -> Tree.Node ("LessOperator", "<") []
+  LessOrEqualOperator {} -> Tree.Node ("LessOrEqualOperator", "<=") []
+  GreaterOperator {} -> Tree.Node ("GreaterOperator", ">") []
+  GreaterOrEqualOperator {} -> Tree.Node ("GreaterOrEqualOperator", ">=") []
+  AndOperator {} -> Tree.Node ("AndOperator", "and") []
+  OrOperator {} -> Tree.Node ("OrOperator", "or") []
+  XorOperator {} -> Tree.Node ("XorOperator", "xor") []
+  PlainAssignOperator {} -> Tree.Node ("PlainAssignOperator", "=") []
+  AddAssignOperator {} -> Tree.Node ("AddAssignOperator", "+=") []
+  SubtractAssignOperator {} -> Tree.Node ("SubtractAssignOperator", "-=") []
+  MultiplyAssignOperator {} -> Tree.Node ("MultiplyAssignOperator", "*=") []
+  DivideAssignOperator {} -> Tree.Node ("DivideAssignOperator", "/=") []
+  ModuloAssignOperator {} -> Tree.Node ("ModuloAssignOperator", "%=") []
 
 
 symbolIdTree :: SymbolId -> Tree (Text, Text)
@@ -260,30 +266,30 @@ tokenTree :: String -> Token -> Tree (Text, Text)
 tokenTree label Token {} = Tree.Node ("Token", Text.pack label) []
 
 
-stateForest :: MonadIO m => State -> m [Tree (Text, Text)]
+stateForest :: MonadIO m => State -> m (Tree.Forest (Text, Text))
 stateForest = \case
   [] -> pure []
 
-  Frame {variables = []} : parents -> stateForest parents
+  Frame {vars = []} : parents -> stateForest parents
 
-  Frame {variables} : parents -> do
-    subforest <- for variables $ \(name, r) -> do
-      v <- readReference r
-      s <- displayValue v
+  Frame {vars} : parents -> do
+    subforest <- for vars $ \(name, r) -> do
+      v <- readRef r
+      s <- displayVal v
       pure (Tree.Node (Text.pack name, Text.pack s) [])
 
     forest <- stateForest parents
     pure (Tree.Node ("Frame", "") subforest : forest)
 
 
-displayValue :: MonadIO m => Value -> m String
-displayValue value = do
-  s <- displaysValue value
+displayVal :: MonadIO m => Value -> m String
+displayVal val = do
+  s <- displaysVal val
   pure (s "")
 
 
-displaysValue :: MonadIO m => Value -> m ShowS
-displaysValue = \case
+displaysVal :: MonadIO m => Value -> m ShowS
+displaysVal = \case
   Unit -> pure (showString "unit")
   Bool x -> pure (showString (if x then "true" else "false"))
   Int x -> pure (shows x)
@@ -292,8 +298,8 @@ displaysValue = \case
   Array rs | Vector.null rs -> pure (showString "[]")
 
   Array rs -> do
-    x <- readReference (rs ! 0)
-    s1 <- displaysValue x
+    x <- readRef (rs ! 0)
+    s1 <- displaysVal x
     s2 <- go (Vector.length rs) 1
     pure (showChar '[' . s1 . s2)
 
@@ -301,7 +307,7 @@ displaysValue = \case
       go n i | i >= n = pure (showChar ']')
 
       go n i = do
-        x <- readReference (rs ! i)
-        s1 <- displaysValue x
+        x <- readRef (rs ! i)
+        s1 <- displaysVal x
         s2 <- go n (i + 1)
         pure (showString ", " . s1 . s2)

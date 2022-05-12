@@ -5,14 +5,13 @@
 
 module Devin.Typers (
   checkDevin,
-  checkDeclaration,
+  checkDefinition,
   checkStatement,
   checkExpression
 ) where
 
 import Control.Monad
 import Data.Foldable
-import Data.Functor
 import Data.Traversable
 
 import Devin.Error
@@ -22,46 +21,46 @@ import Devin.Typer
 
 
 checkDevin :: Devin -> Typer ()
-checkDevin Devin {declarations} = do
-  for_ declarations checkDeclaration1
-  for_ declarations checkDeclaration2
+checkDevin Devin {definitions} = do
+  for_ definitions checkDefinition1
+  for_ definitions checkDefinition2
 
 
-checkDeclaration :: Declaration -> Typer ()
-checkDeclaration declaration = do
-  checkDeclaration1 declaration
-  checkDeclaration2 declaration
+checkDefinition :: Definition -> Typer ()
+checkDefinition definition = do
+  checkDefinition1 definition
+  checkDefinition2 definition
 
 
-checkDeclaration1 :: Declaration -> Typer ()
-checkDeclaration1 = \case
-  VariableDeclaration {} -> pure ()
+checkDefinition1 :: Definition -> Typer ()
+checkDefinition1 = \case
+  VarDefinition {} -> pure ()
 
-  FunctionDeclaration {functionId = SymbolId {name}, parameters, returnInfo} -> do
-    parameterTs <- for parameters $ \(_, _, typeInfo) -> case typeInfo of
-      Just (_, parameterTypeId) -> getType parameterTypeId
+  FunDefinition {funId = SymbolId {name}, params, returnInfo} -> do
+    paramTs <- for params $ \(_, _, typeInfo) -> case typeInfo of
+      Just (_, paramTypeId) -> getType paramTypeId
       Nothing -> pure Unknown
 
     returnT <- case returnInfo of
       Just (_, returnTypeId) -> getType returnTypeId
       Nothing -> pure Unknown
 
-    defineFunctionSignature name (parameterTs, returnT)
+    defineFunSignature name (paramTs, returnT)
 
 
-checkDeclaration2 :: Declaration -> Typer ()
-checkDeclaration2 = \case
-  VariableDeclaration {variableId = SymbolId {name}, value} -> do
+checkDefinition2 :: Definition -> Typer ()
+checkDefinition2 = \case
+  VarDefinition {varId = SymbolId {name}, value} -> do
     t <- checkExpression value
-    defineVariableType name t
+    defineVarType name t
 
-  FunctionDeclaration {functionId, parameters, returnInfo, body} -> withNewScope $ do
-    for_ parameters $ \(_, SymbolId {name}, typeInfo) -> case typeInfo of
-      Just (_, parameterTypeId) -> do
-        parameterT <- getType parameterTypeId
-        defineVariableType name parameterT
+  FunDefinition {funId, params, returnInfo, body} -> withNewScope $ do
+    for_ params $ \(_, SymbolId {name}, typeInfo) -> case typeInfo of
+      Just (_, paramTypeId) -> do
+        paramT <- getType paramTypeId
+        defineVarType name paramT
 
-      Nothing -> defineVariableType name Unknown
+      Nothing -> defineVarType name Unknown
 
     returnT <- case returnInfo of
       Just (_, returnTypeId) -> getType returnTypeId
@@ -73,18 +72,19 @@ checkDeclaration2 = \case
 
       _ -> do
         doesReturn <- checkStatement returnT body
-        unless doesReturn (report (MissingReturnStatement functionId))
+        unless doesReturn (report (MissingReturnStatement funId))
 
 
 checkStatement :: Type -> Statement -> Typer Bool
 checkStatement expectedT statement = case statement of
-  DeclarationStatement {declaration = VariableDeclaration {variableId = SymbolId {name}, value}} -> do
+  DefinitionStatement {definition = VarDefinition {varId, value}} -> do
+    let SymbolId {name} = varId
     t <- checkExpression value
-    defineVariableType name t
+    defineVarType name t
     pure False
 
-  DeclarationStatement {declaration} -> do
-    checkDeclaration declaration
+  DefinitionStatement {definition} -> do
+    checkDefinition definition
     pure False
 
   ExpressionStatement {value} -> do
@@ -134,13 +134,18 @@ checkStatement expectedT statement = case statement of
 
   BlockStatement {statements} -> withNewScope $ do
     for_ statements $ \case
-      DeclarationStatement {declaration} -> checkDeclaration1 declaration
+      DefinitionStatement {definition} -> checkDefinition1 definition
       _ -> pure ()
 
-    foldlM (\doesReturn statement -> (doesReturn ||) <$> check statement) False statements
+    foldlM f False statements
 
     where
-      check DeclarationStatement {declaration} = checkDeclaration2 declaration $> False
+      f doesReturn statement = (doesReturn ||) <$> check statement
+
+      check DefinitionStatement {definition} = do
+        checkDefinition2 definition
+        pure False
+
       check statement = checkStatement expectedT statement
 
 
@@ -150,31 +155,29 @@ checkExpression expression = case expression of
 
   RationalExpression {} -> pure Float
 
-  VariableExpression {variableName, interval} ->
-    lookupVariableType variableName >>= \case
-      Just (t, _) -> pure t
-      Nothing -> report' (UnknownVariable variableName interval)
+  VarExpression {varName, interval} -> lookupVarType varName >>= \case
+    Just (t, _) -> pure t
+    Nothing -> report' (UnknownVar varName interval)
 
-  ArrayExpression {elements = []} -> pure (Array Unknown)
+  ArrayExpression {elems = []} -> pure (Array Unknown)
 
-  ArrayExpression {elements = element : elements} -> go elements =<< checkExpression element
+  ArrayExpression {elems = elem : elems} -> do
+    t <- checkExpression elem
+    go elems t
+
     where
-      go elements Unknown = do
-        for_ elements checkExpression
-        pure (Array Unknown)
-
       go [] t = pure (Array t)
 
-      go (element : elements) t = checkExpression element >>= \case
+      go (elem : elems) t = checkExpression elem >>= \case
         Unknown -> do
-          for_ elements checkExpression
+          for_ elems checkExpression
           pure (Array Unknown)
 
-        t' | t' <: t -> go elements t'
+        t' | t' <: t -> go elems t
 
-        _ -> do
-          for_ elements checkExpression
-          pure (Array Any)
+        t' -> do
+          report (InvalidType elem t t')
+          go elems t
 
   AccessExpression {array, index} -> do
     arrayT <- checkExpression array
@@ -187,21 +190,23 @@ checkExpression expression = case expression of
       (Array _, _) -> report' (InvalidType index Int indexT)
       (_, _) -> report' (InvalidType array (Array Unknown) arrayT)
 
-  CallExpression {functionId = SymbolId {name, interval}, arguments} ->
-    lookupFunctionSignature name >>= \case
-      Just ((parameterTs, returnT), _) -> go 0 arguments parameterTs
+  CallExpression {funId = SymbolId {name, interval}, args} ->
+    lookupFunSignature name >>= \case
+      Just ((paramTs, returnT), _) -> go 0 args paramTs
         where
           go _ [] [] = pure returnT
 
-          go n (argument : arguments) (parameterT : parameterTs) = do
-            argumentT <- checkExpression argument
-            unless (argumentT <: parameterT) (report (InvalidType argument parameterT argumentT))
-            go (n + 1) arguments parameterTs
+          go n (arg : args) (paramT : paramTs) = do
+            argT <- checkExpression arg
+            unless (argT <: paramT) (report (InvalidType arg paramT argT))
+            go (n + 1) args paramTs
 
-          go n arguments parameterTs =
-            report' (InvalidArgumentCount expression (n + length parameterTs) (n + length arguments))
+          go n args paramTs = do
+            let expected = n + length paramTs
+            let actual = n + length args
+            report' (InvalidArgCount expression expected actual)
 
-      Nothing -> report' (UnknownFunction name interval)
+      Nothing -> report' (UnknownFun name interval)
 
   UnaryExpression {unary, operand} | PlusOperator {} <- unary -> do
     operandT <- checkExpression operand
@@ -246,9 +251,7 @@ checkExpression expression = case expression of
       (_, Unknown) -> pure Unknown
       (Int, Int) -> pure Int
       (Float, Float) -> pure Float
-      (Array Unknown, Array _) -> pure (Array Unknown)
-      (Array _, Array Unknown) -> pure (Array Unknown)
-      (Array t1, Array t2) | t1 <: t2 && t2 <: t1 -> pure (Array t1)
+      (Array t1, Array t2) | Just t <- merge t1 t2 -> pure (Array t)
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | SubtractOperator {} <- binary -> do
@@ -449,13 +452,12 @@ checkExpression expression = case expression of
 
 getType :: TypeId -> Typer Type
 getType = \case
-  PlainTypeId {name, interval} ->
-    lookupType name >>= \case
-      Just (t, _) -> pure t
+  PlainTypeId {name, interval} -> lookupType name >>= \case
+    Just (t, _) -> pure t
 
-      Nothing -> do
-        report' (UnknownType name interval)
-        defineType name (Placeholder name)
+    Nothing -> do
+      report' (UnknownType name interval)
+      defineType name (Placeholder name)
 
   ArrayTypeId {innerTypeId} -> do
     t <- getType innerTypeId

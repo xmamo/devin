@@ -30,8 +30,8 @@ data Tags = Tags {
   highlightTag :: GtkSource.Tag,
   bracketTag :: GtkSource.Tag,
   keywordTag :: GtkSource.Tag,
-  variableIdTag :: GtkSource.Tag,
-  functionIdTag :: GtkSource.Tag,
+  varIdTag :: GtkSource.Tag,
+  funIdTag :: GtkSource.Tag,
   typeTag :: GtkSource.Tag,
   numberTag :: GtkSource.Tag,
   operatorTag :: GtkSource.Tag,
@@ -58,13 +58,13 @@ generateTags scheme = do
   defaultLanguage <- GtkSource.languageManagerGetLanguage languageManager "def"
 
   tags <- for styleIds $ \styleId -> do
-    result <- case (scheme, defaultLanguage) of
+    maybeStyle <- case (scheme, defaultLanguage) of
       (Just scheme, Just language) -> getStyle language scheme styleId
       (Just scheme, Nothing) -> GtkSource.styleSchemeGetStyle scheme styleId
       (Nothing, _) -> pure Nothing
 
     tag <- GtkSource.tagNew Nothing
-    whenJust result (\style -> GtkSource.styleApply style tag)
+    whenJust maybeStyle (\style -> GtkSource.styleApply style tag)
     pure tag
 
   let [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10] = tags
@@ -76,8 +76,8 @@ applyTags tags tagTable = do
   Gtk.textTagTableAdd tagTable (highlightTag tags)
   Gtk.textTagTableAdd tagTable (bracketTag tags)
   Gtk.textTagTableAdd tagTable (keywordTag tags)
-  Gtk.textTagTableAdd tagTable (variableIdTag tags)
-  Gtk.textTagTableAdd tagTable (functionIdTag tags)
+  Gtk.textTagTableAdd tagTable (varIdTag tags)
+  Gtk.textTagTableAdd tagTable (funIdTag tags)
   Gtk.textTagTableAdd tagTable (typeTag tags)
   Gtk.textTagTableAdd tagTable (numberTag tags)
   Gtk.textTagTableAdd tagTable (operatorTag tags)
@@ -104,7 +104,6 @@ getStyle language scheme styleId = go Set.empty styleId
 
       Nothing | Set.member styleId seen -> pure Nothing
 
-      Nothing ->
-        GtkSource.languageGetStyleFallback language styleId >>= \case
-          Just fallbackStyleId -> go (Set.insert styleId seen) fallbackStyleId
-          Nothing -> pure Nothing
+      Nothing -> GtkSource.languageGetStyleFallback language styleId >>= \case
+        Just fallbackStyleId -> go (Set.insert styleId seen) fallbackStyleId
+        Nothing -> pure Nothing

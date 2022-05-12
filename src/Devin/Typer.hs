@@ -9,13 +9,13 @@ module Devin.Typer (
   Typer (..),
   Environment,
   Scope (..),
-  predefinedEnvironment,
+  predefinedEnv,
   defineType,
   lookupType,
-  defineFunctionSignature,
-  lookupFunctionSignature,
-  defineVariableType,
-  lookupVariableType,
+  defineFunSignature,
+  lookupFunSignature,
+  defineVarType,
+  lookupVarType,
   withNewScope,
   report
 ) where
@@ -36,50 +36,50 @@ type Environment = [Scope]
 
 data Scope = Scope {
   types :: [(String, Type)],
-  functions :: [(String, ([Type], Type))],
-  variables :: [(String, Type)]
+  funs :: [(String, ([Type], Type))],
+  vars :: [(String, Type)]
 } deriving (Show, Read, Data)
 
 
 instance Applicative Typer where
   pure :: a -> Typer a
-  pure x = Typer (\environment -> (x, environment, []))
+  pure x = Typer (\env -> (x, env, []))
 
 
   liftA2 :: (a -> b -> c) -> Typer a -> Typer b -> Typer c
-  liftA2 f mx my = Typer $ \environment ->
-    let (x, environment', errors1) = runTyper mx environment
-        (y, environment'', errors2) = runTyper my environment'
-     in (f x y, environment'', errors1 ++ errors2)
+  liftA2 f mx my = Typer $ \env ->
+    let (x, env', errors1) = runTyper mx env
+        (y, env'', errors2) = runTyper my env'
+     in (f x y, env'', errors1 ++ errors2)
 
 
 instance Monad Typer where
   (>>=) :: Typer a -> (a -> Typer b) -> Typer b
-  mx >>= f = Typer $ \environment ->
-    let (x, environment', errors1) = runTyper mx environment
-        (y, environment'', errors2) = runTyper (f x) environment'
-     in (y, environment'', errors1 ++ errors2)
+  mx >>= f = Typer $ \env ->
+    let (x, env', errors1) = runTyper mx env
+        (y, env'', errors2) = runTyper (f x) env'
+     in (y, env'', errors1 ++ errors2)
 
 
-predefinedEnvironment :: Environment
-predefinedEnvironment =
+predefinedEnv :: Environment
+predefinedEnv =
   let types = [("Unit", Unit), ("Bool", Bool), ("Int", Int), ("Float", Float)]
-      functions = [("toInt", ([Float], Int)), ("toFloat", ([Int], Float))]
-      variables = [("true", Bool), ("false", Bool), ("unit", Unit)]
-   in [Scope types functions variables]
+      funs = [("toInt", ([Float], Int)), ("toFloat", ([Int], Float))]
+      vars = [("true", Bool), ("false", Bool), ("unit", Unit)]
+   in [Scope types funs vars]
 
 
 defineType :: String -> Type -> Typer Type
 defineType name t = Typer $ \case
-  [] ->
-    (t, [Scope [(name, t)] [] []], [])
+  [] -> (t, [Scope [(name, t)] [] []], [])
 
   scope : parents ->
-    (t, scope {types = (name, t) : types scope} : parents, [])
+    let types' = (name, t) : types scope
+     in (t, scope {types = types'} : parents, [])
 
 
 lookupType :: String -> Typer (Maybe (Type, Int))
-lookupType name = Typer (\environment -> (go 0 environment, environment, []))
+lookupType name = Typer (\env -> (go 0 env, env, []))
   where
     go _ [] = Nothing
 
@@ -88,43 +88,49 @@ lookupType name = Typer (\environment -> (go 0 environment, environment, []))
       Nothing -> go (depth + 1) parents
 
 
-defineFunctionSignature :: String -> ([Type], Type) -> Typer ()
-defineFunctionSignature name signature = Typer $ \case
+defineFunSignature :: String -> ([Type], Type) -> Typer ()
+defineFunSignature name signature = Typer $ \case
   [] -> ((), [Scope [] [(name, signature)] []], [])
-  scope : parents -> ((), scope {functions = (name, signature) : functions scope} : parents, [])
+
+  scope : parents ->
+    let funs' = (name, signature) : funs scope
+     in ((), scope {funs = funs'} : parents, [])
 
 
-lookupFunctionSignature :: String -> Typer (Maybe (([Type], Type), Int))
-lookupFunctionSignature name = Typer (\environment -> (go 0 environment, environment, []))
+lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
+lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
   where
     go _ [] = Nothing
 
-    go depth (Scope {functions} : parents) = case lookup name functions of
+    go depth (Scope {funs} : parents) = case lookup name funs of
       Just signature -> Just (signature, depth)
       Nothing -> go (depth + 1) parents
 
 
-defineVariableType :: String -> Type -> Typer ()
-defineVariableType name t = Typer $ \case
+defineVarType :: String -> Type -> Typer ()
+defineVarType name t = Typer $ \case
   [] -> ((), [Scope [] [] [(name, t)]], [])
-  scope : parents -> ((), scope {variables = (name, t) : variables scope} : parents, [])
+
+  scope : parents ->
+    let vars' = (name, t) : vars scope
+     in ((), scope {vars = vars'} : parents, [])
 
 
-lookupVariableType :: String -> Typer (Maybe (Type, Int))
-lookupVariableType name = Typer (\environment -> (go 0 environment, environment, []))
+lookupVarType :: String -> Typer (Maybe (Type, Int))
+lookupVarType name = Typer (\env -> (go 0 env, env, []))
   where
     go _ [] = Nothing
 
-    go depth (Scope {variables} : parents) = case lookup name variables of
+    go depth (Scope {vars} : parents) = case lookup name vars of
       Just t -> Just (t, depth)
       Nothing -> go (depth + 1) parents
 
 
 withNewScope :: Typer a -> Typer a
-withNewScope mx = Typer $ \environment ->
-  let (x, environment', errors) = runTyper mx (Scope [] [] [] : environment)
-   in (x, tail environment', errors)
+withNewScope mx = Typer $ \env ->
+  let (x, env', errors) = runTyper mx (Scope [] [] [] : env)
+   in (x, tail env', errors)
 
 
 report :: Error -> Typer ()
-report error = Typer (\environment -> ((), environment, [error]))
+report error = Typer (\env -> ((), env, [error]))
