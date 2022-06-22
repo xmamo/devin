@@ -1,10 +1,7 @@
 bachelorthesis.pdf: PhdThesis theorems *.bib *.cfg *.tex
 	$(MAKE) -C PhdThesis
 	$(MAKE) -C theorems
-	TEXINPUTS=:PhdThesis:theorems pdflatex -interaction nonstopmode bachelorthesis.tex
-	bibtex bachelorthesis.aux
-	TEXINPUTS=:PhdThesis:theorems pdflatex -interaction nonstopmode bachelorthesis.tex
-	TEXINPUTS=:PhdThesis:theorems pdflatex -interaction nonstopmode bachelorthesis.tex
+	TEXINPUTS=:PhdThesis latexmk -pdf thesis.tex
 
 PhdThesis:
 	curl 'https://users.dimi.uniud.it/~marco.comini/LaTeX/PhdThesis/PhdThesis.tbz' | tar -xf -

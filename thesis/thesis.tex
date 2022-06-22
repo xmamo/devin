@@ -1,0 +1,3286 @@
+\documentclass[UdineBachThesis,american,11pt,draft]{PhdThesis}
+
+\usepackage{babel}
+\usepackage[final]{graphicx}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\usepackage{enumitem}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\usepackage{biblatex}
+\addbibresource{thesis.bib}
+
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usetikzlibrary{shapes.geometric}
+
+\author{Matteo Morena}
+\supervisor{Marco Comini}
+\date{2021--2022}
+
+\title{
+  Implementation of an interpreter with graphical interface of a simple
+  imperative language
+}
+
+\setlength{\evensidemargin}{3mm}
+\setlength{\oddsidemargin}{7mm}
+\setlength{\textwidth}{150mm}
+\setlength{\parindent}{0pt}
+
+\setlist{
+  topsep=0pt,
+  partopsep=0pt,
+  parsep=\parskip,
+  itemsep=\parskip
+}
+
+\lstset{
+  belowskip=0pt,
+  basicstyle=\ttfamily,
+  upquote=true,
+  captionpos=b,
+  abovecaptionskip=\abovecaptionskip,
+  belowcaptionskip=\belowcaptionskip,
+  columns=fullflexible,
+  keepspaces=true,
+  literate={‘}{\texttt{`}}{1}{’}{'}{1}{“}{\texttt{`}}{1}{”}{'}{1}
+}
+
+\begin{document}
+  \maketitle
+
+  \frontmatter
+
+  \pagestyle{empty}
+
+  \tableofcontents
+
+  \mainmatter
+
+  \pagestyle{serif}
+  \partstyle{serifbig}
+  \chaptertitlestyle{serifbig}
+
+  \chapter{Parsing}
+
+  The first phase of any compiler or interpreter is called \emph{parsing}. Given
+  an input string, it is determined if it conforms to some set of rules; if it
+  does, a logical representation of the input is constructed.
+
+  \section{Languages and grammars}
+
+  Consider a parser for arithmetic expressions. The input of the parser is any
+  sequence of characters. Invalid strings like \lstinline@1+@ and
+  \lstinline@3//4@ get rejected; valid strings like \lstinline@2*(3+4)@ get
+  accepted.
+
+  The \emph{language} accepted by a parser is the set of all possible inputs
+  which the parser might accept. The set of rules to which the input has to
+  conform to is called the \emph{grammar} of the language.
+
+  As an example, we could define the grammar for arithmetic expressions as
+  follows. An \emph{expression} is any of the following items:
+
+  \begin{itemize}[topsep=0pt,partopsep=0pt,itemsep=0pt]
+    \item Any sequence of characters representing a number is a \emph{literal
+    expression};
+
+    \item \lstinline[mathescape]@($x$)@ is a \emph{parenthesized expression} if
+    $x$ is an expression;
+
+    \item \lstinline[mathescape]@+$x$@ and \lstinline[mathescape]@-$x$@ are
+    \emph{unary expressions} if $x$ is a literal/parenthesized expression;
+
+    \item $x$ is a \emph{term} if $x$ is a literal/unary/parenthesized
+    expression;
+
+    \item \lstinline[mathescape]@$x$*$y$@ and \lstinline[mathescape]@$x$/$y$@
+    are \emph{multiplicative expressions} if $y$ is a term and $x$ is a either
+    term or (recursively) a multiplicative
+    expression;
+
+    \item \lstinline[mathescape]@$x$+$y$@ and \lstinline[mathescape]@$x$-$y$@
+    are \emph{additive expressions} if $y$ is either a multiplicative expression
+    or a term, and $x$ is either a multiplicative expression or a term or
+    (recursively) an additive expression.
+  \end{itemize}
+
+  According to such rules, the string \lstinline@2*(3+4)@ is a valid arithmetic
+  expression. By definition:
+
+  \begin{itemize}
+    \item \lstinline@2@, \lstinline@3@, \lstinline@4@ are literal expressions;
+
+    \item \lstinline@3+4@ is an additive expression;
+
+    \item \lstinline@(3+4)@ is a parenthesized expression;
+
+    \item \lstinline@2*(3+4)@ is a multiplicative expression.
+  \end{itemize}
+
+  \section{Syntax tree}
+
+  A \emph{syntax tree} is the representation of a string accepted by the parser;
+  this data structure stores the syntactic structure of the input.
+
+  A syntax tree may retain all information necessary to reconstruct the input,
+  in which case it is called a \emph{concrete} syntax tree. Such a tree can be
+  further processed by either adding or discarding some information; also, nodes
+  in the tree can be rearranged. When there's not a one-to-one correspondence
+  between the input and the produced tree, the syntax tree is said to be
+  \emph{abstract}.
+
+  Consider the language of arithmetic expressions: there are at least two
+  possible syntax trees for the string \lstinline@2+3*(4+5)@, depending on how
+  much information is to be retained. In both cases, the semantic meaning is the
+  same: for instance, details about parenthesization can be discarded if the
+  resulting syntax tree still represents the same order of operations.
+
+  \begin{figure}[h]
+    \centering
+
+    \begin{tabular}{cc}
+      \begin{tikzpicture}[
+        every node/.style={circle,draw},
+        execute at begin node=\begin{ttfamily}\strut,
+        execute at end node=\strut\end{ttfamily}
+      ]
+        \node {+}
+          child {node {2}}
+          child {node {*}
+            child {node {3}}
+            child {node {+}
+              child {node {4}}
+              child {node {5}}
+            }
+          };
+      \end{tikzpicture} &
+
+      \begin{tikzpicture}[
+        every node/.style={circle,draw},
+        execute at begin node=\begin{ttfamily}\strut,
+        execute at end node=\strut\end{ttfamily}
+      ]
+        \node {+}
+          child {node {2}}
+          child {node {*}
+            child {node {3}}
+            child {node[ellipse] {( )}
+              child {node {+}
+                child {node {4}}
+                child {node {5}}
+              }
+            }
+          };
+      \end{tikzpicture}
+    \end{tabular}
+
+    \caption{Two semantically equivalent syntax trees for \lstinline@2+3*(4+5)@}
+  \end{figure}
+
+  As we'll see later, the parser for Devin uses a single tree representation
+  which retains enough information for syntax highlighting, but also discards
+  whitespace and comments. For our purposes, the distinction between abstract
+  and concrete syntax tree isn't necessary: for this reason, from now on I'll
+  just use the term \emph{syntax tree}.
+
+  \section{Parser combinators}
+  \label{section:parsercombinators}
+
+  There are many ways to recognize some input and generate an associated syntax
+  tree. There has been much academic research, and it is trivial to find
+  so-called \emph{parser generators}: tools which automatically generate code
+  for parsing a language, given its grammar. These tools build upon well-known
+  algorithms, such as LL, LR, LALR---just to throw a few names around. These
+  tools are great and very performant; however, they're kind of magical.
+
+  In this section, we'll see how there's no fundamental need for any generators;
+  although such tools are handy, it isn't too difficult to write a parser from
+  scratch, using a technique called \emph{recursive descent parsing}. Among
+  others, recursive descent parsers are used by the GCC compiler and the V8
+  JavaScript engines~\cite{nystrom}.
+
+  Recursive descent is a method of constructing a parser using a collection of
+  recursive functions. The simplest functions parse the atoms (or \emph{tokens})
+  of the target language; examples of tokens are numbers and identifiers. By
+  gluing together simpler functions, more complex parsers can be created: for
+  example, a parser for two-dimensional coordinates
+  \lstinline[mathescape]@($x$,$y$)@ can be built by using the parsers for
+  open-parenthesis, number, comma, number, and close-parenthesis respectively.
+  Parsers can be combined recursively: a parser $P$ could depend on a parser
+  $Q$, which in turn depends on $P$\@. Consider while statements: the body of
+  the loop is yet another statement, which in turn could be a while statement.
+
+  Recursive descent can be implemented in any imperative language. Of course, a
+  similar technique can be applied in functional programming as well. The
+  functional approach lends itself perfectly for this kind of task; in
+  particular, higher order functions abstract the boilerplate necessary to glue
+  different parsing functions together. These higher order functions are called
+  \emph{parser combinators}, as they combine simpler parsers into more complex
+  ones.
+
+  The general interface employed by parser combinators is that of a function
+  which takes some input string and returns either an error or some result
+  together with the remaining input. For instance, applying the function parsing
+  an integer on the input string \lstinline@21*2@ yields the pair
+  $\left(21, \text{\lstinline@*2@}\right)$.
+
+  Many libraries provide a framework for working with parser combinators. There
+  is usually at least some overlap between different combinator libraries, as
+  they all provide some shared functionality. Let $P$ and $Q$ be parsers; some
+  common parser combinators are:
+
+  \begin{itemize}
+    \item The \emph{sequence combinator}. Informally, this combinator runs two
+    parsers in succession and combines their results.
+
+    The sequence combinator runs $P$; if it succeeds, then $Q$ is run on the
+    remaining input. If $Q$ also succeeds, the combinator succeeds with the
+    combined results of $P$ and $Q$\@. If $P$ or $Q$ fail, then the combinator
+    also fails.
+
+    \item The \emph{alternative combinator}. This combinator implements choice.
+
+    The alternative combinator runs $P$ and $Q$ on the same input. If $P$
+    succeeds, the combinator succeeds with the same result as $P$ did; if $Q$
+    succeeds, the combinator succeeds with the same result as $Q$ did. If both
+    $P$ and $Q$ fail, then the combinator also fails.
+
+    \item The \emph{option combinator}. This combinator runs a parser zero or
+    one time.
+
+    The option combinator tries to run $P$\@. If $P$ succeeds, the combinator
+    succeeds with the same result as $P$ did. If $P$ fails, the combinator
+    succeeds with an empty result.
+
+    \item The \emph{repetition combinator}. This combinator runs a parser zero
+    or more times.
+
+    The repetition combinator tries to run $P$ as many times as possible, until
+    $P$ fails. Each time $P$ succeeds, the remaining input is fed back into the
+    next application of $P$ itself. This combinator succeeds with the
+    accumulated results of all successful runs.
+  \end{itemize}
+
+  \chapter{Tree traversal}
+
+  The syntax tree constructed by the parser can be traversed in a multitude of
+  ways. In general, syntax trees not only represent the structure of a
+  programming languages, but also the structure of markup or other kinds of
+  languages. For the purposes of this thesis, I'll discuss the processing of
+  programming languages only.
+
+  It is important to note the grammar of a language only describes its
+  \emph{syntax}: on its own, it only defines which inputs strings are valid and
+  which are not; similarly, a parser only maps syntactically valid input strings
+  into trees. It is the role of other components to give some \emph{semantic
+  meaning} to such trees.
+
+  \begin{itemize}
+    \item An \emph{evaluator} would associate the nodes of the syntax tree with
+    actions to execute. Examples are performing arithmetic calculations,
+    conditionally executing subtrees, and assigning or retrieving values from
+    variables.
+
+    \item A \emph{compiler} would translate the syntax tree into some other form.
+    For instance, the GCC compiler produces object files from valid C syntax; in
+    turn, object files can be parsed by the system's linker, producing an
+    executable.
+
+    \item On languages with static types, a \emph{type checker} would verify
+    that no type errors would be produced by execution. In such systems it is
+    fundamental that both the type checker and the evaluator/compiler obey to
+    the same semantics.
+
+    \item A \emph{linter} would analyze the syntax tree, suggesting how to
+    improve the original source code. Contrary to the type checking, linting may
+    not depend on static types (if any); furthermore, successful
+    compilation/evaluation doesn't depend on the linter. As it is the case for
+    the type checker, all components must obey to the same semantics.
+
+    \item A \emph{syntax highlighter} would use the information stored in the
+    syntax tree to perform syntax highlighting. The used a syntax tree would be
+    rather concrete, as each node would be associated with a position in the
+    parser's input string.
+  \end{itemize}
+
+  \chapter{A first look at Devin}
+
+  In this thesis, I'll discuss the implementation of a simple imperative
+  programming language which I decided to call Devin. The name Devin is an
+  homage to Duino, the city I'm currently living in; its slovenian name is, in
+  fact, Devin.
+
+  Alongside Devin, I developed a graphical text editor for the language. The
+  editor features syntax highlighting, error reporting, and a simple visual
+  debugger.
+
+  \begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{2.png}
+    \caption{The graphical editor associated with Devin}
+  \end{figure}
+
+  \section{Language features}
+
+  Devin is an imperative programming language with lexical variable scoping and
+  support for recursive function definitions. Syntactically, it's similar to any
+  C descendant; among others, it supports variable definition and assignment,
+  while loops, do-while loops, and branching. Two significant differences from C
+  are the syntax required to specify parameter types and the lack of for loops.
+
+  \subsection{Data types}
+
+  Devin features the following data types:
+
+  \begin{itemize}
+    \item \lstinline@Bool@, for the boolean values \lstinline@true@,
+    \lstinline@false@;
+
+    \item \lstinline@Int@, for 64-bit integers like \lstinline@42@;
+
+    \item \lstinline@Float@, for double-precision floating-point numbers like
+    \lstinline@3.14@;
+
+    \item \lstinline[mathescape]@[$T$]@, for arrays like
+    \lstinline@[1, 1, 2, 3, 5, 8, 13, 21, 34, 55]@.
+  \end{itemize}
+
+  In addition to the items above, Devin has a \emph{unit type} named
+  \lstinline@Unit@; it is inhabited by one value only: \lstinline@unit@. Unit
+  types can be used in lieu of void types: when a procedure has side effects
+  only, it marked as returning \lstinline@Unit@.
+
+  One of the advantages of unit types is the uniform treatment of function
+  calls, as there's no need to distinguish between procedures which return a
+  value and those which return no value. While unit types are traditionally used
+  in functional programming languages, some recent imperative languages like
+  Kotlin and Rust incorporate this feature as well.
+
+  \subsection{Built-in operators}
+
+  Booleans support negation, conjunction, disjunction and exclusive disjunction.
+
+  Like in C, the right operand of boolean binary expressions is only evaluated
+  if the left operand doesn't already determine the truthfulness of the whole
+  expression.
+
+  \begin{table}[h]
+    \centering
+
+    \begin{tabular}{|c|c|c|c|}
+      \hline
+
+      Description &
+      Syntax &
+      C equivalent &
+      Semantic meaning \\
+      \hline
+
+      Negation &
+      \lstinline[mathescape]@not $p$@ &
+      \lstinline[mathescape]@!$p$@ &
+      $\lnot p$ \\
+
+      Conjunction &
+      \lstinline[mathescape]@$p$ and $q$@ &
+      \lstinline[mathescape]@$p$ && $q$@ &
+      $p \land q$ \\
+
+      Disjunction &
+      \lstinline[mathescape]@$p$ or $q$@ &
+      \lstinline[mathescape]@$p$ || $q$@ &
+      $p \lor q$ \\
+
+      Exclusive disjunction &
+      \lstinline[mathescape]@$p$ xor $q$@ &
+      \lstinline[mathescape]@$p$ != $q$@ &
+      $\left(p \land \lnot q\right) \lor \left(\lnot p \land q\right)$ \\
+      \hline
+    \end{tabular}
+
+    \caption{Boolean operators}
+  \end{table}
+
+  Integers and floating-point numbers support addition, subtraction,
+  multiplication and division. Integers (but not floats) support the modulo
+  operation.
+
+  Binary arithmetic operations require both operands to be of the same type:
+  there are no implicit type conversions, as Devin is a \emph{strongly typed}
+  programming language. The rationale behind Devin's design decisions is
+  discussed later.
+
+  Division (operator \lstinline@/@) behaves differently depending on the types
+  of the operands. In any case, the result of arithmetic operations has the same
+  type as their operands.
+
+  \begin{table}[h]
+    \centering
+
+    \begin{tabular}{|c|c|c|}
+      \hline
+
+      Description &
+      Syntax &
+      Semantic meaning \\
+      \hline
+
+      Negation &
+      \lstinline[mathescape]@-$x$@ &
+      $-x$ \\
+
+      Identity &
+      \lstinline[mathescape]@+$x$@ &
+      $+x$ \\
+
+      Addition &
+      \lstinline[mathescape]@$x$ + $y$@ &
+      $x + y$ \\
+
+      Subtraction &
+      \lstinline[mathescape]@$x$ - $y$@ &
+      $x - y$ \\
+
+      Multiplication &
+      \lstinline[mathescape]@$x$ * $y$@ &
+      $x \times y$ \\
+
+      Integer division &
+      \lstinline[mathescape]@$n$ / $m$@ &
+      $\lfloor n \div m \rfloor$ \\
+
+      Floating-point division &
+      \lstinline[mathescape]@$x$ / $y$@ &
+      $x \div y$ \\
+
+      Modulo &
+      $n$\lstinline@ % @$m$ &
+      $n - m \times \lfloor n \div m \rfloor$ \\
+      \hline
+    \end{tabular}
+
+    \caption{Arithmetic operators}
+  \end{table}
+
+  Pairs of numbers can be compared with the expressions
+  \lstinline[mathescape]@$x$ < $y$@, \lstinline[mathescape]@$x$ <= $y$@,
+  \lstinline[mathescape]@$x$ > $y$@, \lstinline[mathescape]@$x$ >= $y$@. They
+  yield a \lstinline@Bool@ which is \lstinline@true@ if $x < y$, $x \leq y$,
+  $x > y$, $x \geq y$ respectively. Equality between any two values can be
+  tested with \lstinline[mathescape]@$x$ == $y$@. As a shorthand,
+  \lstinline[mathescape]@$x$ != $y$@ is the same as
+  \lstinline[mathescape]@not ($x$ == $y$)@.
+
+  \begin{table}[h]
+    \centering
+
+    \begin{tabular}{|c|c|c|}
+      \hline
+
+      Description &
+      Syntax &
+      Semantic meaning \\
+      \hline
+
+      \multirow{4}{*}{Comparison} &
+      \lstinline[mathescape]@$x$ > $y$@ &
+      $x < y$ \\
+
+      &
+      \lstinline[mathescape]@$x$ <= $y$@ &
+      $x \leq y$ \\
+
+      &
+      \lstinline[mathescape]@$x$ > $y$@ &
+      $x > y$ \\
+
+      &
+      \lstinline[mathescape]@$x$ >= $y$@ &
+      $x \geq y$ \\
+
+      \multirow{2}{*}{Equality} &
+      \lstinline[mathescape]@$x$ == $y$@ &
+      $x \equiv y$ \\
+
+      &
+      \lstinline[mathescape]@$x$ != $y$@ &
+      $x \not\equiv y$ \\
+      \hline
+    \end{tabular}
+
+    \caption{Equality and comparison operators}
+  \end{table}
+
+  Variables and array elements can be assigned to with the \lstinline@=@
+  operator. Like many languages, Devin features a few shorthands as well.
+
+  \begin{table}[h]
+    \centering
+
+    \begin{tabular}{|c|c|c|}
+      \hline
+
+      Description &
+      Syntax &
+      Semantic meaning \\
+      \hline
+
+      Plain assignment &
+      \lstinline[mathescape]@$x$ = $y$@ &
+      $x \leftarrow y$ \\
+
+      \multirow{5}{*}{Assignment shorthand} &
+      \lstinline[mathescape]@$x$ += $y$@ &
+      \lstinline[mathescape]@$x$ = $x$ + $y$@ \\
+
+      &
+      \lstinline[mathescape]@$x$ -= $y$@ &
+      \lstinline[mathescape]@$x$ = $x$ - $y$@ \\
+
+      &
+      \lstinline[mathescape]@$x$ *= $y$@ &
+      \lstinline[mathescape]@$x$ = $x$ * $y$@ \\
+
+      &
+      \lstinline[mathescape]@$x$ /= $y$@ &
+      \lstinline[mathescape]@$x$ = $x$ / $y$@ \\
+
+      &
+      \lstinline[mathescape]@$x$ %= $y$@ &
+      \lstinline[mathescape]@$x$ = $x$ % $y$@ \\
+      \hline
+    \end{tabular}
+
+    \caption{Assignment operators}
+    \label{table:assignmentoperators}
+  \end{table}
+
+  \section{Working with arrays}
+
+  Arrays support the following operations:
+
+  \begin{itemize}
+    \item \emph{Element access}: \lstinline[mathescape]@$a$[$n$]@, where $a$
+    denotes an array and $n$ an integer index. The expression retrieves the
+    $n$-th element of the array. Like in most programming languages, the first
+    element of the array has index $0$.
+
+    \item \emph{Length information}: \lstinline[mathescape]@len $a$@. The
+    expression returns the number of elements contained in the array $a$.
+
+    \item \emph{Concatenation}: \lstinline[mathescape]@$a$ + $b$@. The
+    expression yields a new array containing the elements of $a$ concatenated
+    with the elements of $b$;
+
+    \item \emph{Repetition}: \lstinline[mathescape]@$a$ * $n$@ or
+    \lstinline[mathescape]@$n$ * $a$@. Equivalent to concatenating $a$ to itself
+    $n$ times.
+
+    Zero-initialized arrays of size $n$ can be generated with the expression
+    \lstinline[mathescape]@[0] * $n$@.
+  \end{itemize}
+
+  \subsection{Variable definitions and scoping}
+
+  Variables can be defined using statements of the form
+  \lstinline[mathescape]@var $x$ = $y$@, where $x$ is an identifier and $y$ is
+  an expression. The type of $y$ is inferred from $x$. Variables can be defined
+  at any point, whether globally or as function locals.
+
+  Devin is \emph{block-structured}: it allows for the creation of blocks,
+  including blocks nested within other blocks. Variables are lexically scoped:
+  they can't be accessed from outside the block they are defined in. As in C,
+  blocks consist of a sequence of statements wrapped in a pair of curly braces
+  (\lstinline@{@, \lstinline@}@).
+
+  Statements are always terminated with semicolons. Empty statements are
+  disallowed: in other words, a semicolon on its own is not a valid statement.
+
+  \subsection{Branching and looping mechanisms}
+
+  The following two looping constructs are supported:
+
+  \begin{itemize}
+    \item \emph{While loops} in the form \lstinline[mathescape]@while $p$ $s$@.
+    This construct runs the statement $s$ as long as the expression $p$ is true;
+
+    \item \emph{Do-while loops} in the form
+    \lstinline[mathescape]@do $s$ while $p$@. This construct runs $s$ once;
+    then, it re-runs $s$ as long as $p$ is true.
+  \end{itemize}
+
+  Conditional code execution is supported through statements of the form
+  \lstinline[mathescape]@if $p$ $s_1$@ and
+  \lstinline[mathescape]@if $p$ $s_1$ else $s_2$@, where $p$ is a boolean
+  predicate and $s_1$ and $s_2$ are statements.
+
+  \begin{lstlisting}[
+    float=h,
+    gobble=4,
+    basicstyle=\ttfamily\small,
+    caption={Devin's scoping rules visualized}
+  ]
+    def main() -> Unit {
+        var a = [1, 2, 3, 4];
+        rotateRight(a);
+    }  // 'a' goes out of scope
+
+    def rotateRight(ref array) -> Unit {
+        var length = len array;
+
+        if length > 0 {
+            var i = length - 1;
+            var t = array[i];
+
+            while i > 0 {
+                array[i] = array[i - 1];
+                i -= 1;
+            }
+
+            array[0] = t;
+        }  // 'i', 't' go out of scope
+    }  // 'array', 'length' go out of scope
+  \end{lstlisting}
+
+  \subsection{Assertions}
+
+  Devin provides a mechanism for asserting that predicates evaluate to
+  \lstinline@true@ at runtime. Assertions can be used to check internal
+  assumptions or to guard against violation of function contracts, among other
+  things.
+
+  For example, the assertion \lstinline@assert n >= 0@ can be used as the first
+  statement of a function calculating the factorial of \lstinline@n@, as the
+  result not defined if $\text{\lstinline@n@} < 0$.
+
+  \subsection{Procedure definition and application}
+
+  Procedures (informally, functions) can be defined either globally or within
+  other procedures. They obey to the same scoping rules as variables. The entry
+  point for Devin programs is a global procedure named \lstinline@main@; it must
+  take no arguments.
+
+  The syntax for calling procedures is the same as in C:
+  \lstinline[mathescape]@$f$()@ calls $f$ with zero arguments,
+  \lstinline[mathescape]@$g$($x$)@ calls $g$ with a single argument $x$,
+  \lstinline[mathescape]@$h$($x$, $y$)@ calls $h$ with two arguments $x$ and
+  $y$, and so on.
+
+  The evaluation strategy of Devin is strict; arguments are evaluated from left
+  to right. By default, procedure arguments are passed by value; with the
+  \lstinline@ref@ keyword, they can be passed by reference instead.
+
+  % \begin{lstlisting}[
+  %   float=h,
+  %   gobble=4,
+  %   basicstyle=\ttfamily\small,
+  %   caption={Two different ways of writing a procedure summing up two numbers}
+  % ]
+  %   def sum1(a: Int, b: Int) -> Int
+  %       return a + b;
+
+  %   def sum2(a: Int, b: Int, ref into: Int) -> Unit
+  %       into = a + b;
+  % \end{lstlisting}
+
+  \subsection{Optional types}
+
+  A peculiar feature of Devin is that of \emph{optional types}. With optional
+  types, the semantic of the language doesn't depend on the static type
+  system~\cite{bracha_2004}. A notable example of an optionally typed language
+  is Python.
+
+  Type annotations may be omitted from Devin programs. Type checking is not
+  performed on terms where type annotations are missing. Effectively, this makes
+  Devin statically typed only if all terms are annotated; if no type annotations
+  are provided, Devin becomes dynamically typed.
+
+  % \begin{lstlisting}[
+  %   float=h,
+  %   gobble=4,
+  %   basicstyle=\ttfamily\small,
+  %   caption={Two procedures written without some type annotations}
+  % ]
+  %   def sum1(a, b: Int)
+  %       return a + b;
+
+  %   def sum2(a, b, ref into) -> Unit
+  %       into = a + b;
+  % \end{lstlisting}
+
+  \section{Editor features}
+
+  Devin is bundled with a code editing UI built upon GTK+, a popular library for
+  creating graphical user interfaces. GTK+ works on Windows, macOS, and many
+  UNIX-like platforms~\cite{gtk+}. The code editor is supported by
+  GtkSourceView, a library that extends the GTK+ framework for text editing and
+  support for configurable syntax highlighting.
+
+  GtkSourceView is powerful enough to automatically perform syntax highlighting
+  if an appropriate language definition is provided. Devin doesn't use this
+  feature: if the library's automatic syntax highlighting was to be used, much
+  care would have to be taken in order to keep GtkSourceView's language
+  definition and Devin's manually written parser in sync.
+
+  Other than syntax highlighting, Devin's editor features error reporting: both
+  syntactic and semantic errors are displayed according to their position within
+  the source code.
+
+  \begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{4.png}
+    \caption{Semantic error reporting and highlighting}
+  \end{figure}
+
+  Once a valid program has been written, it can be run by clicking the
+  $\blacktriangleright$ button. The state of execution can be observed with
+  debug statements; these signal the evaluator to pause execution and display
+  the current \emph{runtime stack}---the data structure which maps values to
+  variables and function arguments. Each time a function gets called, a new
+  \emph{stack frame} is pushed onto the stack; it contains associations between
+  the argument names and their values. Variable definitions within the called
+  function add new associations to the newly pushed frame. When the called
+  function returns, the topmost frame is popped off the stack and execution
+  continues normally.
+
+  Devin has been designed with simplicity of implementation in mind. In
+  particular, Devin's call stack exhibits two uncommon properties:
+
+  \begin{itemize}
+    \item Each block pushes a new frame onto the stack: this allows treating
+      nested scopes with the same mechanism as function calls. The debugger
+      skips visualization of empty blocks, as they occur somewhat frequently.
+
+    \item Execution always starts with a non-empty stack containing a single
+    frame. This frame binds the names \lstinline@true@ to the truth value,
+    \lstinline@false@ to \lstinline@not true@, and \lstinline@unit@ to the unit
+    value. In practice, this means that \lstinline@true@, \lstinline@false@ and
+    \lstinline@unit@ are not special keywords or constants; instead, they are
+    ordinary variables. This is a deliberate design decision.
+  \end{itemize}
+
+  \begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{5.png}
+    \caption{The debugger displaying the current state of the stack}
+  \end{figure}
+
+  Runtime errors are handled as well. When an error occurs, the offending code
+  fragment is highlighted and a message dialog describing the problem is shown
+  to the user. Runtime errors include, but are not limited to, index out of
+  bounds errors, division by zero, and assertion errors.
+
+  \begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{6.png}
+    \caption{Runtime error reporting and highlighting}
+  \end{figure}
+
+  \chapter{Devin's design choices}
+
+  \section{Operations between numeric types}
+
+  Addition, subtraction, multiplication, division and modulo are supported only
+  if both operands are of the same type. For instance, it isn't legal to sum an
+  integer to a floating-point number. While this restriction might seem
+  unconventional at first, there is a very specific reason for it.
+
+  In Devin, both integers and floating-point numbers occupy 64 bits. Summing two
+  numbers of the same type $T$ yields yet another number of type $T$: nothing
+  surprising here. But what should be the result of summing an integer to a
+  floating-point number, or vice versa? Many languages take the approach of
+  silently converting the integer operand to a floating-point value, and then
+  performing the actual summation. Double-precision floating-point format
+  numbers as specified in IEEE 754 can't safely represent integers less than
+  $-\left(2^{53} - 1\right)$ or greater than $2^{53} - 1$ without loss of
+  precision~\cite{mdn}; as such, I argue that a programming language should make
+  conversions between integers and floats explicit.
+
+  This design decision is largely inspired by two factors: how Haskell deals
+  with numbers and rule 2 of the Zen of Python---\emph{explicit is better than
+  implicit}~\cite{peters_2004}. Rather ironically, conversions between numbers
+  are implicit in Python. Examples of languages which lack implicit conversions
+  are Go and Rust.
+
+  \section{Independence between evaluator and type checker}
+
+  In statically typed programming languages, evaluation traditionally follows
+  type checking, which follows parsing. Each step performs some computation and
+  returns some result to be used for the next step.
+
+  \begin{figure}[h]
+    \centering
+
+    \begin{tikzpicture}[
+      execute at begin node=\strut,
+      execute at end node=\strut
+    ]
+      \node(a){};
+      \node[ellipse,draw,right=1cm of a](parse){parse};
+      \node[ellipse,draw,right=2.2cm of parse](typeckeck){type check};
+      \node[ellipse,draw,right=2.4cm of typeckeck](evaluate){evaluate};
+      \node[right=0.8cm of evaluate](b){};
+      \draw[->] (a) to [edge label=text] (parse);
+      \draw[->] (parse) to [edge label=syntax tree] (typeckeck);
+      \draw[->] (typeckeck) to [edge label=environment, edge label'=ok/error] (evaluate);
+      \draw[->] (evaluate) to [edge label=etc.] (b);
+    \end{tikzpicture}
+
+    \caption{Data-flow diagram for a traditional interpreter}
+  \end{figure}
+
+  Devin's implementation differs slightly: the evaluator doesn't depend on any
+  data produced by the type checker. In particular, evaluation doesn't require
+  the type checker to be run at all; furthermore, the computed environment---the
+  data structure binding identifiers to variables and functions---is not used by
+  the evaluator.
+
+  This design decision makes it trivial to make Devin's evaluation functions
+  \emph{total}: every input tree can be mapped to one step of computation.
+
+  \begin{figure}[h]
+    \centering
+
+    \begin{tikzpicture}[
+      execute at begin node=\strut,
+      execute at end node=\strut
+    ]
+      \node(a){};
+      \node[ellipse,draw,right=1cm of a](parse){parse};
+      \node[ellipse,draw,above right=1cm and 2.6cm of parse](typecheck){type check};
+      \node[ellipse,draw,below right=1cm and 2.6cm of parse](evaluate){evaluate};
+      \node[right=2.4cm of typecheck](b){};
+      \node[right=0.8cm of evaluate](c){};
+      \draw[->] (a) to [edge label=text] (parse);
+      \draw[->] (parse) to [edge label=syntax tree, sloped] (typecheck);
+      \draw[->] (parse) to [edge label=syntax tree, sloped] (evaluate);
+      \draw[->] (typecheck) to [edge label=environment, edge label'=ok/error] (b);
+      \draw[->] (evaluate) to [edge label=etc.] (c);
+    \end{tikzpicture}
+
+    \caption{Data-flow diagram for the Devin interpreter}
+  \end{figure}
+
+  \section{Optional types}
+
+  As discussed previously, type annotations may be omitted at will. Admittedly,
+  this feature was included due the to the ease of its implementation. As
+  Devin's type checker and evaluator are independent, optional types
+  \emph{emerged} as a possible addition.
+
+  Much can be said regarding the benefits and drawbacks of optional types; a
+  completely separate dissertation on its own would be needed to discuss this
+  subject alone. There are programming languages with optional types; as
+  mentioned previously, Python is just one example.
+
+  Devin was born due to my own curiosity regarding programming languages and
+  their implementation; recreating the next Pascal or C clone has never been an
+  objective. Optional types are not a common language feature. As languages
+  shape the way we think about solving problems, I decided to add this feature
+  to be played around with.
+
+  \chapter{Implementing Devin}
+
+  Devin's implementation spans approximately 4500 lines of code. Knowledge about
+  programming in Haskell is required to understanding this chapter. In
+  particular, I'll assume that the reader is familiar with functional
+  programming, including the concepts of pure functions, higher order functions,
+  and monads as used in Haskell's \lstinline@do@ notation.
+
+  Devin is entirely written in Haskell. Given the size of its implementation,
+  some details will be omitted. In particular, import declarations and
+  \lstinline@LANGUAGE@ pragmas are left out for simplicity.
+
+  In terms of implementation complexity, both the type checker and the evaluator
+  are somewhat simpler than the parser. In particular, the parser makes much
+  greater use of higher order functions and uses multi-parameter type classes;
+  this causes some syntactical noise on function signatures. Experienced
+  Haskellers should have no problems reading the parser's implementation; in any
+  case, I'll describe parsing last.
+
+  \section{The syntax tree}
+
+  Devin's syntax tree stores enough information to perform syntax highlighting.
+  Given a node in the tree, it is always possible to determine its position
+  within the parsed source code. Only leaf nodes store their positions directly;
+  the positions of non-leaf nodes can be computed by considering their first and
+  last children.
+
+  Two leaf nodes commonly used across Devin's syntax tree are
+  \lstinline@SymbolId@ and \lstinline@Token@. They store information about
+  identifiers (e.g.\ \lstinline@x@, \lstinline@Int@) and tokens (e.g.\
+  \lstinline@{@, \lstinline@}@, \lstinline@->@) respectively. They are defined
+  as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data SymbolId = SymbolId {name :: String, interval :: (Int, Int)}
+
+    data Token = Token {interval :: (Int, Int)}
+  \end{lstlisting}
+
+  \subsection{Representing expressions}
+
+  Devin supports 4 unary operators: \lstinline@+@, \lstinline@-@,
+  \lstinline@not@, \lstinline@len@. Unary operators are represented by the
+  algebraic data type \lstinline@UnaryOperator@, which is defined as follows:\
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data UnaryOperator
+      = PlusOperator {interval :: (Int, Int)}
+      | MinusOperator {interval :: (Int, Int)}
+      | NotOperator {interval :: (Int, Int)}
+      | LenOperator {interval :: (Int, Int)}
+  \end{lstlisting}
+
+  The 20 binary operators \lstinline@+@, \lstinline@-@, \lstinline@*@,
+  \lstinline@/@, \lstinline@%@, \lstinline@==@,
+  \lstinline@!=@, \lstinline@<@, \lstinline@<=@, \lstinline@>@, \lstinline@>=@,
+  \lstinline@and@, \lstinline@or@, \lstinline@xor@, \lstinline@=@,
+  \lstinline@+=@, \lstinline@-=@, \lstinline@*=@, \lstinline@/=@,
+  \lstinline@%=@ are represented by the
+  type \lstinline@BinaryOperator@:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data BinaryOperator
+      = AddOperator {interval :: (Int, Int)}
+      | SubtractOperator {interval :: (Int, Int)}
+      | MultiplyOperator {interval :: (Int, Int)}
+      | DivideOperator {interval :: (Int, Int)}
+      | ModuloOperator {interval :: (Int, Int)}
+      | EqualOperator {interval :: (Int, Int)}
+      | NotEqualOperator {interval :: (Int, Int)}
+      | LessOperator {interval :: (Int, Int)}
+      | LessOrEqualOperator {interval :: (Int, Int)}
+      | GreaterOperator {interval :: (Int, Int)}
+      | GreaterOrEqualOperator {interval :: (Int, Int)}
+      | AndOperator {interval :: (Int, Int)}
+      | OrOperator {interval :: (Int, Int)}
+      | XorOperator {interval :: (Int, Int)}
+      | PlainAssignOperator {interval :: (Int, Int)}
+      | AddAssignOperator {interval :: (Int, Int)}
+      | SubtractAssignOperator {interval :: (Int, Int)}
+      | MultiplyAssignOperator {interval :: (Int, Int)}
+      | DivideAssignOperator {interval :: (Int, Int)}
+      | ModuloAssignOperator {interval :: (Int, Int)}
+  \end{lstlisting}
+
+  Leaf expressions are literals, numbers and variables. More complex expressions
+  can be built from simpler ones: for example, a binary expression is
+  constructed by two subexpressions and a binary operator.
+
+  Expressions are described by a single algebraic data type:
+  \lstinline@Expression@. Opening and closing parentheses are stored in the
+  syntax tree. Parentheses include round, square and curly braces. As a
+  convention, parentheses are always identified by the \lstinline@open@ and
+  \lstinline@close@ fields, regardless of the specific kind.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Expression where
+      VarExpression :: {
+        varName :: String,
+        interval :: (Int, Int)
+      } -> Expression
+
+      IntegerExpression :: {
+        integer :: Integer,
+        interval :: (Int, Int)
+      } -> Expression
+
+      RationalExpression :: {
+        rational :: Rational,
+        interval :: (Int, Int)
+      } -> Expression
+
+      ArrayExpression :: {
+        open :: Token,
+        elems :: [Expression],
+        commas :: [Token],
+        close :: Token
+      } -> Expression
+
+      AccessExpression :: {
+        array :: Expression,
+        open :: Token,
+        index :: Expression,
+        close :: Token
+      } -> Expression
+
+      CallExpression :: {
+        funId :: SymbolId,
+        open :: Token,
+        args :: [Expression],
+        commas :: [Token],
+        close :: Token
+      } -> Expression
+
+      UnaryExpression :: {
+        unary :: UnaryOperator,
+        operand :: Expression
+      } -> Expression
+
+      BinaryExpression :: {
+        left :: Expression,
+        binary :: BinaryOperator,
+        right :: Expression
+      } -> Expression
+
+      ParenthesizedExpression :: {
+        open :: Token,
+        inner :: Expression,
+        close :: Token
+      } -> Expression
+  \end{lstlisting}
+
+  \subsection{Representing statements}
+
+  Any expression followed by a semicolon becomes a statement. The type
+  \lstinline@Statement@ accounts for such semicolon terminated expressions,
+  along with if, while, do-while, return, assert, debug and block statements.
+
+  In any point in which a statement may occur, a variable or function definition
+  can be placed instead. Because of this, the data constructor
+  \lstinline@DefinitionStatement@ delegates to the relevant
+  \lstinline@Definition@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Statement where
+      DefinitionStatement :: {
+        definition :: Definition
+      } -> Statement
+
+      ExpressionStatement :: {
+        value :: Expression,
+        semicolon :: Token
+      } -> Statement
+
+      IfStatement :: {
+        ifKeyword :: Token,
+        predicate :: Expression,
+        trueBranch :: Statement
+      } -> Statement
+
+      IfElseStatement :: {
+        ifKeyword :: Token,
+        predicate :: Expression,
+        trueBranch :: Statement,
+        elseKeyword :: Token,
+        falseBranch :: Statement
+      } -> Statement
+
+      WhileStatement :: {
+        whileKeyword :: Token,
+        predicate :: Expression,
+        body :: Statement
+      } -> Statement
+
+      DoWhileStatement :: {
+        doKeyword :: Token,
+        body :: Statement,
+        whileKeyword :: Token,
+        predicate :: Expression,
+        semicolon :: Token
+      } -> Statement
+
+      ReturnStatement :: {
+        returnKeyword :: Token,
+        result :: Maybe Expression,
+        semicolon :: Token
+      } -> Statement
+
+      AssertStatement :: {
+        assertKeyword :: Token,
+        predicate :: Expression,
+        semicolon :: Token
+      } -> Statement
+
+      DebugStatement :: {
+        debugKeyword :: Token,
+        semicolon :: Token
+      } -> Statement
+
+      BlockStatement :: {
+        open :: Token,
+        statements :: [Statement],
+        close :: Token
+      } -> Statement
+  \end{lstlisting}
+
+  \subsection{Representing variable and function definitions}
+
+  Devin's function definitions may include signatures with explicit types. The
+  syntax for array types is that of a type wrapped in square brackets, as in
+  \lstinline@[Int]@ or \lstinline@[[Float]]@. The arbitrary syntactical nesting
+  of paired square brackets around a type is permitted by the algebraic data
+  type \lstinline@TypeId@:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data TypeId
+      = PlainTypeId {name :: String, interval :: (Int, Int)}
+      | ArrayTypeId {open :: Token, innerTypeId :: TypeId, close :: Token}
+  \end{lstlisting}
+
+  Variables and functions definitions are given by \lstinline@Definition@'s
+  \lstinline@VarDefinition@ and \lstinline@FunDefinition@ data constructors
+  respectively.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Definition where
+      VarDefinition :: {
+        varKeyword :: Token,
+        varId :: SymbolId,
+        equalSign :: Token,
+        value :: Expression,
+        semicolon :: Token
+      } -> Definition
+
+      FunDefinition :: {
+        defKeyword :: Token,
+        funId :: SymbolId,
+        open :: Token,
+        params :: [(Maybe Token, SymbolId, Maybe (Token, TypeId))],
+        commas :: [Token],
+        close :: Token,
+        returnInfo :: Maybe (Token, TypeId),
+        body :: Statement
+      } -> Definition
+  \end{lstlisting}
+
+  \section{The type checker}
+
+  At high level, type checking is performed by a set of functions that operate
+  on an \emph{environment}, which associates identifiers to types. The
+  environment is used to assert that function calls and variable usages are
+  valid within their context.
+
+  The module \lstinline@Devin.Type@ provides the structures necessary to
+  represent types. \lstinline@Unit@, \lstinline@Bool@, \lstinline@Int@,
+  \lstinline@Float@ and \lstinline@Array@ correspond to Devin's supported types.
+  To aid the type checker, two other data constructors are provided, both of
+  which indicate some sort of error: \lstinline@Unknown@ and
+  \lstinline@Placeholder@. While \lstinline@Unknown@ stands for an unknown type,
+  a \lstinline@Placeholder@ represents a specific unresolved type.
+  Differentiating between between \lstinline@Placeholder@ and
+  \lstinline@Unknown@ allows for fine-grained error messages and diagnostics.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Type
+      = Unknown
+      | Unit
+      | Bool
+      | Int
+      | Float
+      | Array Type
+      | Placeholder String
+  \end{lstlisting}
+
+  While types could be compared by simple equality, the relation
+  \lstinline@(<:)@ is provided. This operator allows for simpler error
+  propagation.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    (<:) :: Type -> Type -> Bool
+    t1 <: t2 = isJust (merge t1 t2)
+
+    merge :: Type -> Type -> Maybe Type
+    merge Unknown _ = Just Unknown
+    merge _ Unknown = Just Unknown
+    merge Unit Unit = Just Unit
+    merge Bool Bool = Just Bool
+    merge Int Int = Just Int
+    merge Float Float = Just Float
+    merge (Array t1) (Array t2) = Array <$> merge t1 t2
+    merge (Placeholder n1) (Placeholder n2) | n1 == n2 = Just (Placeholder n1)
+    merge _ _ = Nothing
+  \end{lstlisting}
+
+  The module \lstinline@Devin.Typer@ implements the type checker interface. In
+  order to account for Devin's lexical scoping rules, the environment is
+  represented as a linked list of association lists.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Typer a = Typer {runTyper :: Environment -> (a, Environment, [Error])}
+      deriving Functor
+
+    type Environment = [Scope]
+
+    data Scope = Scope {
+      types :: [(String, Type)],
+      funs :: [(String, ([Type], Type))],
+      vars :: [(String, Type)]
+    }
+  \end{lstlisting}
+
+  In the listing above, \lstinline@Typer@ wraps a function which takes an
+  \lstinline@Environment@ and returns a new environment and a potentially empty
+  list of \lstinline@Error@s, along with a result of some kind.
+  \lstinline@deriving Functor@ instructs GHC to automatically generate an
+  implementation for the function
+  \lstinline@fmap :: (a -> b) -> Typer a -> Typer b@.
+
+  Below, implementations for \lstinline@pure@, \lstinline@liftA2@,
+  \lstinline@(>>=)@ are provided. Implementing those functions, along with
+  \lstinline@fmap@, makes \lstinline@Typer@ a monad.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance Applicative Typer where
+      pure :: a -> Typer a
+      pure x = Typer (\env -> (x, env, []))
+
+      liftA2 :: (a -> b -> c) -> Typer a -> Typer b -> Typer c
+      liftA2 f mx my = Typer $ \env ->
+        let (x, env', errors1) = runTyper mx env
+            (y, env'', errors2) = runTyper my env'
+        in (f x y, env'', errors1 ++ errors2)
+
+    instance Monad Typer where
+      (>>=) :: Typer a -> (a -> Typer b) -> Typer b
+      mx >>= f = Typer $ \env ->
+        let (x, env', errors1) = runTyper mx env
+            (y, env'', errors2) = runTyper (f x) env'
+        in (y, env'', errors1 ++ errors2)
+  \end{lstlisting}
+
+  Next, some utility functions are defined. The function \lstinline@defineType@
+  binds a name to a \lstinline@Type@ (the binding is added in the current
+  environment). Its dual, \lstinline@lookupType@, looks up to which type a name
+  is bound. \lstinline@lookupType@ searches the current environment first; if no
+  bindings are found, the parent environment is scanned next.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    defineType :: String -> Type -> Typer Type
+    defineType name t = Typer $ \case
+      [] -> (t, [Scope [(name, t)] [] []], [])
+
+      scope : parents ->
+        let types' = (name, t) : types scope
+        in (t, scope {types = types'} : parents, [])
+
+    lookupType :: String -> Typer (Maybe (Type, Int))
+    lookupType name = Typer (\env -> (go 0 env, env, []))
+      where
+        go _ [] = Nothing
+
+        go depth (Scope {types} : parents) = case lookup name types of
+          Just t -> Just (t, depth)
+          Nothing -> go (depth + 1) parents
+  \end{lstlisting}
+
+  The functions \lstinline@defineFunSignature@ and
+  \lstinline@lookupFunSignature@ define and lookup associations between names
+  and function signatures; these are represented by a tuple,
+  \lstinline@([Type], Type)@. The first element of the tuple is the list of
+  parameter types, the second is the return type.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    defineFunSignature :: String -> ([Type], Type) -> Typer ()
+    defineFunSignature name signature = Typer $ \case
+      [] -> ((), [Scope [] [(name, signature)] []], [])
+
+      scope : parents ->
+        let funs' = (name, signature) : funs scope
+        in ((), scope {funs = funs'} : parents, [])
+
+    lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
+    lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
+      where
+        go _ [] = Nothing
+
+        go depth (Scope {funs} : parents) = case lookup name funs of
+          Just signature -> Just (signature, depth)
+          Nothing -> go (depth + 1) parents
+  \end{lstlisting}
+
+  Finally, variables can be defined and looked up with the functions
+  \lstinline@defineVarType@ and \lstinline@lookupVarType@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    defineVarType :: String -> Type -> Typer ()
+    defineVarType name t = Typer $ \case
+      [] -> ((), [Scope [] [] [(name, t)]], [])
+
+      scope : parents ->
+        let vars' = (name, t) : vars scope
+        in ((), scope {vars = vars'} : parents, [])
+
+    lookupVarType :: String -> Typer (Maybe (Type, Int))
+    lookupVarType name = Typer (\env -> (go 0 env, env, []))
+      where
+        go _ [] = Nothing
+
+        go depth (Scope {vars} : parents) = case lookup name vars of
+          Just t -> Just (t, depth)
+          Nothing -> go (depth + 1) parents
+  \end{lstlisting}
+
+  Functions to remove previously defined associations could be implemented; in
+  practice, this is not necessary. The function \lstinline@withNewScope@ runs
+  another \lstinline@Typer@ on a modified environment where an empty
+  \lstinline@Scope@ is added; when the function returns, the previous
+  environment is restored.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    withNewScope :: Typer a -> Typer a
+    withNewScope mx = Typer $ \env ->
+      let (x, env', errors) = runTyper mx (Scope [] [] [] : env)
+      in (x, tail env', errors)
+  \end{lstlisting}
+
+  One last function is provided for utility: \lstinline@report@. As its name
+  implies, this function reports some \lstinline@Error@; errors are accumulated
+  by the \lstinline@Typer@ monad and can be used in successive phases for error
+  reporting and highlighting.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    report :: Error -> Typer ()
+    report error = Typer (\env -> ((), env, [error]))
+  \end{lstlisting}
+
+  \subsection{Checking expressions}
+
+  Expression related type checking is implemented in the
+  \lstinline@Devin.Typers@ module with the
+  \lstinline@checkExpression :: Expression -> Typer Type@ function.
+
+  Devin has a rudimentary mechanism for type inference. The type of literal
+  expressions is trivially determined given the kind of literal. For variables,
+  a lookup in the current environment is performed; if the variable is not
+  bound, an error is reported via the \lstinline@report'@ helper function, in
+  which case the type of the expression is \lstinline@Unknown@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    report' error = do
+      report error
+      pure Unknown
+
+    checkExpression IntegerExpression {} = pure Int
+
+    checkExpression RationalExpression {} = pure Float
+
+    checkExpression VarExpression {varName, interval} =
+      lookupVarType varName >>= \case
+        Just (t, _) -> pure t
+        Nothing -> report' (UnknownVar varName interval)
+  \end{lstlisting}
+
+  Inferring the type of arrays requires special care. In general, the type of an
+  array is represented by \lstinline[mathescape]@Array $T$@. If all the elements
+  of the array have the same type $T_0$, then $T$ can determined to be $T_0$. If
+  the array is empty, or if there are at least two elements of the array with
+  different types, then $T$ can't be inferred.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression ArrayExpression {elems = []} = pure (Array Unknown)
+
+    checkExpression ArrayExpression {elems = elem : elems} = do
+      t <- checkExpression elem
+      go elems t
+
+      where
+        go [] t = pure (Array t)
+
+        go (elem : elems) t = checkExpression elem >>= \case
+          Unknown -> do
+            for_ elems checkExpression
+            pure (Array Unknown)
+
+          t' | t' <: t -> go elems t
+
+          t' -> do
+            report (InvalidType elem t t')
+            go elems t
+  \end{lstlisting}
+
+  Access to array elements is checked as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression AccessExpression {array, index} = do
+      arrayT <- checkExpression array
+      indexT <- checkExpression index
+
+      case (arrayT, indexT) of
+        (Unknown, Int) -> pure Unknown
+        (Unknown, _) -> report' (InvalidType index Int indexT)
+        (Array t, Int) -> pure t
+        (Array _, _) -> report' (InvalidType index Int indexT)
+        (_, _) -> report' (InvalidType array (Array Unknown) arrayT)
+  \end{lstlisting}
+
+  The type resulting from function invocations is determined by looking up the
+  callee's signature. If a call refers to an unbound identifier, or if the wrong
+  number of arguments is provided, or if an argument has the wrong type, an
+  error is reported.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression CallExpression {funId = SymbolId {name, interval}, args} =
+      lookupFunSignature name >>= \case
+        Just ((paramTs, returnT), _) -> go 0 args paramTs
+          where
+            go _ [] [] = pure returnT
+
+            go n (arg : args) (paramT : paramTs) = do
+              argT <- checkExpression arg
+              unless (argT <: paramT) (report (InvalidType arg paramT argT))
+              go (n + 1) args paramTs
+
+            go n args paramTs = do
+              let expected = n + length paramTs
+              let actual = n + length args
+              report' (InvalidArgCount expression expected actual)
+
+        Nothing -> report' (UnknownFun name interval)
+  \end{lstlisting}
+
+  The unary arithmetic operators \lstinline@+@ and \lstinline@-@ are type
+  checked as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression UnaryExpression {unary, operand}
+      | PlusOperator {} <- unary = do
+        operandT <- checkExpression operand
+
+        case operandT of
+          Unknown -> pure Unknown
+          Int -> pure Int
+          Float -> pure Float
+          _ -> report' (InvalidUnary unary operandT)
+
+    checkExpression UnaryExpression {unary, operand}
+      | MinusOperator {} <- unary = do
+        operandT <- checkExpression operand
+
+        case operandT of
+          Unknown -> pure Unknown
+          Int -> pure Int
+          Float -> pure Float
+          _ -> report' (InvalidUnary unary operandT)
+  \end{lstlisting}
+
+  The boolean \lstinline@not@ is checked in a similar manner:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression UnaryExpression {unary, operand}
+      | NotOperator {} <- unary = do
+        operandT <- checkExpression operand
+
+        case operandT of
+          Unknown -> pure Unknown
+          Bool -> pure Bool
+          _ -> report' (InvalidUnary unary operandT)
+  \end{lstlisting}
+
+  The operator \lstinline@len@ can be applied to arrays only, and returns the
+  length as an \lstinline@Int@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression UnaryExpression {unary, operand}
+      | LenOperator {} <- unary = do
+        operandT <- checkExpression operand
+
+        case operandT of
+          Unknown -> pure Unknown
+          Array _ -> pure Int
+          _ -> report' (InvalidUnary unary operandT)
+  \end{lstlisting}
+
+  As can be seen, there is a certain degree of repetition within
+  \lstinline@checkExpression@. While \emph{DRY} (Don't Repeat Yourself) is
+  usually a good software development practice, it does become impractical when
+  there are edge cases to consider. For instance, while both \lstinline@+@ and
+  \lstinline@-@ operate on arithmetic types, \lstinline@+@ also works with
+  arrays. The problem becomes worse in the evaluator, where both \lstinline@+@
+  and \lstinline@and@ compute some result based on their operands, but the
+  evaluation strategy of \lstinline@and@ differs from that of \lstinline@+@.
+
+  What follows is the implementation to type check expressions with
+  \lstinline@/@. The binary operators \lstinline@-@ and \lstinline@%@ are
+  implemented in a similar manner, except for the fact that \lstinline@%@ only
+  accepts \lstinline@Int@s.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression BinaryExpression {left, binary, right}
+      | DivideOperator {} <- binary = do
+        leftT <- checkExpression left
+        rightT <- checkExpression right
+
+        case (leftT, rightT) of
+          (Unknown, _) -> pure Unknown
+          (_, Unknown) -> pure Unknown
+          (Int, Int) -> pure Int
+          (Float, Float) -> pure Float
+          (_, _) -> report' (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  Devin's operator \lstinline@+@ not only supports arithmetic addition, but also
+  array concatenation. Similarly, \lstinline@*@ supports both multiplication and
+  array repetition.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression BinaryExpression {left, binary, right}
+      | AddOperator {} <- binary = do
+        leftT <- checkExpression left
+        rightT <- checkExpression right
+
+        case (leftT, rightT) of
+          (Unknown, _) -> pure Unknown
+          (_, Unknown) -> pure Unknown
+          (Int, Int) -> pure Int
+          (Float, Float) -> pure Float
+          (Array t1, Array t2) | Just t <- merge t1 t2 -> pure (Array t)
+          (_, _) -> report' (InvalidBinary binary leftT rightT)
+
+    checkExpression BinaryExpression {left, binary, right}
+      | MultiplyOperator {} <- binary = do
+        leftT <- checkExpression left
+        rightT <- checkExpression right
+
+        case (leftT, rightT) of
+          (Unknown, _) -> pure Unknown
+          (_, Unknown) -> pure Unknown
+          (Int, Int) -> pure Int
+          (Float, Float) -> pure Float
+          (Array t, Int) -> pure (Array t)
+          (Int, Array t) -> pure (Array t)
+          (_, _) -> report' (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  Numeric values can be compared with \lstinline@<@, \lstinline@<=@,
+  \lstinline@>@ and \lstinline@>=@. Type checking is the same for all those
+  operators:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression BinaryExpression {left, binary, right}
+      | LessOperator {} <- binary = do
+        leftT <- checkExpression left
+        rightT <- checkExpression right
+
+        case (leftT, rightT) of
+          (Unknown, _) -> pure Unknown
+          (_, Unknown) -> pure Unknown
+          (Int, Int) -> pure Bool
+          (Float, Float) -> pure Bool
+          (_, _) -> report' (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  Equality can be tested between any two values. Values of different types can
+  be compared, but they are always deemed to be different.
+
+  Notice that \lstinline@left@ and \lstinline@right@ are recursively type
+  checked even though the resulting type (\lstinline@Bool@) is known. This is
+  important, as failing to check subexpressions could lead to runtime errors.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression BinaryExpression {left, binary, right}
+      | EqualOperator {} <- binary = do
+        checkExpression left
+        checkExpression right
+        pure Bool
+
+    checkExpression BinaryExpression {left, binary, right}
+      | NotEqualOperator {} <- binary = do
+        checkExpression left
+        checkExpression right
+        pure Bool
+  \end{lstlisting}
+
+  The operators \lstinline@and@, \lstinline@or@ and \lstinline@xor@ are all
+  checked in the same manner.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression BinaryExpression {left, binary, right}
+      | AndOperator {} <- binary = do
+        leftT <- checkExpression left
+        rightT <- checkExpression right
+
+        case (leftT, rightT) of
+          (Unknown, _) -> pure Unknown
+          (_, Unknown) -> pure Unknown
+          (Bool, Bool) -> pure Bool
+          (_, _) -> report' (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  Assignments with \lstinline@=@ are checked by verifying that both the left and
+  right operands are of the same type. Interestingly, it is not checked whether
+  the left-hand side is a variable. As an example, an expression like
+  \lstinline@1 = 2@ would not fail at runtime. The reason for such odd behavior
+  is the implementation of the evaluator, which for simplicity considers
+  everything to be an L-value. The type checker could've been programmed to
+  reject such behavior even if it is well defined at runtime; however, it could
+  be argued that it is the job of a linter to check for such expressions.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression BinaryExpression {left, binary, right}
+      | PlainAssignOperator {} <- binary = do
+        leftT <- checkExpression left
+        rightT <- checkExpression right
+
+        if leftT <: rightT then
+          pure leftT
+        else
+          report' (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  The operators \lstinline@+=@, \lstinline@-=@, \lstinline@*=@, \lstinline@/=@,
+  \lstinline@%=@ are implemented considering the shorthands detailed in table
+  \ref{table:assignmentoperators}.
+
+  \subsection{Checking statements}
+
+  The function \lstinline@checkStatement :: Type -> Statement -> Typer Bool@
+  performs type checking on statements. A type must be provided: on return
+  statements, \lstinline@checkStatement@ verifies that the returned value is of
+  the given type.
+
+  Inside functions, return statements signal control to be returned the callee.
+  Block statements with a \lstinline@return@ inside return control as well.
+  Thus, \lstinline@checkStatement@ wraps a \lstinline@Bool@ which is
+  \lstinline@True@ if control is guaranteed to be returned to the callee and
+  \lstinline@False@ otherwise.
+
+  \lstinline@ExpressionStatement@s and \lstinline@DefinitionStatement@s are
+  trivial to check. In both cases, type checking is delegated to the relevant
+  function. \lstinline@checkDefinitions@ is defined in the next section.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkStatement _ ExpressionStatement {value} = do
+      checkExpression value
+      pure False
+
+    checkStatement _ DefinitionStatement {definition} = do
+      checkDefinitions [definition]
+      pure False
+  \end{lstlisting}
+
+  If-else statements are type checked by asserting that the predicate is a
+  boolean and recursively checking both possible execution paths. If both
+  branches return control, then the if-else statement surely returns control as
+  well.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkStatement expectedT IfElseStatement {predicate, trueBranch, falseBranch} = do
+      t <- checkExpression predicate
+      unless (t <: Bool) (report (InvalidType predicate Bool t))
+      trueBranchDoesReturn <- withNewScope (checkStatement expectedT trueBranch)
+      falseBranchDoesReturn <- withNewScope (checkStatement expectedT falseBranch)
+      pure (trueBranchDoesReturn && falseBranchDoesReturn)
+  \end{lstlisting}
+
+  If statements without \lstinline@else@ are checked in a similar way. It can't
+  be deduced whether control is returned, as the value of the predicate is only
+  known at runtime.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkStatement expectedT IfStatement {predicate, trueBranch} = do
+      t <- checkExpression predicate
+      unless (t <: Bool) (report (InvalidType predicate Bool t))
+      withNewScope (checkStatement expectedT trueBranch)
+      pure False
+  \end{lstlisting}
+
+  While and do-while statements are checked with the considerations similar to
+  if and if-else statements respectively.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkStatement expectedT WhileStatement {predicate, body} = do
+      t <- checkExpression predicate
+      unless (t <: Bool) (report (InvalidType predicate Bool t))
+      withNewScope (checkStatement expectedT body)
+      pure False
+
+    checkStatement expectedT DoWhileStatement {body, predicate} = do
+      doesReturn <- withNewScope (checkStatement expectedT body)
+      t <- checkExpression predicate
+      unless (t <: Bool) (report (InvalidType predicate Bool t))
+      pure doesReturn
+  \end{lstlisting}
+
+  Return statements are checked by asserting that the returned value has the
+  correct type. If the return value is omitted, it is assumed that
+  \lstinline@unit@ is returned instead.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkStatement expectedT ReturnStatement {result = Just result} = do
+      t <- checkExpression result
+      unless (t <: expectedT) (report (InvalidType result expectedT t))
+      pure True
+
+    checkStatement expectedT statement @ ReturnStatement {result = Nothing} = do
+      unless (Unit <: expectedT) (report (MissingReturnValue statement expectedT))
+      pure True
+  \end{lstlisting}
+
+  Assertions are type checked by verifying whether the predicate is of type
+  \lstinline@Bool@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkStatement _ AssertStatement {predicate} = do
+      t <- checkExpression predicate
+      unless (t <: Bool) (report (InvalidType predicate Bool t))
+      pure False
+  \end{lstlisting}
+
+  For debug statements, nothing needs to be done.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkStatement _ DebugStatement {} = pure False
+  \end{lstlisting}
+
+  Finally, blocks are type checked by recursively checking all statements they
+  contain. It is deduced that a block returns control if at least one of it
+  statements does.
+
+  Devin's syntactical scoping rules have to be considered: declarations in a
+  block have to be forgotten about at the end of its scope. Because of this,
+  statements and declarations within blocks have to be checked in a new
+  environment linked to the previous one, using the \lstinline@withNewScope@
+  function.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkStatement expectedT BlockStatement {statements} = withNewScope $ do
+      for_ statements $ \case
+        DefinitionStatement {definition} -> checkDefinition1 definition
+        _ -> pure ()
+
+      foldlM f False statements
+
+      where
+        f doesReturn statement = (doesReturn ||) <$> check statement
+
+        check DefinitionStatement {definition} = do
+          checkDefinition2 definition
+          pure False
+
+        check statement = checkStatement expectedT statement
+  \end{lstlisting}
+
+  \subsection{Checking variable and function definitions}
+
+  Definitions are checked in two passes. The first pass looks for function
+  definitions and stores the relevant signatures in the environment; the body of
+  the functions is not checked at this stage. The second pass processes variable
+  definitions and statements within those function definitions.
+
+  Without two pass type checking, mutually recursive function definitions would
+  not be supported---at least not without a mechanism like C's forward
+  declarations.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkDefinitions :: [Definition] -> Typer ()
+    checkDefinitions definitions = do
+      for_ definitions checkDefinition1
+      for_ definitions checkDefinition2
+  \end{lstlisting}
+
+  In the first pass, function signatures are processed by resolving the
+  parameter and return types, if specified. Type identifiers are mapped to the
+  type they refer to through the \lstinline@getType@ helper function.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    getType :: TypeId -> Typer Type
+    getType = \case
+      PlainTypeId {name, interval} -> lookupType name >>= \case
+        Just (t, _) -> pure t
+
+        Nothing -> do
+          report (UnknownType name interval)
+          defineType name (Placeholder name)
+
+      ArrayTypeId {innerTypeId} -> do
+        t <- getType innerTypeId
+        pure (Array t)
+
+    checkDefinition1 :: Definition -> Typer ()
+    checkDefinition1 = \case
+      VarDefinition {} -> pure ()
+
+      FunDefinition {funId = SymbolId {name}, params, returnInfo} -> do
+        paramTs <- for params $ \(_, _, typeInfo) -> case typeInfo of
+          Just (_, paramTypeId) -> getType paramTypeId
+          Nothing -> pure Unknown
+
+        returnT <- case returnInfo of
+          Just (_, returnTypeId) -> getType returnTypeId
+          Nothing -> pure Unknown
+
+        defineFunSignature name (paramTs, returnT)
+  \end{lstlisting}
+
+  Finally, variable definitions and function bodies are type checked as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkDefinition2 :: Definition -> Typer ()
+    checkDefinition2 = \case
+      VarDefinition {varId = SymbolId {name}, value} -> do
+        t <- checkExpression value
+        defineVarType name t
+
+      FunDefinition {funId, params, returnInfo, body} -> withNewScope $ do
+        for_ params $ \(_, SymbolId {name}, typeInfo) -> case typeInfo of
+          Just (_, paramTypeId) -> do
+            paramT <- getType paramTypeId
+            defineVarType name paramT
+
+          Nothing -> defineVarType name Unknown
+
+        returnT <- case returnInfo of
+          Just (_, returnTypeId) -> getType returnTypeId
+          Nothing -> pure Unknown
+
+        case returnT of
+          Unknown -> void (checkStatement Unknown body)
+          Unit -> void (checkStatement Unit body)
+
+          _ -> do
+            doesReturn <- checkStatement returnT body
+            unless doesReturn (report (MissingReturnStatement funId))
+  \end{lstlisting}
+
+  \section{The evaluator}
+
+  The types and functions in the module \lstinline@Devin.Evaluator@ implement
+  the evaluator interface. Mirroring type checking, evaluation operates on a
+  linked list of \lstinline@Frame@s; each frame holds bindings between function
+  names and their definitions, and between variable names and their value stored
+  in memory.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Evaluator a = Evaluator (State -> IO (Result a, State))
+      deriving Functor
+
+    type State = [Frame]
+
+    data Frame = Frame {
+      offset :: Int,  -- Access link / static link
+      funs :: [(String, Function)],
+      vars :: [(String, Reference)]
+    }
+  \end{lstlisting}
+
+  An \lstinline@Evaluator@ wraps a function which updates a \lstinline@State@,
+  possibly producing some side effect. To allow execution to be interrupted by
+  debug statements, the wrapped function furthermore returns a
+  \lstinline@Result@ which is one of the following:
+
+  \begin{itemize}
+    \item \lstinline@Done@, if the last statement has been executed. This data
+    constructor stores the result of computation.
+
+    \item \lstinline@Debug@, if a debug statement has been reached. The debug
+    statement, along with the next step to execute, is stored by this
+    constructor.
+
+    \item \lstinline@Error@, if an error occurred at runtime.
+  \end{itemize}
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Result a
+      = Done a
+      | Debug Statement (Evaluator a)
+      | Error Error
+      deriving Functor
+  \end{lstlisting}
+
+  A \lstinline@Function@ can either be a built-in Devin with ad-hoc semantics,
+  or user-defined.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Function
+      = UserDefined Definition
+      | BuiltinToInt
+      | BuiltinToFloat
+  \end{lstlisting}
+
+  Values are not stored directly inside \lstinline@State@. Rather, they're
+  wrapped in a cell which holds the actual value---this mirrors LISP's
+  implementation, and allows multiple identifiers to refer to the same value.
+  In Devin, cells are implemented by the \lstinline@Reference@ data type.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Reference = Reference (IORef Value)
+
+    data Value
+      = Unit
+      | Bool Bool
+      | Int Int64
+      | Float Double
+      | Array (Vector Reference)
+  \end{lstlisting}
+
+  References be created, read from and modified with the \lstinline@newRef@,
+  \lstinline@readRef@, \lstinline@writeRef@ functions respectively.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    newRef :: MonadIO m => Value -> m Reference
+    newRef x = liftIO $ do
+      ref <- newIORef x
+      pure (Reference ref)
+
+    readRef :: MonadIO m => Reference -> m Value
+    readRef (Reference ref) = liftIO (readIORef ref)
+
+    writeRef :: MonadIO m => Reference -> Value -> m ()
+    writeRef (Reference ref) v = liftIO (writeIORef ref v)
+  \end{lstlisting}
+
+  Since a \lstinline@Value@ can be an array containing references, it may be
+  useful to clone it, copying the values contained in its cells.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    cloneVal :: MonadIO m => Value -> m Value
+    cloneVal = \case
+      Unit -> pure Unit
+      Bool x -> pure (Bool x)
+      Int x -> pure (Int x)
+      Float x -> pure (Float x)
+
+      Array rs -> do
+        rs' <- Vector.forM rs cloneRef
+        pure (Array rs')
+
+    cloneRef :: MonadIO m => Reference -> m Reference
+    cloneRef r = do
+      v <- readRef r
+      v' <- cloneVal v
+      newRef v'
+  \end{lstlisting}
+
+  Equality between values can be tested with \lstinline@compareVals@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    compareVals :: MonadIO m => Value -> Value -> m Bool
+    compareVals v1 v2 = case (v1, v2) of
+      (Unit, Unit) -> pure True
+      (Bool x, Bool y) -> pure (x == y)
+      (Int x, Int y) -> pure (x == y)
+      (Float x, Float y) -> pure (x == y)
+
+      (Array rs1, Array rs2) -> do
+        let n1 = Vector.length rs1
+        let n2 = Vector.length rs2
+        if n1 /= n2 then pure False else go n1 0
+
+        where
+          go n i | i >= n = pure True
+
+          go n i = do
+            x <- readRef (rs1 ! i)
+            y <- readRef (rs2 ! i)
+            ifM (compareVals x y) (go n (i + 1)) (pure False)
+
+      (_, _) -> pure False
+
+    compareRefs :: MonadIO m => Reference -> Reference -> m Bool
+    compareRefs r1 r2 = do
+      v1 <- readRef r1
+      v2 <- readRef r2
+      compareVals v1 v2
+  \end{lstlisting}
+
+  An \lstinline@Evaluator@ wraps a function which executes a single step of
+  computation, possibly indicating what to execute next. It makes sense to
+  provide two functions: one to run a single step, and one to run all remaining
+  steps. These are implemented by the \lstinline@runEvaluatorStep@ and
+  \lstinline@runEvaluator@ functions respectively.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    runEvaluatorStep :: MonadIO m => Evaluator a -> State -> m (Result a, State)
+    runEvaluatorStep (Evaluator f) state = liftIO (f state)
+
+    runEvaluator :: MonadIO m => Evaluator a -> State -> m (Either Error a, State)
+    runEvaluator mx state = do
+      (result, state') <- runEvaluatorStep mx state
+
+      case result of
+        Done x -> pure (Right x, state')
+        Debug _ mx -> runEvaluator mx state'
+        Error error -> pure (Left error, state')
+  \end{lstlisting}
+
+  Further, an \lstinline@Evaluator@ is a monad.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance Applicative Evaluator where
+      pure :: a -> Evaluator a
+      pure x = Evaluator (\state -> pure (Done x, state))
+
+      liftA2 :: (a -> b -> c) -> Evaluator a -> Evaluator b -> Evaluator c
+      liftA2 f mx my = Evaluator $ \state -> do
+        (result, state') <- runEvaluatorStep mx state
+
+        case result of
+          Done x -> runEvaluatorStep (f x <$> my) state'
+          Debug statement mx -> pure (Debug statement (liftA2 f mx my), state')
+          Error error -> pure (Error error, state')
+
+    instance Monad Evaluator where
+      (>>=) :: Evaluator a -> (a -> Evaluator b) -> Evaluator b
+      mx >>= f = Evaluator $ \state -> do
+        (result, state') <- runEvaluatorStep mx state
+
+        case result of
+          Done x -> runEvaluatorStep (f x) state'
+          Debug statement mx -> pure (Debug statement (f =<< mx), state')
+          Error error -> pure (Error error, state')
+  \end{lstlisting}
+
+  For convenience, an instance for \lstinline@MonadIO@ is provided as well. The
+  first instance permits, among others, \lstinline@newRef@, \lstinline@readRef@,
+  \lstinline@writeRef@, \lstinline@cloneRef@, \lstinline@compareRefs@,
+  \lstinline@cloneVals@ and \lstinline@compareVals@ to be used with the
+  \lstinline@Evaluator@ monad as well.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance MonadIO Evaluator where
+      liftIO :: IO a -> Evaluator a
+      liftIO mx = Evaluator $ \state -> do
+        x <- mx
+        pure (Done x, state)
+  \end{lstlisting}
+
+  Functions and variables can be defined and looked up with
+  \lstinline@defineFun@, \lstinline@lookupFun@, \lstinline@defineVar@ and
+  \lstinline@lookupVar@. On lookup, the stack of frames is searched from top to
+  bottom. Lexical scoping is implemented by making each \lstinline@Frame@ store
+  how many frames to skip during search to reach to get to the enclosing scope.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    defineFun :: String -> Function -> Evaluator ()
+    defineFun name fun = Evaluator $ \case
+      [] -> pure (Done (), [Frame 0 [(name, fun)] []])
+
+      frame : parents -> do
+        let funs' = (name, fun) : funs frame
+        pure (Done (), frame {funs = funs'} : parents)
+
+    lookupFun :: String -> Evaluator (Maybe (Function, Int))
+    lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
+      where
+        go _ [] = Nothing
+
+        go depth (Frame {offset, funs} : parents) = case lookup name funs of
+          Just fun -> Just (fun, depth)
+          Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
+
+    defineVar :: String -> Reference -> Evaluator ()
+    defineVar name r = Evaluator $ \case
+      [] -> pure (Done (), [Frame 0 [] [(name, r)]])
+
+      frame : parents -> do
+        let vars' = (name, r) : vars frame
+        pure (Done (), frame {vars = vars'} : parents)
+
+    lookupVar :: String -> Evaluator (Maybe (Reference, Int))
+    lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
+      where
+        go _ [] = Nothing
+
+        go depth (Frame {offset, vars} : parents) = case lookup name vars of
+          Just ref -> Just (ref, depth)
+          Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
+  \end{lstlisting}
+
+  The function \lstinline@withNewFrame@ runs another \lstinline@Evaluator@ on
+  a modified state here a new \lstinline@Frame@ is added; when the function
+  returns, the previous state is restored.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    withNewFrame :: Int -> Evaluator a -> Evaluator a
+    withNewFrame offset mx = do
+      pushFrame
+      x <- mx
+      popFrame
+      pure x
+      where
+        pushFrame = Evaluator (\state -> pure (Done (), Frame offset [] [] : state))
+        popFrame = Evaluator (\state -> pure (Done (), tail state))
+  \end{lstlisting}
+
+  The functions \lstinline@debug@ and \lstinline@raise@ are provided for
+  utility.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    debug :: Statement -> Evaluator ()
+    debug statement = Evaluator (\state -> pure (Debug statement (pure ()), state))
+
+    raise :: Error -> Evaluator a
+    raise error = Evaluator (\state -> pure (Error error, state))
+  \end{lstlisting}
+
+  \subsection{Evaluating expressions}
+
+  The module \lstinline@Devin.Evaluators@ implements functions to evaluate
+  expressions, statements and definitions.
+  \lstinline@evalExpression :: Expression -> Evaluator Reference@ executes an
+  expression and returns the cell containing the evaluated value.
+
+  Evaluating integer and floating-point literals is trivial: all that needs to
+  be done is to allocate a new cell containing the value of the literal. For
+  integers, an exception is raised if the literal is out of the 64-bit range.
+  Variable literals get looked up in the running state.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression expression @ IntegerExpression {integer} =
+      case toIntegralSized integer of
+        Just x -> newRef (Int x)
+        Nothing -> raise (IntegerOverflow expression)
+
+    evalExpression RationalExpression {rational} =
+      newRef (Float (fromRat rational))
+
+    evalExpression VarExpression {varName, interval} =
+      lookupVar varName >>= \case
+        Just (r, _) -> pure r
+        Nothing -> raise (UnknownVar varName interval)
+  \end{lstlisting}
+
+  Arrays get processed by recursively evaluating all the elements, cloning the
+  resulting cells. As a general pattern, cloning is performed when it is
+  undesired that two objects point to the same value. For instance, the
+  expression \lstinline@[x]@ should produce a new array with one element which
+  is a \emph{copy} of \lstinline@x@'s cell; otherwise, modifying \lstinline@x@
+  would also appear to modify the newly created array.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression ArrayExpression {elems} = do
+      rs <- Vector.unfoldrM f elems
+      newRef (Array rs)
+
+      where
+        f [] = pure Nothing
+
+        f (elem : elems) = do
+          r <- evalExpression elem
+          r' <- cloneRef r
+          pure (Just (r', elems))
+  \end{lstlisting}
+
+  Access to array elements is evaluated by considering the array to access and
+  its index. Notice that it is not assumed that the type checker has been run
+  before: if the the expression involves invalid types, a runtime exception is
+  raised.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression AccessExpression {array, index} = do
+      arrayR <- evalExpression array
+      arrayV <- readRef arrayR
+
+      indexR <- evalExpression index
+      indexV <- readRef indexR
+
+      case (arrayV, indexV) of
+        (Array rs, Int x) -> case toIntegralSized x of
+          Just n | Just r <- rs !? n -> pure r
+          _ -> raise (IndexOutOfBounds index x)
+
+        (Array _, _) -> do
+          indexT <- getType indexV
+          raise (InvalidType index Type.Int indexT)
+
+        (_, _) -> do
+          arrayT <- getType arrayV
+          raise (InvalidType array (Type.Array Type.Unknown) arrayT)
+  \end{lstlisting}
+
+  Executing function calls is probably the most complex part of Devin's
+  evaluator. The called function is looked up, rasing an error if it is not
+  found. Arguments are evaluated from left to right; if an argument has the
+  wrong type, or if too many or to few arguments are passed, an exception is
+  raised. The built-in functions \lstinline@toFloat@ and \lstinline@toInt@
+  convert an \lstinline@Int@ to a \lstinline@Float@ and round a
+  \lstinline@Float@ to an \lstinline@Int@ respectively. A user-defined function
+  call is evaluated by updating Devin's state with bindings to parameter names.
+  If an argument is passed by value, a copy of its cell is bound; otherwise, no
+  copy is performed.
+
+  A new frame is pushed when executing the function's body using
+  \lstinline@withNewFrame (depth + 1)@. \lstinline@depth@ denotes the lexical
+  nesting of the callee with respect to the caller.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression expression |
+      CallExpression {funId = SymbolId {name, interval}, args} <- expression = do
+        argRs <- for args evalExpression
+
+        lookupFun name >>= \case
+          Just (UserDefined FunDefinition {params, body}, depth) ->
+            withNewFrame (depth + 1) (go 0 params argRs)
+            where
+              -- Pass by value
+              go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do
+                argR' <- cloneRef argR
+                defineVar name argR'
+                go (n + 1) params argRs
+
+              -- Pass by reference
+              go n ((Just _, SymbolId {name}, _) : params) (argR : argRs) = do
+                defineVar name argR
+                go (n + 1) params argRs
+
+              go _ [] [] = evalStatement body >>= \case
+                Just r -> cloneRef r
+                Nothing -> newRef Unit
+
+              go n params argRs = do
+                let expected = n + length params
+                let actual = n + length argRs
+                raise (InvalidArgCount expression expected actual)
+
+          Just (BuiltinToInt, depth) -> withNewFrame (depth + 1) $ case argRs of
+            [argR] -> do
+              argV <- readRef argR
+
+              case argV of
+                Float x -> newRef (Int (round x))
+
+                _ -> do
+                  argT <- getType argV
+                  raise (InvalidType (head args) Type.Float argT)
+
+            _ -> raise (InvalidArgCount expression 1 (length argRs))
+
+          Just (BuiltinToFloat, depth) -> withNewFrame (depth + 1) $ case argRs of
+            [argR] -> do
+              argV <- readRef argR
+
+              case argV of
+                Int x -> newRef (Float (fromIntegral x))
+
+                _ -> do
+                  argT <- getType argV
+                  raise (InvalidType (head args) Type.Int argT)
+
+            _ -> raise (InvalidArgCount expression 1 (length argRs))
+
+          _ -> raise (UnknownFun name interval)
+  \end{lstlisting}
+
+  Evaluating arithmetic expressions on \lstinline@Int@s may lead to overflows.
+  The helper functions \lstinline@safeUnary@ and \lstinline@safeBinary@ wrap
+  Haskell's built-in operators, allowing for overflow detection. Both
+  \lstinline@toInteger@ and \lstinline@toIntegralSized@ are functions from the
+  \lstinline@base@ library. In the context of Devin's evaluator,
+  \lstinline@toInteger@ converts an \lstinline@Int64@ to an unbounded
+  \lstinline@Integer@; \lstinline@toIntegralSized@ is its inverse, as it
+  attempts to convert an \lstinline@Integer@ back to an \lstinline@Int64@. On
+  overflow, it yields \lstinline@Nothing@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    safeUnary op x = toIntegralSized (toInteger (op x))
+    safeBinary op x y = toIntegralSized (toInteger x `op` toInteger y)
+  \end{lstlisting}
+
+  Unary expressions are evaluated as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression UnaryExpression {unary, operand}
+      | PlusOperator {} <- unary = do
+        operandR <- evalExpression operand
+        operandV <- readRef operandR
+
+        case operandV of
+          Int x -> newRef (Int x)
+          Float x -> newRef (Float x)
+
+          _ -> do
+            operandT <- getType operandV
+            raise (InvalidUnary unary operandT)
+
+    evalExpression expression @ UnaryExpression {unary, operand}
+      | MinusOperator {} <- unary = do
+        operandR <- evalExpression operand
+        operandV <- readRef operandR
+
+        case operandV of
+          Int x | Just y <- safeUnary negate x -> newRef (Int y)
+          Int _ -> raise (IntegerOverflow expression)
+
+          Float x -> newRef (Float (negate x))
+
+          _ -> do
+            operandT <- getType operandV
+            raise (InvalidUnary unary operandT)
+
+    evalExpression UnaryExpression {unary, operand}
+      | NotOperator {} <- unary = do
+        operandR <- evalExpression operand
+        operandV <- readRef operandR
+
+        case operandV of
+          Bool x -> newRef (Bool (not x))
+
+          _ -> do
+            operandT <- getType operandV
+            raise (InvalidUnary unary operandT)
+
+    evalExpression UnaryExpression {unary, operand}
+      | LenOperator {} <- unary = do
+        operandR <- evalExpression operand
+        operandV <- readRef operandR
+
+        case operandV of
+          Array rs -> newRef (Int (fromIntegral (length rs)))
+
+          _ -> do
+            operandT <- getType operandV
+            raise (InvalidUnary unary operandT)
+  \end{lstlisting}
+
+  The binary arithmetic operators \lstinline@-@, \lstinline@/@ and \lstinline@%@
+  have similar implementations, with the exception that \lstinline@%@ supports
+  only \lstinline@Int@s, and that both \lstinline@/@ and \lstinline@%@ raise an
+  exception if the dividend is 0.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression expression @ BinaryExpression {left, binary, right}
+      | DivideOperator {} <- binary = do
+        leftR <- evalExpression left
+        leftV <- readRef leftR
+
+        rightR <- evalExpression right
+        rightV <- readRef rightR
+
+        case (leftV, rightV) of
+          (Int _, Int 0) -> raise (DivisionByZero expression)
+          (Int x, Int y) | Just z <- safeBinary div x y -> newRef (Int z)
+          (Int _, Int _) -> raise (IntegerOverflow expression)
+
+          (Float x, Float y) -> newRef (Float (x / y))
+
+          (_, _) -> do
+            leftT <- getType leftV
+            rightT <- getType rightV
+            raise (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  The operators \lstinline@+@ and \lstinline@*@ are overloaded and are meant to
+  work with both arrays and numbers. Array concatenation and repetition require
+  cells to be cloned.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression expression @ BinaryExpression {left, binary, right}
+      | AddOperator {} <- binary = do
+        leftR <- evalExpression left
+        leftV <- readRef leftR
+
+        rightR <- evalExpression right
+        rightV <- readRef rightR
+
+        case (leftV, rightV) of
+          (Int x, Int y) | Just z <- safeBinary (+) x y -> newRef (Int z)
+          (Int _, Int _) -> raise (IntegerOverflow expression)
+
+          (Float x, Float y) -> newRef (Float (x + y))
+
+          (Array rs1, Array rs2) -> do
+            let n1 = Vector.length rs1
+            let n2 = Vector.length rs2
+
+            case safeBinary (+) n1 n2 of
+              Nothing -> raise (IntegerOverflow expression)
+
+              Just n3 -> do
+                let f i = cloneRef (if i < n1 then rs1 ! i else rs2 ! (i - n1))
+                rs3 <- Vector.generateM n3 f
+                newRef (Array rs3)
+
+          (_, _) -> do
+            leftT <- getType leftV
+            rightT <- getType rightV
+            raise (InvalidBinary binary leftT rightT)
+
+    evalExpression expression @ BinaryExpression {left, binary, right}
+      | MultiplyOperator {} <- binary = do
+        leftR <- evalExpression left
+        leftV <- readRef leftR
+
+        rightR <- evalExpression right
+        rightV <- readRef rightR
+
+        case (leftV, rightV) of
+          (Int x, Int y) | Just z <- safeBinary (*) x y -> newRef (Int z)
+          (Int _, Int _) -> raise (IntegerOverflow expression)
+
+          (Float x, Float y) -> newRef (Float (x * y))
+
+          (Int x, Array _) | x <= 0 -> newRef (Array Vector.empty)
+          (Array _, Int y) | y <= 0 -> newRef (Array Vector.empty)
+
+          (Int x, Array rs) -> do
+            let n = Vector.length rs
+
+            case safeBinary (*) x n of
+              Nothing -> raise (IntegerOverflow expression)
+
+              Just n' -> do
+                rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
+                newRef (Array rs')
+
+          (Array rs, Int y) -> do
+            let n = Vector.length rs
+
+            case safeBinary (*) n y of
+              Nothing -> raise (IntegerOverflow expression)
+
+              Just n' -> do
+                rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
+                newRef (Array rs')
+
+          (_, _) -> do
+            leftT <- getType leftV
+            rightT <- getType rightV
+            raise (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  The operators \lstinline@<@, \lstinline@<=@, \lstinline@>@, \lstinline@>=@
+  have trivial implementations.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression BinaryExpression {left, binary, right}
+      | LessOperator {} <- binary = do
+        leftR <- evalExpression left
+        leftV <- readRef leftR
+
+        rightR <- evalExpression right
+        rightV <- readRef rightR
+
+        case (leftV, rightV) of
+          (Int x, Int y) -> newRef (Bool (x < y))
+          (Float x, Float y) -> newRef (Bool (x < y))
+
+          (_, _) -> do
+            leftT <- getType leftV
+            rightT <- getType rightV
+            raise (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  Equality is checked via \lstinline@compareRefs@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression BinaryExpression {left, binary, right}
+      | EqualOperator {} <- binary = do
+        leftR <- evalExpression left
+        rightR <- evalExpression right
+        x <- compareRefs leftR rightR
+        newRef (Bool x)
+
+    evalExpression BinaryExpression {left, binary, right}
+      | NotEqualOperator {} <- binary = do
+        leftR <- evalExpression left
+        rightR <- evalExpression right
+        x <- compareRefs leftR rightR
+        newRef (Bool (not x))
+  \end{lstlisting}
+
+  The boolean operators \lstinline@and@ and \lstinline@or@ are lazy in their
+  second operand. As such, their implementation differs from that of other
+  binary operands.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression BinaryExpression {left, binary, right}
+      | AndOperator {} <- binary = do
+        leftR <- evalExpression left
+        leftV <- readRef leftR
+
+        case leftV of
+          Bool False -> newRef (Bool False)
+
+          _ -> do
+            rightR <- evalExpression right
+            rightV <- readRef rightR
+
+            case (leftV, rightV) of
+              (Bool x, Bool y) -> newRef (Bool (x && y))
+
+              (_, _) -> do
+                leftT <- getType leftV
+                rightT <- getType rightV
+                raise (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  For \lstinline@xor@, both operands need to be evaluated.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression BinaryExpression {left, binary, right}
+      | XorOperator {} <- binary = do
+        leftR <- evalExpression left
+        leftV <- readRef leftR
+
+        rightR <- evalExpression right
+        rightV <- readRef rightR
+
+        case (leftV, rightV) of
+          (Bool x, Bool y) -> newRef (Bool (x /= y))
+
+          (_, _) -> do
+            leftT <- getType leftV
+            rightT <- getType rightV
+            raise (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  Plain assignments with \lstinline@=@ are evaluated by modifying the value of
+  the cell given by the left operand.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression BinaryExpression {left, binary, right}
+      | PlainAssignOperator {} <- binary = do
+        leftR <- evalExpression left
+
+        rightR <- evalExpression right
+        rightV <- readRef rightR
+        rightV' <- cloneVal rightV
+
+        writeRef' leftR rightV'
+  \end{lstlisting}
+
+  The other assignment operators are implemented according to the shorthands of
+  table \ref{table:assignmentoperators}. For example, \lstinline@+=@ is
+  implemented as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression BinaryExpression {left, binary, right}
+      | AddAssignOperator {} <- binary = do
+        leftR <- evalExpression left
+        leftV <- readRef leftR
+
+        rightR <- evalExpression right
+        rightV <- readRef rightR
+
+        case (leftV, rightV) of
+          (Int x, Int y) | Just z <- safeBinary (+) x y -> writeRef' leftR (Int z)
+          (Int _, Int _) -> raise (IntegerOverflow expression)
+
+          (Float x, Float y) -> writeRef' leftR (Float (x + y))
+
+          (_, _) -> do
+            leftT <- getType leftV
+            rightT <- getType rightV
+            raise (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
+
+  \subsection{Evaluating statements}
+
+  The function
+  \lstinline@evalStatement :: Statement -> Evaluator (Maybe Reference)@
+  evaluates statements. The evaluator returns \lstinline@Just@ on return
+  statements and \lstinline@Nothing@ otherwise.
+
+  The following two base cases are trivial (\lstinline@evalDefinitions@'s
+  implementation is discussed in the next section):
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression DefinitionStatement {definition} = do
+      evalDefinitions [definition]
+      pure Nothing
+
+    evalExpression ExpressionStatement {value} = do
+      evalExpression value
+      pure Nothing
+  \end{lstlisting}
+
+  An if-else statement is processed by evaluating its predicate; based on its
+  value, the relevant branch is executed. A branch can either be a block of
+  statements or a single statement. As discussed previously, a declaration can
+  be inserted wherever a statement can be placed; as such, a new frame is pushed
+  to evaluate the branch. If the statement is in fact a single declaration,
+  its scope is limited to the declaration itself only.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression IfStatement {predicate, trueBranch} = do
+      r <- evalExpression predicate
+      v <- readRef r
+
+      case v of
+        Bool True -> withNewFrame 1 (evalStatement trueBranch)
+        Bool False -> pure Nothing
+
+        _ -> do
+          t <- getType v
+          raise (InvalidType predicate Type.Bool t)
+
+    evalExpression IfElseStatement {predicate, trueBranch, falseBranch} = do
+      r <- evalExpression predicate
+      v <- readRef r
+
+      case v of
+        Bool True -> withNewFrame 1 (evalStatement trueBranch)
+        Bool False -> withNewFrame 1 (evalStatement falseBranch)
+
+        _ -> do
+          t <- getType v
+          raise (InvalidType predicate Type.Bool t)
+  \end{lstlisting}
+
+  For while statements, the predicate is evaluated. If true, the body is
+  executed. To allow the body to be executed multiple times, the while statement
+  itself is recursively evaluated again.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression statement @ WhileStatement {predicate, body} = do
+      r <- evalExpression predicate
+      v <- readRef r
+
+      case v of
+        Bool False -> pure Nothing
+
+        Bool True -> withNewFrame 1 (evalStatement body) >>= \case
+          Just r -> pure (Just r)
+          Nothing -> evalStatement statement
+
+        _ -> do
+          t <- getType v
+          raise (InvalidType predicate Type.Bool t)
+
+    evalExpression statement @ DoWhileStatement {body, predicate} =
+      withNewFrame 1 (evalStatement body) >>= \case
+        Just r -> pure (Just r)
+
+        Nothing -> do
+          r <- evalExpression predicate
+          v <- readRef r
+
+          case v of
+            Bool False -> pure Nothing
+            Bool True -> evalStatement statement
+
+            _ -> do
+              t <- getType v
+              raise (InvalidType predicate Type.Bool t)
+  \end{lstlisting}
+
+  Return statements are evaluated as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression ReturnStatement {result = Just result} = do
+      r <- evalExpression result
+      pure (Just r)
+
+    evalExpression ReturnStatement {result = Nothing} = do
+      r <- newRef Unit
+      pure (Just r)
+  \end{lstlisting}
+
+  Assertions evaluate their predicate. If it is not a boolean, or if it is
+  false, an exception is raised.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression statement @ AssertStatement {predicate} = do
+      r <- evalExpression predicate
+      v <- readRef r
+
+      case v of
+        Bool False -> raise (AssertionFailed statement)
+        Bool True -> pure Nothing
+
+        _ -> do
+          t <- getType v
+          raise (InvalidType predicate Type.Bool t)
+  \end{lstlisting}
+
+  Not much is required to handle debug statements.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression DebugStatement {} = do
+      debug statement
+      pure Nothing
+  \end{lstlisting}
+
+  Blocks are processed in two steps. First, all function definitions are bound;
+  then, all other statements and/or definitions are evaluated. With
+  \lstinline@firstJustM@, execution stops at the first return statement, as
+  only return statements produce a \lstinline@Just@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalExpression BlockStatement {statements} = withNewFrame 1 $ do
+      for_ statements $ \case
+        DefinitionStatement {definition} -> evalDefinition1 definition
+        _ -> pure ()
+
+      firstJustM eval statements
+
+      where
+        eval DefinitionStatement {definition} = do
+          evalDefinition2 definition
+          pure Nothing
+
+        eval statement = evalStatement statement
+  \end{lstlisting}
+
+  \subsection{Evaluating variable and function definitions}
+
+  As mentioned previously, the evaluator is independent from the type checker.
+  One consequence of this separation is that the environment computed by type
+  checking can't be used in execution: the evaluator has to keep track its own
+  bindings in its state. While this leads to some code duplication as the
+  environment is handled pretty much in the same way in both cases, the
+  implementation is so trivial that there's little benefit in refactoring.
+
+  As with type checking, evaluation is performed in two phases.
+  \lstinline@evalDefinition1@ registers function definitions to the current
+  environment; \lstinline@evalDefinition2@ evaluates variable definitions.
+  \lstinline@evalDefinitions@ takes a list of function or variable definitions
+  and applies the two previous functions in the correct manner.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    evalDefinitions :: [Definition] -> Evaluator ()
+    evalDefinitions definitions = do
+      for_ definitions evalDefinition1
+      for_ definitions evalDefinition2
+
+    evalDefinition1 :: Definition -> Evaluator ()
+    evalDefinition1 definition = case definition of
+      VarDefinition {} -> pure ()
+
+      FunDefinition {funId = SymbolId {name}} ->
+        defineFun name (UserDefined definition)
+
+    evalDefinition2 :: Definition -> Evaluator ()
+    evalDefinition2 = \case
+      VarDefinition {varId = SymbolId {name}, value} -> do
+        r <- evalExpression value
+        r' <- cloneRef r
+        defineVar name r'
+
+      FunDefinition {} -> pure ()
+  \end{lstlisting}
+
+  \section{The parser}
+
+  Devin's parser is implemented with the help of the \lstinline@parsec@ parser
+  combinator library. Parser combinators have been described in section
+  \ref{section:parsercombinators}.
+
+  As mentioned, the positions of leaf nodes are stored in the syntax tree. While
+  the \lstinline@parsec@ library does provide functionality to query the current
+  line and column during parsing, it doesn't allow to obtain the character index
+  describing the same position. This is an inconvenient limitation, as the
+  syntax highlighter works with indices; luckily, there is a hack to get such
+  arguably missing functionality back. Usually, the input of a
+  \lstinline@parsec@ parser is a string; by writing new instances for the
+  \lstinline@Stream@ typeclass, other kinds of inputs can be supported. The
+  trick is to consider the parser's input to be pair: the first element is an
+  integer character offset, the second is the underlying stream.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance (Num a, Stream s m t) => Stream (a, s) m t where
+      uncons :: (a, s) -> m (Maybe (t, (a, s)))
+      uncons (offset, stream) = uncons stream >>= \case
+        Just (token, rest) -> pure (Just (token, (offset + 1, rest)))
+        Nothing -> pure Nothing
+
+    getOffset :: Monad m => ParsecT (a, s) u m a
+    getOffset = do
+      State {stateInput = (offset, _)} <- getParserState
+      pure offset
+  \end{lstlisting}
+
+  The module \lstinline@Devin.Parsers@ implements the functions required to
+  parse Devin code. A Devin parser is a \lstinline@Parsec (Int, s) [Token] a@,
+  where: \lstinline@Int@ is the offset, \lstinline@s@ is the underlying
+  \lstinline@Steam@ (either \lstinline@String@ or \lstinline@Text@),
+  \lstinline@[Token]@ is the list of comments accumulated in the state,
+  \lstinline@a@ is the result of the parser.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    type ParserT s m a = ParsecT (Int, s) [Token] m a
+    type Parser s a = Parsec (Int, s) [Token] a
+  \end{lstlisting}
+
+  \subsection{Parsing expressions}
+
+  Let's start by examining how an integer is parsed. Syntactically, an integer
+  is made up of one or more digits 0--9; it is optionally preceded by a sign
+  \lstinline@+@ or \lstinline@-@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    integerExpression :: Stream s m Char => ParserT s m Expression
+    integerExpression = flip label "number" $ try $ syntax $ do
+      sign <- (char '+' $> 1) <|> (char '-' $> -1) <|> pure 1
+      digits <- many1 (satisfy isDigit)
+      let magnitude = foldl (\a d -> 10 * a + toInteger (digitToInt d)) 0 digits
+      pure (IntegerExpression (sign * magnitude))
+  \end{lstlisting}
+
+  The do block first parses the sign, then the digits. It computes the
+  magnitude, which multiplied by the sign gives the value of the integer.
+
+  \lstinline@char '+'@ tries to parse \lstinline@+@; if it succeeds, the its
+  yields the parsed character. Similarly, \lstinline@char '-'@ parses a
+  \lstinline@-@. If the parsed character is \lstinline@+@, the sign is positive;
+  if it is \lstinline@-@, the sign is negative; if neither a \lstinline@+@ nor a
+  \lstinline@-@ is parsed, the sign is assumed to be positive.
+
+  The combinator \lstinline@(<|>)@ implements choice. The parser
+  \lstinline[mathescape]@$p$ <|> $q$@ first applies $p$. If it succeeds, the
+  value of $p$ is returned. If $p$ fails without consuming any input, parser $q$
+  is tried. Thus, \lstinline@(char '+' $> 1) <|> (char '-' $> -1) <|> pure 1@
+  tries to parse \lstinline@+@ (in which case the sign is $+1$), then
+  \lstinline@-@ (sign $-1$); if neither character could be parsed,
+  \lstinline@pure 1@ does nothing and yields $+1$.
+
+  Digits are parsed with \lstinline@satisfy isDigit@. The parser
+  \lstinline[mathescape]@satisfy $p$@ succeeds for any character for which the
+  predicate $p$ is true and returns the parsed character. The combinator
+  \lstinline[mathescape]@many1 $p$@ applies a parser $p$ one or more times.
+  Thus, \lstinline@many1 (satisfy isDigit)@ parses one or more digits.
+
+  The constructor \lstinline@IntegerExpression@ has two fields, the second of
+  which is of type \lstinline@(Int, Int)@: it marks the start and end offset
+  where the integer was parsed. The \lstinline@syntax@ combinator gets the
+  position before and after the do block as a tuple; this value is given to the
+  partially applied \lstinline@IntegerExpression@ returned by the block.
+  \lstinline@try@ makes \lstinline@integerExpression@ atomic, in the sense that
+  it either succeeds or fails without consuming any input.
+  \lstinline@flip label "number"@ gives a description to be used for error
+  reporting.
+
+  The helper function \lstinline@syntax@ is implemented as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    syntax :: Stream s m Char => ParserT s m ((Int, Int) -> a) -> ParserT s m a
+    syntax mf = do
+      start <- getOffset
+      f <- mf
+      end <- getOffset
+      pure (f (start, end))
+  \end{lstlisting}
+
+  Numbers with decimals are parsed similarly with respect to integers. The dot,
+  parsed with \lstinline@char '.'@, does not get used directly to compute the
+  value of the parsed rational. The combinator \lstinline@(*>)@ sequences two
+  parsers, discarding the result of the first operand.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    rationalExpression :: Stream s m Char => ParserT s m Expression
+    rationalExpression = flip label "number" $ try $ syntax $ do
+      sign <- (char '+' $> 1) <|> (char '-' $> -1) <|> pure 1
+      digits1 <- many1 (satisfy isDigit)
+      digits2 <- char '.' *> many1 (satisfy isDigit)
+      let digits = digits1 ++ digits2
+      let mantissa = foldl (\a d -> 10 * a + toRational (digitToInt d)) 0 digits
+      pure (RationalExpression (sign * mantissa * 0.1 ^^ length digits2))
+  \end{lstlisting}
+
+  Array literals are parsed as a list of comma separated expressions surrounded
+  by square brackets (\lstinline@[@, \lstinline@]@).
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    arrayExpression :: Stream s m Char => ParserT s m Expression
+    arrayExpression = do
+      open <- token "["
+
+      (elems, commas) <- s *> optionMaybe expression >>= \case
+        Nothing -> pure ([], [])
+
+        Just first -> do
+          rest <- many (liftA2 (,) (try (s *> token ",")) (s *> expression))
+          pure (first : map snd rest, map fst rest)
+
+      close <- s *> token "]"
+      pure (ArrayExpression open elems commas close)
+  \end{lstlisting}
+
+  After the opening bracket is matched with \lstinline@token "["@, a space is
+  skipped and an expression is optionally parsed with
+  \lstinline@optionMaybe expression@. If no expression was parsed, the array
+  is empty and the next character must be a \lstinline@]@; otherwise, zero or
+  more comma-expression sequences are parsed.
+
+  Two helper functions are used: \lstinline@token@ and \lstinline@s@: the first
+  one matches the input string against a sequence of characters, the second
+  skips zero or more spaces. They are defined as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    token :: Stream s m Char => String -> ParserT s m Token
+    token literal = syntax $ do
+      text literal
+      pure Token
+
+    text :: Stream s m Char => String -> ParserT s m String
+    text literal = try (string literal) <?> ("“" ++ literal ++ "”")
+
+    s :: Stream s m Char => ParserT s m ()
+    s = skipMany (skipMany1 (space <?> "") <|> void (comment <?> ""))
+  \end{lstlisting}
+
+  The function \lstinline@string@ is provided by \lstinline@parsec@; it parses a
+  sequence of characters, consuming characters even if the whole string could't
+  be matched: \lstinline@try@ has to be used to disable this odd behavior.
+  \lstinline@skipMany@ and \lstinline@skipMany1@ are similar to \lstinline@many@
+  and \lstinline@many1@, except that they ignore the result. The combinator
+  \lstinline@(<?>)@ gives a label to a parser; if an empty string is provided,
+  any previous label is removed.
+
+  As mentioned, comments are accumulated in the parser's state. As such,
+  comments are parsed as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    comment :: Stream s m Char => ParserT s m Token
+    comment = flip label "comment" $ do
+      token <- syntax $ do
+        text "//"
+        skipMany (noneOf "\n\v\r\x85\x2028\x2029")
+        pure Token
+
+      modifyState (++ [token])
+      pure token
+  \end{lstlisting}
+
+  The \lstinline@parsec@ provided \lstinline[mathescape]@noneOf $s$@
+  function matches a single character which is not supplied in the string $s$.
+  Thus, once \lstinline@//@ has been parsed, all characters until the next line
+  break become part of that comment. \lstinline@modifyState@ updates the
+  parser's state according to the given function.
+
+  Variable and function names are parsed following Unicode's definitions of
+  general-purpose identifiers~\cite{identifier-syntax}, albeit with some minor
+  variations applied to their recomandations. Simplifying, identifiers starting
+  with a letter and continuing with either letters or numbers are accepted; the
+  more general Unicode definition allows characters like \texttt{è} or
+  \texttt{ß} to be accepted as well.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    identifier :: Stream s m Char => ParserT s m String
+    identifier = flip label "identifier" $ do
+      start <- satisfy (isStart . generalCategory)
+      continue <- many (satisfy (isContinue . generalCategory))
+      pure (start : continue)
+
+      where
+        isStart UppercaseLetter = True
+        isStart LowercaseLetter = True
+        isStart TitlecaseLetter = True
+        isStart ModifierLetter = True
+        isStart OtherLetter = True
+        isStart LetterNumber = True
+        isStart ConnectorPunctuation = True
+        isStart _ = False
+
+        isContinue NonSpacingMark = True
+        isContinue SpacingCombiningMark = True
+        isContinue DecimalNumber = True
+        isContinue category = isStart category
+  \end{lstlisting}
+
+  Keywords are handled by parsing an identifier and checking that it is equal to
+  some string.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    keyword :: Stream s m Char => String -> ParserT s m Token
+    keyword literal = flip label ("keyword “" ++ literal ++ "”") $ try $ syntax $ do
+      name <- identifier
+      guard (name == literal)
+      pure Token
+  \end{lstlisting}
+
+  Unary operators are parsed as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    unaryOperator :: Stream s m Char => ParserT s m UnaryOperator
+    unaryOperator = syntax $ choice
+      [
+        text "+" $> PlusOperator,
+        text "-" $> MinusOperator,
+        keyword "not" $> NotOperator,
+        keyword "len" $> LenOperator
+      ]
+  \end{lstlisting}
+
+  Unary expressions are parsed as a unary operator followed by some expression:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    unaryExpression :: Stream s m Char => ParserT s m Expression
+    unaryExpression = do
+      unary <- unaryOperator
+      operand <- s *> expression6
+      pure (UnaryExpression unary operand)
+  \end{lstlisting}
+
+  Parsing binary expressions is more involved, as operator precedence has to be
+  accounted for. There are 5 levels of precedence: the operators \lstinline@and@,
+  \lstinline@or@ and \lstinline@xor@ have the lowest precedence, while
+  \lstinline@*@, \lstinline@/@, \lstinline@%@ have the highest.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    expression :: Stream s m Char => ParserT s m Expression
+    expression = expression1
+
+    expression1 :: Stream s m Char => ParserT s m Expression
+    expression1 = chainl1 expression2 $ do
+      binary <- try $ between s s $ syntax $ choice
+        [
+          keyword "and" $> AndOperator,
+          keyword "or" $> OrOperator,
+          keyword "xor" $> XorOperator
+        ]
+
+      pure (\left right -> BinaryExpression left binary right)
+
+    expression2 :: Stream s m Char => ParserT s m Expression
+    expression2 = chainl1 expression3 $ do
+      binary <- try $ between s s $ syntax $ choice
+        [
+          text "==" $> EqualOperator,
+          text "!=" $> NotEqualOperator
+        ]
+
+      pure (\left right -> BinaryExpression left binary right)
+
+    expression3 :: Stream s m Char => ParserT s m Expression
+    expression3 = chainl1 expression4 $ do
+      binary <- try $ between s s $ syntax $ choice
+        [
+          text ">=" $> GreaterOrEqualOperator,
+          text ">" $> GreaterOperator,
+          text "<=" $> LessOrEqualOperator,
+          text "<" $> LessOperator
+        ]
+
+      pure (\left right -> BinaryExpression left binary right)
+
+    expression4 :: Stream s m Char => ParserT s m Expression
+    expression4 = chainl1 expression5 $ do
+      binary <- try $ between s s $ syntax $ choice
+        [
+          text "+" $> AddOperator,
+          text "-" $> SubtractOperator
+        ]
+
+      pure (\left right -> BinaryExpression left binary right)
+
+    expression5 :: Stream s m Char => ParserT s m Expression
+    expression5 = chainl1 expression6 $ do
+      binary <- try $ between s s $ syntax $ choice
+        [
+          text "*" $> MultiplyOperator,
+          text "/" $> DivideOperator,
+          text "%" $> ModuloOperator
+        ]
+
+      pure (\left right -> BinaryExpression left binary right)
+  \end{lstlisting}
+
+  The combinator \lstinline[mathescape]@chainl1 $p$ $q$@ parses one or more
+  occurrences of $p$, separated by $q$. The recursive nature of the implemented
+  functions implicitly handles operator precedence. \lstinline@between s s@
+  allows for an arbitrary amount of spaces between operands and operators.
+
+  For simplicity, \lstinline@expression6@ is not listed here. This function
+  handles parenthesized expressions, function calls, variables and array access
+  expressions. Interested readers may read the complete implementation in the
+  appendix.
+
+  \subsection{Parsing statements}
+
+  There are many kinds of statements which can be parsed.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    statement :: Stream s m Char => ParserT s m Statement
+    statement = choice
+      [
+        DefinitionStatement <$> definition,
+        ifStatement,
+        whileStatement,
+        doWhileStatement,
+        returnStatement,
+        assertStatement,
+        debugStatement,
+        expressionStatement,
+        blockStatement
+      ]
+  \end{lstlisting}
+
+  The simplest statement to parse consists of an expression followed by a
+  semicolon:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    expressionStatement :: Stream s m Char => ParserT s m Statement
+    expressionStatement = do
+      value <- expression
+      semicolon <- s *> token ";"
+      pure (ExpressionStatement value semicolon)
+  \end{lstlisting}
+
+  If statements are handled by parsing an \lstinline@if@ keyword, then an
+  expression, then a statement. Optionally, an \lstinline@else@ keyword and
+  another statement can follow.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    ifStatement :: Stream s m Char => ParserT s m Statement
+    ifStatement = do
+      ifKeyword <- keyword "if"
+      predicate <- s *> expression
+      trueBranch <- s *> statement
+
+      optionMaybe (try (s *> keyword "else")) >>= \case
+        Nothing -> pure (IfStatement ifKeyword predicate trueBranch)
+
+        Just elseKeyword -> do
+          falseBranch <- s *> statement
+          pure (IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch)
+  \end{lstlisting}
+
+  While statements are parsed as a \lstinline@while@ keyword, followed by an
+  expression, followed by a statement. Do-while statements are parsed in a
+  similar manner, except for the additional \lstinline@do@ keyword and the
+  different order between statement and predicate.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    whileStatement :: Stream s m Char => ParserT s m Statement
+    whileStatement = do
+      whileKeyword <- keyword "while"
+      predicate <- s *> expression
+      body <- s *> statement
+      pure (WhileStatement whileKeyword predicate body)
+
+    doWhileStatement :: Stream s m Char => ParserT s m Statement
+    doWhileStatement = do
+      doKeyword <- keyword "do"
+      body <- s *> statement
+      whileKeyword <- s *> keyword "while"
+      predicate <- s *> expression
+      semicolon <- s *> token ";"
+      pure (DoWhileStatement doKeyword body whileKeyword predicate semicolon)
+  \end{lstlisting}
+
+  Return and assert statements are both parsed as a keyword, followed by an
+  expression, followed by a semicolon. For return statements, the expression is
+  optional.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    returnStatement :: Stream s m Char => ParserT s m Statement
+    returnStatement = do
+      returnKeyword <- keyword "return"
+      result <- s *> optionMaybe expression
+      semicolon <- s *> token ";"
+      pure (ReturnStatement returnKeyword result semicolon)
+
+    assertStatement :: Stream s m Char => ParserT s m Statement
+    assertStatement = do
+      assertKeyword <- keyword "assert"
+      predicate <- s *> expression
+      semicolon <- s *> token ";"
+      pure (AssertStatement assertKeyword predicate semicolon)
+  \end{lstlisting}
+
+  Debug statements are just a \lstinline@debug@ keyword followed by a semicolon.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    debugStatement :: Stream s m Char => ParserT s m Statement
+    debugStatement = do
+      debugKeyword <- keyword "debug"
+      semicolon <- s *> token ";"
+      pure (DebugStatement debugKeyword semicolon)
+  \end{lstlisting}
+
+  Finally, block statements are parsed as an open brace, followed by zero or
+  more statements, followed by a closing brace.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    blockStatement :: Stream s m Char => ParserT s m Statement
+    blockStatement = do
+      open <- token "{"
+      statements <- s *> many (statement <* s)
+      close <- token "}"
+      pure (BlockStatement open statements close)
+  \end{lstlisting}
+
+  \subsection{Parsing variable and function definitions}
+
+  Both variable and function definitions use identifiers to give a name to the
+  variable or function respectively. The function \lstinline@symbolId@ wraps
+  the previously defined \lstinline@identifier@ by providing information about
+  position in source code.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    symbolId :: Stream s m Char => ParserT s m SymbolId
+    symbolId = syntax $ do
+      name <- identifier
+      pure (SymbolId name)
+  \end{lstlisting}
+
+  Variables are parsed as a sequence of the following items: a \lstinline@var@
+  keyword, an identifier, an equal sign, an expression as value, a semicolon.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    varDefinition :: Stream s m Char => ParserT s m Definition
+    varDefinition = do
+      varKeyword <- keyword "var"
+      varId <- s *> symbolId
+      equalSign <- s *> token "="
+      value <- s *> expression
+      semicolon <- s *> token ";"
+      pure (VarDefinition varKeyword varId equalSign value semicolon)
+  \end{lstlisting}
+
+  Parsing function definitions is more involved. Syntactically, function
+  definitions are made up by a \lstinline@def@ keyword, an identifier, zero or
+  more comma separated parameters surrounded by parentheses and statement as
+  body. Optionally, type annotations can be added to specify the types of
+  parameters and the return type.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    funDefinition :: Stream s m Char => ParserT s m Definition
+    funDefinition = do
+      defKeyword <- keyword "def"
+      funId <- s *> symbolId
+      open <- s *> token "("
+
+      (params, commas) <- s *> optionMaybe param >>= \case
+        Nothing -> pure ([], [])
+
+        Just first -> do
+          rest <- many (liftA2 (,) (try (s *> token ",")) (s *> param))
+          pure (first : map snd rest, map fst rest)
+
+      close <- s *> token ")"
+
+      returnInfo <- s *> optionMaybe (token "->") >>= \case
+        Nothing -> pure Nothing
+
+        Just arrow -> do
+          returnTypeId <- s *> typeId
+          pure (Just (arrow, returnTypeId))
+
+      body <- s *> statement
+      pure (FunDefinition defKeyword funId open params commas close returnInfo body)
+  \end{lstlisting}
+
+  Parameters are parsed by the \lstinline@param@ function. This function
+  accounts for the fact that each parameter may be preceded by a \lstinline@ref@
+  keyword.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    param = do
+      (refKeyword, paramId) <- choice
+        [
+          try $ do
+            token <- keyword "ref"
+            paramId <- s *> symbolId
+            pure (Just token, paramId),
+
+          do
+            paramId <- symbolId
+            pure (Nothing, paramId)
+        ]
+
+      paramInfo <- optionMaybe (try (s *> token ":")) >>= \case
+        Nothing -> pure Nothing
+
+        Just colon -> do
+          paramTypeId <- s *> typeId
+          pure (Just (colon, paramTypeId))
+
+      pure (refKeyword, paramId, paramInfo)
+  \end{lstlisting}
+
+  % \backmatter
+  % \appendix
+  % \chapter{}
+  % \section{}
+
+  \printbibliography
+\end{document}

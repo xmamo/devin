@@ -77,12 +77,6 @@ checkDefinition2 = \case
 
 checkStatement :: Type -> Statement -> Typer Bool
 checkStatement expectedT statement = case statement of
-  DefinitionStatement {definition = VarDefinition {varId, value}} -> do
-    let SymbolId {name} = varId
-    t <- checkExpression value
-    defineVarType name t
-    pure False
-
   DefinitionStatement {definition} -> do
     checkDefinition definition
     pure False
@@ -184,8 +178,10 @@ checkExpression expression = case expression of
     indexT <- checkExpression index
 
     case (arrayT, indexT) of
+      (Unknown, Unknown) -> pure Unknown
       (Unknown, Int) -> pure Unknown
       (Unknown, _) -> report' (InvalidType index Int indexT)
+      (Array t, Unknown) -> pure t
       (Array t, Int) -> pure t
       (Array _, _) -> report' (InvalidType index Int indexT)
       (_, _) -> report' (InvalidType array (Array Unknown) arrayT)
@@ -238,7 +234,7 @@ checkExpression expression = case expression of
     operandT <- checkExpression operand
 
     case operandT of
-      Unknown -> pure Unknown
+      Unknown -> pure Int
       Array _ -> pure Int
       _ -> report' (InvalidUnary unary operandT)
 
@@ -456,7 +452,7 @@ getType = \case
     Just (t, _) -> pure t
 
     Nothing -> do
-      report' (UnknownType name interval)
+      report (UnknownType name interval)
       defineType name (Placeholder name)
 
   ArrayTypeId {innerTypeId} -> do

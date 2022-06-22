@@ -31,8 +31,8 @@
    XDG_DATA_DIRS="${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/:}$(brew --prefix)/share/" cabal build all
    ```
 
-   If the command above fails, retry with `sudo`[^1]. If you do, execute the following commands as
-   well:
+   If the command above fails, retry with `sudo`[^1]. If you do, execute the
+   following commands as well:
 
    ```sh
    test -e ./dist && sudo chown -R "$(whoami)" ./dist
@@ -40,7 +40,8 @@
    sudo chown -R "$(whoami)" ~/.cabal
    ```
 
-   Building the application the first time will take a lot of time: this is normal!
+   Building the application the first time will take a lot of time: this is
+   normal!
 
 6. Run the program:
 
@@ -83,7 +84,8 @@
    cabal build all
    ```
 
-   Building the application the first time will take a lot of time: this is normal!
+   Building the application the first time will take a lot of time: this is
+   normal!
 
 6. Run the program:
 
@@ -97,7 +99,8 @@
 TBD
 
 
-[^1]: On macOS Monterey, repeatedly executing the command yields different errors every time. If you
-      try long enough, you’ll find that one of the possible reasons the command fails is because it
-      can’t run `touch`. Clearly, `touch` is a trivial command: there has to be some kind of problem
-      regarding permissions.
+[^1]: On macOS Monterey, repeatedly executing the command yields different
+      errors every time. If you try long enough, you’ll find that one of the
+      possible reasons the command fails is because it can’t run `touch`.
+      Clearly, `touch` is a trivial command: there has to be some kind of
+      problem regarding permissions.

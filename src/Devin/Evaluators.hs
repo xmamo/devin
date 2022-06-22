@@ -129,7 +129,9 @@ evalStatement statement = case statement of
     r <- evalExpression result
     pure (Just r)
 
-  ReturnStatement {result = Nothing} -> pure Nothing
+  ReturnStatement {result = Nothing} -> do
+    r <- newRef Unit
+    pure (Just r)
 
   AssertStatement {predicate} -> do
     r <- evalExpression predicate

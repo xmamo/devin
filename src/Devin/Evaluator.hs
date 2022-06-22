@@ -205,7 +205,7 @@ cloneRef r = do
 
 
 compareRefs :: MonadIO m => Reference -> Reference -> m Bool
-compareRefs r1 r2 = liftIO $ do
+compareRefs r1 r2 = do
   v1 <- readRef r1
   v2 <- readRef r2
   compareVals v1 v2
