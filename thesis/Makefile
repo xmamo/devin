@@ -1,16 +1,21 @@
-bachelorthesis.pdf: PhdThesis theorems *.bib *.cfg *.tex
+.PHONY: thesis.pdf
+thesis.pdf: PhdThesis theorems
 	$(MAKE) -C PhdThesis
 	$(MAKE) -C theorems
-	TEXINPUTS=:PhdThesis latexmk -pdf thesis.tex
+	TEXINPUTS=:PhdThesis:theorems latexmk -pdf thesis.tex
 
 PhdThesis:
+	rm -rf PhdThesis
 	curl 'https://users.dimi.uniud.it/~marco.comini/LaTeX/PhdThesis/PhdThesis.tbz' | tar -xf -
 
 theorems:
+	rm -rf theorems
 	curl 'https://users.dimi.uniud.it/~marco.comini/LaTeX/Theorems/theorems.tbz' | tar -xf -
 
 .PHONY: clean
 clean:
 	test -f PhdThesis/Makefile && $(MAKE) -C PhdThesis clean
 	test -f theorems/Makefile && $(MAKE) -C theorems clean
-	rm -f *.aux *.bbl *.blg *.lof *.log *.lot *.pdf *.toc
+	latexmk -C
+	rm *.bbl
+	rm *.run.xml

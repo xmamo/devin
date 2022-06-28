@@ -2,9 +2,11 @@
 /theorems/
 /*.aux
 /*.bbl
+/*.bcf
 /*.blg
-/*.lof
+/*.fdb_latexmk
+/*.fls
 /*.log
-/*.lot
 /*.pdf
+/*.run.xml
 /*.toc
