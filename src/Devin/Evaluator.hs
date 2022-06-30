@@ -184,8 +184,8 @@ compareVals v1 v2 = case (v1, v2) of
 
 
 newRef :: MonadIO m => Value -> m Reference
-newRef x = liftIO $ do
-  ref <- newIORef x
+newRef v = liftIO $ do
+  ref <- newIORef v
   pure (Reference ref)
 
 

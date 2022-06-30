@@ -31,6 +31,7 @@
 \setlength{\oddsidemargin}{7mm}
 \setlength{\textwidth}{150mm}
 \setlength{\parindent}{0pt}
+\setlength{\parskip}{0.4em plus 1pt minus 1pt}
 
 \setlist{
   topsep=0pt,
@@ -40,6 +41,7 @@
 }
 
 \lstset{
+  aboveskip=2\parskip,
   belowskip=0pt,
   basicstyle=\ttfamily,
   upquote=true,
@@ -109,7 +111,7 @@
     additive expression.
   \end{itemize}
 
-  \pagebreak
+  \newpage
 
   According to such rules, the string \lstinline@2*(3+4)@ is a valid arithmetic
   expression. By definition:
@@ -184,7 +186,7 @@
     \caption{Two semantically equivalent syntax trees for \lstinline@2+3*(4+5)@}
   \end{figure}
 
-  \pagebreak
+  \newpage
 
   As we'll see later, the parser for Devin uses a single tree representation
   which retains enough information for syntax highlighting, but also discards
@@ -233,7 +235,7 @@
   an integer on the input string \lstinline@21*2@ yields the pair
   $\left(21, \text{\lstinline@*2@}\right)$.
 
-  \pagebreak
+  \newpage
 
   Many libraries provide a framework for working with parser combinators. There
   is usually at least some overlap between different combinator libraries, as
@@ -327,7 +329,7 @@
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{2.png}
+    \includegraphics[width=0.9\textwidth]{2.png}
     \caption{The graphical editor associated with Devin}
   \end{figure}
 
@@ -412,16 +414,15 @@
     \caption{Boolean operators}
   \end{table}
 
-  \pagebreak
-
   Integers and floating-point numbers support addition, subtraction,
   multiplication and division. Integers (but not floats) support the modulo
   operation.
 
+  \newpage
+
   Binary arithmetic operations require both operands to be of the same type:
   there are no implicit type conversions, as Devin is a \emph{strongly typed}
-  programming language. The rationale behind Devin's design decisions is
-  discussed later.
+  programming language.
 
   Division (operator \lstinline@/@) behaves differently depending on the types
   of the operands. In any case, the result of arithmetic operations has the same
@@ -676,11 +677,9 @@
   A peculiar feature of Devin is that of \emph{optional types}. With optional
   types, the semantic of the language doesn't depend on the static type
   system~\cite{bracha_2004}. A notable example of an optionally typed language
-  is Python.
-
-  With this feature, type annotations can be omitted from Devin programs. Type
-  checking is not performed on terms where type annotations are missing. If no
-  type annotations are provided, Devin becomes dynamically typed.
+  is Python. With this feature, type annotations can be omitted from Devin
+  programs. Type checking is not performed on terms where type annotations are
+  missing. If no type annotations are provided, Devin becomes dynamically typed.
 
   \begin{lstlisting}[
     float=h,
@@ -716,9 +715,11 @@
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{4.png}
+    \includegraphics[width=0.9\textwidth]{4.png}
     \caption{Semantic error reporting and highlighting}
   \end{figure}
+
+  \newpage
 
   Once a valid program has been written, it can be run by clicking the
   $\blacktriangleright$ button. The state of execution can be observed with
@@ -736,8 +737,8 @@
 
   \begin{itemize}
     \item Each block pushes a new frame onto the stack: this allows treating
-      nested scopes with the same mechanism as function calls. The debugger
-      skips visualization of empty frames, as they occur somewhat frequently.
+    nested scopes with the same mechanism as function calls. The debugger skips
+    visualization of empty frames, as they occur somewhat frequently.
 
     \item Execution always starts with a non-empty stack containing a single
     frame. This frame binds the names \lstinline@true@ to the truth value,
@@ -749,9 +750,11 @@
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{5.png}
+    \includegraphics[width=0.9\textwidth]{5.png}
     \caption{The debugger displaying the current state of the stack}
   \end{figure}
+
+  \newpage
 
   Runtime errors are handled as well. When an error occurs, the offending code
   fragment is highlighted and a message dialog describing the problem is shown
@@ -760,7 +763,7 @@
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{6.png}
+    \includegraphics[width=0.9\textwidth]{6.png}
     \caption{Runtime error reporting and highlighting}
   \end{figure}
 
@@ -784,10 +787,8 @@
   precision~\cite{mdn}; as such, I argue that a programming language should make
   conversions between integers and floats explicit.
 
-  This design decision is largely inspired by two factors: how Haskell deals
-  with numbers and rule 2 of the Zen of Python: \emph{explicit is better than
-  implicit}~\cite{peters_2004}. Examples of other languages which lack implicit
-  conversions are Go and Rust.
+  This design decision is largely inspired by how Haskell deals with numbers.
+  Examples of other languages which lack implicit conversions are Go and Rust.
 
   \section{Independence between evaluator and type checker}
 
@@ -799,8 +800,8 @@
     \centering
 
     \begin{tikzpicture}[
-      execute at begin node=\strut,
-      execute at end node=\strut
+      execute at begin node=\begin{small}\strut,
+      execute at end node=\strut\end{small}
     ]
       \node(a){};
       \node[ellipse,draw,right=1cm of a](parse){parse};
@@ -816,6 +817,8 @@
     \caption{Data-flow diagram for a traditional interpreter}
   \end{figure}
 
+  \newpage
+
   Devin's implementation differs slightly: evaluation doesn't require the type
   checker to be run at all. The type checker's computed environment---the data
   structure binding identifiers to variables and functions definitions---is not
@@ -829,20 +832,20 @@
     \centering
 
     \begin{tikzpicture}[
-      execute at begin node=\strut,
-      execute at end node=\strut
+      execute at begin node=\begin{small}\strut,
+        execute at end node=\strut\end{small}
     ]
       \node(a){};
       \node[ellipse,draw,right=1cm of a](parse){parse};
-      \node[ellipse,draw,above right=1cm and 2.6cm of parse](typecheck){type check};
-      \node[ellipse,draw,below right=1cm and 2.6cm of parse](evaluate){evaluate};
+      \node[ellipse,draw,above right=0.5cm and 2.6cm of parse](typecheck){type check};
+      \node[ellipse,draw,below right=0.5cm and 2.6cm of parse](evaluate){evaluate};
       \node[right=2.4cm of typecheck](b){};
       \node[right=0.8cm of evaluate](c){};
-      \draw[->] (a) to [edge label=text] (parse);
-      \draw[->] (parse) to [edge label=syntax tree, sloped] (typecheck);
-      \draw[->] (parse) to [edge label=syntax tree, sloped] (evaluate);
-      \draw[->] (typecheck) to [edge label=environment, edge label'=ok/error] (b);
-      \draw[->] (evaluate) to [edge label=etc.] (c);
+      \draw[->] (a) to [edge label={text}] (parse);
+      \draw[->] (parse) to [edge label={syntax tree}, sloped] (typecheck);
+      \draw[->] (parse) to [edge label'={syntax tree}, sloped] (evaluate);
+      \draw[->] (typecheck) to [edge label={environment}, edge label'={ok/error}] (b);
+      \draw[->] (evaluate) to [edge label={etc.}] (c);
     \end{tikzpicture}
 
     \caption{Data-flow diagram for the Devin interpreter}
@@ -874,8 +877,8 @@
   Haskell's \lstinline@do@ notation.
 
   Devin is entirely written in Haskell. Given the size of its implementation,
-  some details will be omitted for brevity. In particular, import declarations
-  and \lstinline@LANGUAGE@ pragmas are left out for simplicity. Devin's full
+  some details are omitted for brevity. In particular, import declarations and
+  \lstinline@LANGUAGE@ pragmas are left out for simplicity. Devin's full
   implementation can be found in the appendix.
 
   In terms of implementation complexity, both the type checker and the evaluator
@@ -970,7 +973,7 @@
       } -> Expression
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       IntegerExpression :: {
@@ -1026,8 +1029,8 @@
   \subsection{Representing statements}
 
   Any expression followed by a semicolon becomes a statement. The type
-  \lstinline@Statement@ accounts for such semicolon terminated expressions,
-  along with if, while, do-while, return, assert, debug and block statements.
+  \lstinline@Statement@ represents these, along with if, while, do-while,
+  return, assert, debug and block statements.
 
   In any point in which a statement may occur, a variable or function definition
   can be placed instead. The data constructor \lstinline@DefinitionStatement@
@@ -1217,7 +1220,7 @@
   \section{The type checker}
 
   At high level, type checking is performed by a set of functions that operate
-  on an \emph{environment}: a data structure which associates identifiers to
+  on an \emph{environment}, a data structure which associates identifiers to
   types. The environment is used to assert that function calls and variable
   usages are valid within their context.
 
@@ -1241,6 +1244,8 @@
       | Array Type
       | Placeholder String
   \end{lstlisting}
+
+  \newpage
 
   While types could be compared by simple equality, the relation
   \lstinline@(<:)@ is provided. This operator allows for simpler error
@@ -1300,7 +1305,11 @@
         let (x, env', errors1) = runTyper mx env
             (y, env'', errors2) = runTyper my env'
         in (f x y, env'', errors1 ++ errors2)
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Typer where
       (>>=) :: Typer a -> (a -> Typer b) -> Typer b
       mx >>= f = Typer $ \env ->
@@ -1358,6 +1367,8 @@
           Just signature -> Just (signature, depth)
           Nothing -> go (depth + 1) parents
   \end{lstlisting}
+
+  \newpage
 
   Finally, variables can be defined and looked up with
   \lstinline@defineVarType@ and \lstinline@lookupVarType@.
@@ -1430,11 +1441,13 @@
   \end{lstlisting}
 
   For simplicity, the function \lstinline@report'@ is provided for future use.
-  It is equivalent to \lstinline@report@, but its result wraps
+  It is similar to \lstinline@report@, but its result wraps
   \lstinline@Unknown@ instead of the unit type \lstinline@()@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    report' error = do { report error; pure Unknown }
+    report' error = do
+      report error
+      pure Unknown
   \end{lstlisting}
 
   Inferring the type of arrays requires special care. In general, the type of an
@@ -1495,11 +1508,7 @@
           Int -> pure Int
           Float -> pure Float
           _ -> report' (InvalidUnary unary operandT)
-  \end{lstlisting}
 
-  \pagebreak
-
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression UnaryExpression {unary, operand}
       | MinusOperator {} <- unary = do
         operandT <- checkExpression operand
@@ -1556,8 +1565,6 @@
   checked in a similar manner, with the exception of the fact that the operator
   \lstinline@%@ only accepts \lstinline@Int@ operands.
 
-  \pagebreak
-
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression {left, binary, right}
       | DivideOperator {} <- binary = do
@@ -1597,7 +1604,11 @@
       | MultiplyOperator {} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case (leftT, rightT) of
           (Unknown, _) -> pure Unknown
           (_, Unknown) -> pure Unknown
@@ -1613,8 +1624,6 @@
   both operands are of the same numeric type; if they are, expressions with such
   operators yield a \lstinline@Bool@. Type checking is implemented in the
   exactly same way for all four comparison operators:
-
-  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression {left, binary, right}
@@ -1634,7 +1643,7 @@
   types are deemed to be always different.
 
   Notice that \lstinline@left@ and \lstinline@right@ are recursively type
-  checked even though the result type~(\lstinline@Bool@) is known. This is
+  checked even though the result type (\lstinline@Bool@) is known. This is
   important, as failing to check subexpressions could lead to runtime errors
   during evaluation.
 
@@ -1732,11 +1741,9 @@
   is \lstinline@True@ if control is guaranteed to be returned to the callee and
   \lstinline@False@ otherwise.
 
-  \lstinline@ExpressionStatement@s and \lstinline@DefinitionStatement@s are
-  trivial to check. In both cases, type checking is delegated to the relevant
-  function. \lstinline@checkDefinitions@ is defined in the next section.
-
-  \pagebreak
+  Expression and definition statements are trivial to check. In both cases, type
+  checking is delegated to the relevant function. \lstinline@checkDefinitions@
+  is defined in the next section.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement _ ExpressionStatement {value} = do
@@ -1949,6 +1956,33 @@
       deriving Functor
   \end{lstlisting}
 
+  A \lstinline@Function@ represents a bound function. It can either be a Devin
+  built-in with ad-hoc semantics, or user-defined.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Function
+      = UserDefined Definition
+      | BuiltinToInt
+      | BuiltinToFloat
+  \end{lstlisting}
+
+  Values are not stored directly inside \lstinline@State@. Mirroring LISP's
+  implementation, each identifier is bound to a cell which holds the actual
+  value. This way, multiple identifiers can refer to the same value. In Devin,
+  cells are implemented by the \lstinline@Reference@ data type; it wraps
+  Haskell's \lstinline@IORef@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Reference = Reference (IORef Value)
+
+    data Value
+      = Unit
+      | Bool Bool
+      | Int Int64
+      | Float Double
+      | Array (Vector Reference)
+  \end{lstlisting}
+
   An \lstinline@Evaluator@ represents a computation which updates a
   \lstinline@State@, possibly producing some side effect. To allow execution to
   be interrupted by debug statements, the algebraic data type \lstinline@Result@
@@ -1956,7 +1990,7 @@
 
   \begin{itemize}
     \item \lstinline@Done@, if the last statement has been executed. This data
-    constructor stores the result of the completed computation.
+    constructor stores the result of the computation.
 
     \item \lstinline@Debug@, if a debug statement has been reached. The debug
     statement, along with the next step to execute, is stored by this
@@ -1973,39 +2007,14 @@
       deriving Functor
   \end{lstlisting}
 
-  A \lstinline@Function@ can either be a built-in Devin with ad-hoc semantics,
-  or user-defined.
-
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    data Function
-      = UserDefined Definition
-      | BuiltinToInt
-      | BuiltinToFloat
-  \end{lstlisting}
-
-  Values are not stored directly inside \lstinline@State@. Rather, they're
-  wrapped in a cell which holds the actual value---this mirrors LISP's
-  implementation, and allows multiple identifiers to refer to the same value.
-  In Devin, cells are implemented by the \lstinline@Reference@ data type.
-
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    data Reference = Reference (IORef Value)
-
-    data Value
-      = Unit
-      | Bool Bool
-      | Int Int64
-      | Float Double
-      | Array (Vector Reference)
-  \end{lstlisting}
-
-  References be created, read from and modified with the \lstinline@newRef@,
-  \lstinline@readRef@, \lstinline@writeRef@ functions respectively.
+  To operate on cells, the the \lstinline@newRef@, \lstinline@readRef@ and
+  \lstinline@writeRef@ functions are provided. These create, read from and
+  modify references respectively.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     newRef :: MonadIO m => Value -> m Reference
-    newRef x = liftIO $ do
-      ref <- newIORef x
+    newRef v = liftIO $ do
+      ref <- newIORef v
       pure (Reference ref)
 
     readRef :: MonadIO m => Reference -> m Value
@@ -2015,29 +2024,8 @@
     writeRef (Reference ref) v = liftIO (writeIORef ref v)
   \end{lstlisting}
 
-  Since a \lstinline@Value@ can be an array containing references, it may be
-  useful to clone it, copying the values contained in its cells.
-
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    cloneVal :: MonadIO m => Value -> m Value
-    cloneVal = \case
-      Unit -> pure Unit
-      Bool x -> pure (Bool x)
-      Int x -> pure (Int x)
-      Float x -> pure (Float x)
-
-      Array rs -> do
-        rs' <- Vector.forM rs cloneRef
-        pure (Array rs')
-
-    cloneRef :: MonadIO m => Reference -> m Reference
-    cloneRef r = do
-      v <- readRef r
-      v' <- cloneVal v
-      newRef v'
-  \end{lstlisting}
-
-  Equality between values can be tested with \lstinline@compareVals@.
+  Equality between pairs of values or cells can be tested with
+  \lstinline@compareVals@ and \lstinline@compareRefs@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     compareVals :: MonadIO m => Value -> Value -> m Bool
@@ -2069,6 +2057,30 @@
       compareVals v1 v2
   \end{lstlisting}
 
+  Since a \lstinline@Value@ can be an array containing references, it may be
+  useful to clone it, copying the values contained in its cells. The functions
+  \lstinline@cloneVal@ and \lstinline@cloneRef@ are implemented to provide such
+  functionality.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    cloneVal :: MonadIO m => Value -> m Value
+    cloneVal = \case
+      Unit -> pure Unit
+      Bool x -> pure (Bool x)
+      Int x -> pure (Int x)
+      Float x -> pure (Float x)
+
+      Array rs -> do
+        rs' <- Vector.forM rs cloneRef
+        pure (Array rs')
+
+    cloneRef :: MonadIO m => Reference -> m Reference
+    cloneRef r = do
+      v <- readRef r
+      v' <- cloneVal v
+      newRef v'
+  \end{lstlisting}
+
   An \lstinline@Evaluator@ wraps a function which executes a single step of
   computation, possibly indicating what to execute next. It makes sense to
   provide two functions: one to run a single step, and one to run all remaining
@@ -2089,7 +2101,10 @@
         Error error -> pure (Left error, state')
   \end{lstlisting}
 
-  Further, an \lstinline@Evaluator@ is a monad.
+  To use \lstinline@Evaluator@s monadically, implementations for the functions
+  \lstinline@pure@, \lstinline@liftA2@ and \lstinline@(>>=)@ are listed below.
+  \lstinline@fmap :: (a -> b) -> Evaluator a -> Evaluator b@ is automatically
+  implemented by GHC thanks to the \lstinline@deriving Functor@ clause.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Applicative Evaluator where
@@ -2116,8 +2131,8 @@
           Error error -> pure (Error error, state')
   \end{lstlisting}
 
-  For convenience, an instance for \lstinline@MonadIO@ is provided as well. The
-  first instance permits, among others, \lstinline@newRef@, \lstinline@readRef@,
+  For convenience, an instance for \lstinline@MonadIO@ is provided as well. This
+  instance permits, among others, \lstinline@newRef@, \lstinline@readRef@,
   \lstinline@writeRef@, \lstinline@cloneRef@, \lstinline@compareRefs@,
   \lstinline@cloneVals@ and \lstinline@compareVals@ to be used with the
   \lstinline@Evaluator@ monad as well.
@@ -2130,11 +2145,37 @@
         pure (Done x, state)
   \end{lstlisting}
 
-  Functions and variables can be defined and looked up with
+  Procedures and variables can be defined and looked up with the
   \lstinline@defineFun@, \lstinline@lookupFun@, \lstinline@defineVar@ and
-  \lstinline@lookupVar@. On lookup, the stack of frames is searched from top to
-  bottom. Lexical scoping is implemented by making each \lstinline@Frame@ store
-  how many frames to skip during search to reach to get to the enclosing scope.
+  \lstinline@lookupVar@ functions. On lookup, the stack of frames is searched
+  for the requested binding from top to bottom.
+
+  \newpage
+
+  Contrary to the environment used in static type checking, there's not a
+  one-to-one correspondence between the evaluator's runtime stack and lexical
+  scoping. As such, each frame has to keep track which of is its lexical parent;
+  this is done with the \lstinline@offset@ field. This value is used in
+  \lstinline@lookupFun@ and \lstinline@lookupVar@, as it indicates how many
+  frames need to be skipped during search:
+
+  \begin{itemize}
+    \item When $\text{\lstinline@offset@} = 1$, the previous frame coincides
+    with the lexical parent: only the current needs to be skipped to reach its
+    parent.
+
+    \item When $\text{\lstinline@offset@} > 1$, the previous frame doesn't
+    coincide with the lexical parent: more than one frame needs to be skipped to
+    reach the parent.
+
+    Consider two functions, \lstinline@f@ and \lstinline@g@, defined at the same
+    nesting level; suppose that \lstinline@f@ calls \lstinline@g@. It should be
+    clear that \lstinline@g@'s body doesn't have access to the variables defined
+    inside \lstinline@f@. At the same time, from the perspective of the runtime
+    stack, \lstinline@g@'s frame succeeds \lstinline@f@'s frame. It is in cases
+    like these that the \lstinline@offset@ helps to recover the actual lexical
+    parent.
+  \end{itemize}
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     defineFun :: String -> Function -> Evaluator ()
@@ -2188,8 +2229,8 @@
         popFrame = Evaluator (\state -> pure (Done (), tail state))
   \end{lstlisting}
 
-  The functions \lstinline@debug@ and \lstinline@raise@ are provided for
-  utility.
+  Finally, the functions \lstinline@debug@ and \lstinline@raise@ are provided
+  for convenience.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     debug :: Statement -> Evaluator ()
@@ -2228,10 +2269,10 @@
 
   Arrays get processed by recursively evaluating all the elements, cloning the
   resulting cells. As a general pattern, cloning is performed when it is
-  undesired that two objects point to the same value. For instance, the
+  undesired that two objects refer to the same value. For instance, the
   expression \lstinline@[x]@ should produce a new array with one element which
-  is a \emph{copy} of \lstinline@x@'s cell; otherwise, modifying \lstinline@x@
-  would also appear to modify the newly created array.
+  is a copy of \lstinline@x@'s cell; otherwise, modifying \lstinline@x@ would
+  also appear to modify the newly created array.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression ArrayExpression {elems} = do
@@ -2272,79 +2313,6 @@
         (_, _) -> do
           arrayT <- getType arrayV
           raise (InvalidType array (Type.Array Type.Unknown) arrayT)
-  \end{lstlisting}
-
-  Executing function calls is probably the most complex part of Devin's
-  evaluator. The called function is looked up, rasing an error if it is not
-  found. Arguments are evaluated from left to right; if an argument has the
-  wrong type, or if too many or to few arguments are passed, an exception is
-  raised. The built-in functions \lstinline@toFloat@ and \lstinline@toInt@
-  convert an \lstinline@Int@ to a \lstinline@Float@ and round a
-  \lstinline@Float@ to an \lstinline@Int@ respectively. A user-defined function
-  call is evaluated by updating Devin's state with bindings to parameter names.
-  If an argument is passed by value, a copy of its cell is bound; otherwise, no
-  copy is performed.
-
-  A new frame is pushed when executing the function's body using
-  \lstinline@withNewFrame (depth + 1)@. \lstinline@depth@ denotes the lexical
-  nesting of the callee with respect to the caller.
-
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression expression |
-      CallExpression {funId = SymbolId {name, interval}, args} <- expression = do
-        argRs <- for args evalExpression
-
-        lookupFun name >>= \case
-          Just (UserDefined FunDefinition {params, body}, depth) ->
-            withNewFrame (depth + 1) (go 0 params argRs)
-            where
-              -- Pass by value
-              go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do
-                argR' <- cloneRef argR
-                defineVar name argR'
-                go (n + 1) params argRs
-
-              -- Pass by reference
-              go n ((Just _, SymbolId {name}, _) : params) (argR : argRs) = do
-                defineVar name argR
-                go (n + 1) params argRs
-
-              go _ [] [] = evalStatement body >>= \case
-                Just r -> cloneRef r
-                Nothing -> newRef Unit
-
-              go n params argRs = do
-                let expected = n + length params
-                let actual = n + length argRs
-                raise (InvalidArgCount expression expected actual)
-
-          Just (BuiltinToInt, depth) -> withNewFrame (depth + 1) $ case argRs of
-            [argR] -> do
-              argV <- readRef argR
-
-              case argV of
-                Float x -> newRef (Int (round x))
-
-                _ -> do
-                  argT <- getType argV
-                  raise (InvalidType (head args) Type.Float argT)
-
-            _ -> raise (InvalidArgCount expression 1 (length argRs))
-
-          Just (BuiltinToFloat, depth) -> withNewFrame (depth + 1) $ case argRs of
-            [argR] -> do
-              argV <- readRef argR
-
-              case argV of
-                Int x -> newRef (Float (fromIntegral x))
-
-                _ -> do
-                  argT <- getType argV
-                  raise (InvalidType (head args) Type.Int argT)
-
-            _ -> raise (InvalidArgCount expression 1 (length argRs))
-
-          _ -> raise (UnknownFun name interval)
   \end{lstlisting}
 
   Evaluating arithmetic expressions on \lstinline@Int@s may lead to overflows.
@@ -3028,8 +2996,9 @@
   general-purpose identifiers~\cite{identifier-syntax}, albeit with some minor
   variations applied to their recomandations. Simplifying, identifiers starting
   with a letter and continuing with either letters or numbers are accepted; the
-  more general Unicode definition allows characters like \texttt{è} or
-  \texttt{ß} to be accepted as well.
+  more general Unicode definition allows characters like
+  \lstinline[literate={è}{\`e}{1}]@è@ or \lstinline[literate={ß}{\ss}{1}]@ß@ to
+  be accepted as well.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     identifier :: Stream s m Char => ParserT s m String
@@ -3366,10 +3335,143 @@
       pure (refKeyword, paramId, paramInfo)
   \end{lstlisting}
 
-  % \backmatter
-  % \appendix
-  % \chapter{}
-  % \section{}
+  \backmatter
+
+  \appendix
+
+  \chapter{Devin source code}
+
+  \section{\texttt{devin.cabal}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../devin.cabal}
+
+  \section{\texttt{src/Devin/Display.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Display.hs}
+
+  \section{\texttt{src/Devin/Error.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Error.hs}
+
+  \section{\texttt{src/Devin/Evaluator.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Evaluator.hs}
+
+  \section{\texttt{src/Devin/Evaluators.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Evaluators.hs}
+
+  \section{\texttt{src/Devin/Interval.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Interval.hs}
+
+  \section{\texttt{src/Devin/Parsec.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Parsec.hs}
+
+  \section{\texttt{src/Devin/Parsers.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Parsers.hs}
+
+  \section{\texttt{src/Devin/Syntax.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Syntax.hs}
+
+  \section{\texttt{src/Devin/Type.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Type.hs}
+
+  \section{\texttt{src/Devin/Typer.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Typer.hs}
+
+  \section{\texttt{src/Devin/Typers.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Typers.hs}
+
+  \section{\texttt{src/Devin/Utils.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../src/Devin/Utils.hs}
+
+  \section{\texttt{test/Main.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../test/Main.hs}
+
+  \section{\texttt{test/Devin/EvaluatorsSpec.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../test/Devin/EvaluatorsSpec.hs}
+
+  \section{\texttt{test/Devin/ParsersSpec.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../test/Devin/ParsersSpec.hs}
+
+  \section{\texttt{test/Devin/TypersSpec.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../test/Devin/TypersSpec.hs}
+
+  \section{\texttt{app/Main.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../app/Main.hs}
+
+  \section{\texttt{app/Devin/Highlight.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../app/Devin/Highlight.hs}
+
+  \section{\texttt{app/Devin/Tree.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../app/Devin/Tree.hs}
+
+  \section{\texttt{app/Devin/Highlight/Braces.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../app/Devin/Highlight/Braces.hs}
+
+  \section{\texttt{app/Devin/Highlight/Syntax.hs}}
+
+  \lstinputlisting
+    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
+    {../app/Devin/Highlight/Syntax.hs}
 
   \printbibliography
 \end{document}

@@ -6,16 +6,16 @@ thesis.pdf: PhdThesis theorems
 
 PhdThesis:
 	rm -rf PhdThesis
-	curl 'https://users.dimi.uniud.it/~marco.comini/LaTeX/PhdThesis/PhdThesis.tbz' | tar -xf -
+	curl -k 'https://users.dimi.uniud.it/~marco.comini/LaTeX/PhdThesis/PhdThesis.tbz' | tar -xf -
 
 theorems:
 	rm -rf theorems
-	curl 'https://users.dimi.uniud.it/~marco.comini/LaTeX/Theorems/theorems.tbz' | tar -xf -
+	curl -k 'https://users.dimi.uniud.it/~marco.comini/LaTeX/Theorems/theorems.tbz' | tar -xf -
 
 .PHONY: clean
 clean:
 	test -f PhdThesis/Makefile && $(MAKE) -C PhdThesis clean
 	test -f theorems/Makefile && $(MAKE) -C theorems clean
 	latexmk -C
-	rm *.bbl
-	rm *.run.xml
+	rm -f *.bbl
+	rm -f *.run.xml
