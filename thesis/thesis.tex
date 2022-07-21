@@ -18,8 +18,10 @@
 \usetikzlibrary{positioning}
 \usetikzlibrary{shapes.geometric}
 
+\usepackage{theorems}
+
 \author{Matteo Morena}
-\supervisor{Marco Comini}
+\supervisor{Prof.~Marco Comini}
 \date{2021--2022}
 
 \title{
@@ -67,6 +69,16 @@
   \pagestyle{serif}
   \partstyle{serifbig}
   \chaptertitlestyle{serifbig}
+
+  \chapter{Programming languages}
+  
+  paradigms, modifiable variables, scoping, 
+  
+  
+  \introduction\label{ch:intro}
+
+  
+  \include{Haskell.tex}
 
   \chapter{Parsing}
 
@@ -309,8 +321,10 @@
     rather concrete, as each node would need to be associated with a position in
     the parser's input string.
   \end{itemize}
+  
+  \chapter{The GTK library}
 
-  \chapter{A first look at Devin}
+  \chapter{The Programming Language Devin}
 
   In this thesis, I'll discuss the implementation of a simple imperative
   programming language which I decided to call Devin. The name Devin is an
@@ -755,9 +769,9 @@
     \caption{Runtime error reporting and highlighting}
   \end{figure}
 
-  \chapter{Devin's design choices}
+  \section{Devin's design choices}
 
-  \section{Operations between numeric types}
+  \subsection{Operations between numeric types}
 
   Addition, subtraction, multiplication, division and modulo are supported only
   if both operands are of the same type. For instance, it isn't legal to sum a
@@ -778,7 +792,7 @@
   This design decision is largely inspired by how Haskell deals with numbers.
   Examples of other languages which lack implicit conversions are Go and Rust.
 
-  \section{Independence between evaluator and type checker}
+  \subsection{Independence between evaluator and type checker}
 
   In statically typed programming languages, evaluation traditionally follows
   type checking, which follows parsing. Each step depends on data computed by
@@ -837,7 +851,7 @@
     \caption{Data-flow diagram for the Devin interpreter}
   \end{figure}
 
-  \section{Optional types}
+  \subsection{Optional types}
 
   As discussed previously, type annotations may be omitted at will. As Devin's
   type checker and evaluator are independent, optional types \emph{emerged} as a
