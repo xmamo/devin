@@ -18,7 +18,7 @@
 \usetikzlibrary{positioning}
 \usetikzlibrary{shapes.geometric}
 
-\usepackage{theorems}
+% \usepackage{theorems}
 
 \author{Matteo Morena}
 \supervisor{Prof.~Marco Comini}
@@ -70,17 +70,16 @@
   \partstyle{serifbig}
   \chaptertitlestyle{serifbig}
 
+  \introduction
+  % \label{ch:intro}
+
   \chapter{Programming languages}
-  
-  paradigms, modifiable variables, scoping, 
-  
-  
-  \introduction\label{ch:intro}
 
-  
-  \include{Haskell.tex}
+  % paradigms, modifiable variables, scoping,
 
-  \chapter{Parsing}
+  % \include{Haskell.tex}
+
+  \chapter{Parsing and processing languages}
 
   The first phase of any compiler or interpreter is called \emph{parsing}. Given
   an input string, it is determined if it conforms to some set of rules; if it
@@ -141,12 +140,12 @@
   When a parser accepts an input, a \emph{syntax tree} is built. It is a data
   structure which represents the syntactic structure of the accepted string.
 
-  A syntax tree that retains all information necessary to reconstruct the
-  original input it is called a \emph{concrete} syntax tree. Such a tree can be
-  further processed by either adding or discarding some information; also, nodes
-  can be rearranged. When there's not a one-to-one correspondence between the
-  parsed input and the produced tree, the syntax tree is said to be
-  \emph{abstract}.
+  A syntax tree that retains all information necessary to identically
+  reconstruct the original input it is called a \emph{concrete} syntax tree.
+  Such a tree can be further processed by either adding or discarding some
+  information; also, nodes can be rearranged. When there's not a one-to-one
+  correspondence between the parsed input and the produced tree, the syntax tree
+  is said to be \emph{abstract}.
 
   Consider the language of arithmetic expressions: there are at least two
   possible syntax trees for the input string \lstinline@2+3*(4+5)@, depending on
@@ -196,21 +195,20 @@
     \caption{Two semantically equivalent syntax trees for \lstinline@2+3*(4+5)@}
   \end{figure}
 
-  As we'll see later, the parser for Devin uses a single tree representation
-  which retains enough information for syntax highlighting, but also discards
-  whitespace and comments. For our purposes, the distinction between abstract
-  and concrete syntax tree isn't necessary: for this reason, from now on I'll
-  just use the term \emph{syntax tree}.
+  For our purposes, the distinction between abstract and concrete syntax tree
+  isn't necessary: for this reason, from now on I'll just use the term
+  \emph{syntax tree}.
 
   \section{Parser combinators}
-  \label{section:parsercombinators}
+  % \label{section:parsercombinators}
 
   There are many ways to recognize some input and generate an associated syntax
-  tree. There has been much academic research, and it is trivial to find
-  so-called \emph{parser generators}: tools which automatically generate code
-  for parsing a language, given its grammar. These tools build upon well-known
-  algorithms, such as LL, LR, LALR---just to throw a few names around. These
-  tools are great and very performant; however, they're kind of magical.
+  tree. There has been much academic research, and there are many readily
+  available implementations of so-called \emph{parser generators}: tools which
+  automatically generate code for parsing a language, given its grammar. These
+  tools build upon well-known algorithms, like those available for such as LL or
+  LALR grammar classes, just to throw a few names around. These tools are very
+  performant; however, they're kind of magical.
 
   In this section, we'll see how there's no fundamental need for any generators;
   although such tools are handy, it isn't too difficult to write a parser from
@@ -218,35 +216,34 @@
   others, recursive descent parsers are used by the GCC compiler and the V8
   JavaScript engines~\cite{nystrom}.
 
-  Recursive descent is a method of constructing a parser using a collection of
-  recursive functions. The simplest functions parse the atoms (or \emph{tokens})
-  of the target language; examples of tokens are numbers and identifiers. By
-  gluing together simpler functions, more complex parsers can be created: for
-  example, a parser for 2D coordinates \lstinline[mathescape]@($x$,$y$)@ can be
-  built by using the parsers for open-parenthesis, number, comma, number and
-  close-parenthesis respectively. Parsers can be combined recursively: a parser
-  $P$ could depend on a parser $Q$, which in turn depends on $P$\@. Consider
-  while statements: the body of the loop is yet another statement, which in turn
-  could be a while statement.
+  Recursive descent parsing is a method for constructing a parser using a
+  collection of recursive functions. The simplest functions parse the atoms (or
+  \emph{tokens}) of the target language; examples of tokens are numbers and
+  identifiers. By gluing together simpler functions, more complex parsers can be
+  created: for example, a parser for 2D coordinates
+  \lstinline[mathescape]@($x$,$y$)@ can be built by using the parsers for
+  open-parenthesis, number, comma, number and close-parenthesis, in sequence.
+  Parsers can be combined recursively: a parser $P$ could depend on a parser
+  $Q$, which in turn depends on $P$\@. Consider while statements: the body of
+  the loop is yet another statement, which in turn could be another while
+  statement.
 
-  Recursive descent can be implemented in any imperative language. Of course, a
-  similar technique can be applied in the functional world as well. The
-  functional approach lends itself perfectly for this kind of task: in
-  particular, higher order functions abstract the boilerplate otherwise
-  necessary to glue different parsing functions together. These higher order
-  functions are called \emph{parser combinators}, as they combine simpler
-  parsers into more complex ones.
+  The functional approach lends itself perfectly for implementing recursive
+  descent parsers: in particular, higher order functions abstract the
+  boilerplate otherwise necessary to glue different parsing functions together.
+  These higher order functions are called \emph{parser combinators}, as they
+  combine simpler parsers into more complex ones.
 
   The general interface employed by parser combinators is that of a function
   which takes some input string and returns either an error or some result
-  together with the remaining input. For instance, applying the function parsing
-  an integer on the input string \lstinline@21*2@ yields the pair
-  $\left(21, \text{\lstinline@*2@}\right)$.
+  together with the remaining input. For instance, applying the function to
+  parse an integer on the input string \lstinline@20*2+2@ yields the pair
+  $\left(20, \text{\lstinline@*2+2@}\right)$.
 
   Many libraries provide a framework for working with parser combinators. There
-  is usually at least some overlap between different combinator libraries, as
-  they all provide some shared functionality. Let $P$ and $Q$ be parsers; some
-  common parser combinators are:
+  is usually some overlap between different combinator libraries, as they all
+  provide some shared functionality. Let $P$ and $Q$ be parsers; some common
+  parser combinators are:
 
   \begin{itemize}
     \item The \emph{sequence combinator}. Informally, this combinator runs two
@@ -259,10 +256,10 @@
 
     \item The \emph{alternative combinator}. This combinator implements choice.
 
-    The alternative combinator runs $P$ and $Q$ on the same input. If $P$
-    succeeds, the combinator succeeds with the same result as $P$ did; if $Q$
-    succeeds, the combinator succeeds with the same result as $Q$ did. If both
-    $P$ and $Q$ fail, then the combinator also fails.
+    The alternative combinator non-deterministically runs $P$ and $Q$ on the
+    same input. If $P$ succeeds, the combinator succeeds with the same result as
+    $P$ did; if $Q$ succeeds, the combinator succeeds with the same result as
+    $Q$ did. If both $P$ and $Q$ fail, then the combinator also fails.
 
     \item The \emph{option combinator}. This combinator runs a parser zero or
     one time.
@@ -280,19 +277,16 @@
     accumulated results of all successful runs.
   \end{itemize}
 
-  \chapter{Tree traversal}
+  \section{Tree traversal}
 
-  The syntax tree constructed by a parser can be traversed and analyzed in a
-  multitude of ways. In general, syntax trees not only represent the structure
-  of a programming languages, but also the structure of markup or other kinds of
-  languages. For the purposes of this thesis, I'll discuss the processing of
-  programming languages only.
+  The grammar of a language only describes its \emph{syntax}: on its own, it
+  only defines which inputs strings are valid and which are not; similarly, a
+  parser only maps syntactically valid input strings into syntax trees. It is
+  the role of other components to give some \emph{semantic meaning} to such
+  trees.
 
-  It is important to note the grammar of a language only describes its
-  \emph{syntax}: on its own, it only defines which inputs strings are valid and
-  which are not; similarly, a parser only maps syntactically valid input strings
-  into trees. It is the role of other components to give some \emph{semantic
-  meaning} to such trees.
+  Through tree traversal, the syntax tree constructed by a parser can be
+  processed in a multitude of ways, depending on the desired functionality:
 
   \begin{itemize}
     \item An \emph{evaluator} would associate the nodes of the syntax tree with
@@ -300,12 +294,13 @@
     calculations, conditionally executing subtrees and assigning or retrieving
     values from variables.
 
-    \item A \emph{compiler} would translate the syntax tree into some other form.
-    For instance, the GCC compiler produces object files from valid C syntax; in
-    turn, object files can be parsed by the system's linker, producing an
-    executable.
+    \item A \emph{compiler} would translate the syntax tree into some other
+    form---typically, lower level target language. For instance, the GCC
+    compiler translates valid C syntax and into object files, a form of machine
+    executable instructions and metadata. A linker would parse the metadata of
+    one or more object files and produce an executable.
 
-    \item On languages with static types, a \emph{type checker} would verify
+    \item For languages with static types, a \emph{type checker} would verify
     that no type errors would be produced by execution. In such systems, it is
     fundamental that both the type checker and the evaluator/compiler obey to
     the same semantics.
@@ -317,14 +312,22 @@
     the type checker, all components must obey to the same semantics.
 
     \item A \emph{syntax highlighter} would use the information stored in the
-    syntax tree to perform syntax highlighting. The used syntax tree would be
-    rather concrete, as each node would need to be associated with a position in
-    the parser's input string.
+    syntax tree to perform \emph{syntax highlighting}: displaying program text
+    with different colors depending on semantic meaning. The used syntax tree
+    would be rather concrete, as each node would need to be associated with a
+    position in the parser's input string.
   \end{itemize}
-  
+
+  In general, syntax trees not only represent the structure of a programming
+  languages, but also the structure of markup or other kinds of languages. For
+  the purposes of this thesis, I'll discuss the processing of programming
+  languages only.
+
   \chapter{The GTK library}
 
-  \chapter{The Programming Language Devin}
+  % TODO
+
+  \chapter{The Devin programming language}
 
   In this thesis, I'll discuss the implementation of a simple imperative
   programming language which I decided to call Devin. The name Devin is an
@@ -346,8 +349,7 @@
   Devin is an imperative programming language with lexical variable scoping and
   support for recursive function definitions. Syntactically, it's similar to any
   C descendant; among others, it supports variable definition and assignment,
-  while loops, do-while loops and branching. Two significant differences from C
-  are the syntax required to specify parameter types and the lack of for loops.
+  while loops, do-while loops and branching.
 
   \subsection{Data types}
 
@@ -357,33 +359,37 @@
     \item \lstinline@Bool@, for the boolean values \lstinline@true@,
     \lstinline@false@;
 
-    \item \lstinline@Int@, for 64-bit integers like \lstinline@42@;
+    \item \lstinline@Int@, for 64-bit integers denoted by sequences of digits
+    like \lstinline@42@;
 
     \item \lstinline@Float@, for double-precision floating-point numbers like
-    \lstinline@3.14@;
+    \lstinline@0.0@ and \lstinline@3.14@. The presence of the fractional part
+    distinguishes integers from floats. Contrary to C, exponential notation like
+    \lstinline@1E100@ is disallowed;
 
     \item \lstinline[mathescape]@[$T$]@, for arrays like
     \lstinline@[1, 1, 2, 3, 5, 8, 13, 21, 34, 55]@.
   \end{itemize}
 
   In addition to the items above, Devin has a \emph{unit type} named
-  \lstinline@Unit@; it is inhabited by one value only: \lstinline@unit@. Unit
-  types can be used in lieu of void types: when a procedure has side effects
-  only, it marked as returning \lstinline@Unit@.
+  \lstinline@Unit@; it is inhabited by one value only: \lstinline@unit@. When a
+  procedure has side effects only, it marked as returning \lstinline@Unit@.
 
-  One of the advantages of unit types is the uniform treatment of function
-  calls, as there's no need to distinguish between procedures which return a
-  value and those which return no value. While unit types are traditionally used
-  in functional programming languages, some recent imperative languages like
-  Kotlin and Rust incorporate this feature as well.
+  With unit types, there's no need to distinguish between functions which return
+  a value and procedures which do not: all which can be called always returns a
+  value. One of the advantages of unit types is the uniform treatment
+  assignments to calls. While unit types are traditionally used in functional
+  programming languages, some recent imperative languages like Kotlin and Rust
+  incorporate this feature as well.
 
   \subsection{Built-in operators}
 
-  Booleans support negation, conjunction, disjunction and exclusive disjunction.
+  Booleans support the usual operations of negation, conjunction, disjunction
+  and exclusive disjunction.
 
-  Like in C, the right operand of boolean binary expressions is only evaluated
-  if the left operand doesn't already determine the truthfulness of the whole
-  expression.
+  Like many languages, boolean binary operators are evaluated lazily: the right
+  operand is only evaluated if the left operand doesn't already determine the
+  truthfulness of the whole expression.
 
   \begin{table}[h]
     \centering
@@ -423,12 +429,11 @@
   \end{table}
 
   Integers and floating-point numbers support addition, subtraction,
-  multiplication and division. Integers (but not floats) support the modulo
+  multiplication and division. For integers (but not floats), there's the modulo
   operation.
 
   Binary arithmetic operations require both operands to be of the same type:
-  there are no implicit type conversions, as Devin is a \emph{strongly typed}
-  programming language.
+  there are no implicit type conversions.
 
   Division (operator \lstinline@/@) behaves differently depending on the types
   of the operands. In any case, the result of arithmetic operations has the same
@@ -602,6 +607,7 @@
   \lstinline[mathescape]@var $x$ = $y$@, where $x$ is an identifier and $y$ is
   an expression. The type of of the new variable $x$ is inferred from $y$.
   Variables can be defined at any point, whether globally or as function locals.
+  Their visibility extends from the point of their definition onwards.
 
   Devin is \emph{block-structured}: it allows for the creation of blocks,
   including blocks nested within other blocks. Variables are lexically scoped:
@@ -611,6 +617,10 @@
 
   Statements are always terminated with semicolons. Empty statements are
   disallowed: in other words, a semicolon on its own is not a valid statement.
+
+  % TODO: io terrei i commenti nel listing, in quanto hanno senso in questa
+  % sezione (Variable definitions and scoping). Aggiungerò però una sezione
+  % aggiuntiva sullo scoping nell'introduzione.
 
   \begin{lstlisting}[
     float=h,
@@ -653,10 +663,15 @@
 
   \subsection{Assertions}
 
+  % TODO: non è necessario aggiungere "should". Anche Rust spiega gli assert
+  % in maniera simile: "Asserts that a boolean expression is true at runtime."
+  % (https://doc.rust-lang.org/std/macro.assert.html). Ho però esplicitato
+  % che è un errore se il predicato è falso.
+
   Devin provides a mechanism for asserting that predicates evaluate to
-  \lstinline@true@ at runtime. Assertions can be used to check internal
-  assumptions or to guard against violation of function contracts, among other
-  things.
+  \lstinline@true@ at runtime; if they are not, an error is generated, causing
+  program termination. Assertions can be used to check internal assumptions or
+  to guard against violation of function contracts, among other things.
 
   For example, the assertion \lstinline@assert n >= 0@ can be used as the first
   statement of a function calculating the factorial of \lstinline@n@, as the
@@ -674,7 +689,7 @@
   \lstinline[mathescape]@$g$($x$)@ calls $g$ with a single argument,
   \lstinline[mathescape]@$h$($x$, $y$)@ calls $h$ with two arguments, and so on.
 
-  The evaluation strategy of Devin is strict; arguments are evaluated from left
+  The evaluation strategy of Devin is eager; arguments are evaluated from left
   to right. By default, procedure arguments are passed by value; with the
   \lstinline@ref@ keyword, they can be passed by reference instead.
 
@@ -737,7 +752,7 @@
   continues normally.
 
   Devin has been designed with simplicity of implementation in mind. In
-  particular, Devin's call stack exhibits two uncommon properties:
+  particular, Devin's call stack exhibits two properties:
 
   \begin{itemize}
     \item Each block pushes a new frame onto the stack: this allows treating
@@ -761,7 +776,7 @@
   Runtime errors are handled as well. When an error occurs, the offending code
   fragment is highlighted and a message dialog describing the problem is shown
   to the user. Runtime errors include, but are not limited to, index out of
-  bounds errors, division by zero, assertion errors.
+  bounds errors, division by zero, assertion violations.
 
   \begin{figure}[h]
     \centering
@@ -794,35 +809,12 @@
 
   \subsection{Independence between evaluator and type checker}
 
-  In statically typed programming languages, evaluation traditionally follows
-  type checking, which follows parsing. Each step depends on data computed by
-  the previous step.
-
-  \begin{figure}[h]
-    \centering
-
-    \begin{tikzpicture}[
-      execute at begin node=\begin{small}\strut,
-      execute at end node=\strut\end{small}
-    ]
-      \node(a){};
-      \node[ellipse,draw,right=1cm of a](parse){parse};
-      \node[ellipse,draw,right=2.2cm of parse](typeckeck){type check};
-      \node[ellipse,draw,right=2.4cm of typeckeck](evaluate){evaluate};
-      \node[right=0.8cm of evaluate](b){};
-      \draw[->] (a) to [edge label=text] (parse);
-      \draw[->] (parse) to [edge label=syntax tree] (typeckeck);
-      \draw[->] (typeckeck) to [edge label=environment, edge label'=ok/error] (evaluate);
-      \draw[->] (evaluate) to [edge label=etc.] (b);
-    \end{tikzpicture}
-
-    \caption{Data-flow diagram for a traditional interpreter}
-  \end{figure}
-
-  Devin's implementation differs slightly: evaluation doesn't require the type
-  checker to be run at all. The type checker's computed environment---the data
-  structure binding identifiers to variables and functions definitions---is not
-  used by the evaluator.
+  As customary, type checking is followed by evaluation. While some data could
+  be computed during the first phase to be reused in the second, Devin's
+  implementation makes the type checker and the evaluator are independent; in
+  other words, evaluation doesn't require the type checker to be run at all. The
+  type checker's computed environment---the data structure binding identifiers
+  to variables and functions definitions---is not used by the evaluator.
 
   This design decision makes it trivial to make Devin's evaluation functions
   \emph{total}: every input tree can be mapped to some step of computation. It
@@ -871,10 +863,7 @@
   \chapter{Implementing Devin}
 
   Devin's implementation spans approximately 4500 lines of code. Knowledge about
-  programming in Haskell is required to understand this chapter. In particular,
-  I'll assume that the reader is familiar with functional programming, including
-  the concepts of pure functions, higher order functions and monads as used in
-  Haskell's \lstinline@do@ notation.
+  programming in Haskell is required to understand this chapter.
 
   Devin is entirely written in Haskell. Given the size of its implementation,
   some details are omitted for brevity. In particular, import declarations and
@@ -1951,11 +1940,11 @@
       | BuiltinToFloat
   \end{lstlisting}
 
-  Values are not stored directly inside \lstinline@State@. Mirroring LISP's
-  implementation, each identifier is bound to a cell which holds the actual
-  value. This way, multiple identifiers can refer to the same value. In Devin,
-  cells are implemented by the \lstinline@Reference@ data type; it wraps
-  Haskell's \lstinline@IORef@.
+  Values are not stored directly inside \lstinline@State@: each identifier is
+  bound to a cell which holds the actual value. This way, multiple identifiers
+  can refer to the same value. In Devin, cells are implemented by the
+  \lstinline@Reference@ data type; it wraps Haskell's \lstinline@IORef@, which
+  provides mutable references in the \lstinline@IO@ monad.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Value
@@ -3386,6 +3375,8 @@
   \end{lstlisting}
 
   \backmatter
+
+  % TODO: insert index
 
   \appendix
 
