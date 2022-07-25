@@ -6,22 +6,22 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 
+\usepackage{csquotes}
 \usepackage{enumitem}
 \usepackage[final]{listings}
 \usepackage{multirow}
 
 \usepackage{biblatex}
-\usepackage{csquotes}
 \addbibresource{thesis.bib}
 
 \usepackage{tikz}
 \usetikzlibrary{positioning}
 \usetikzlibrary{shapes.geometric}
 
-% \usepackage{theorems}
+\usepackage{theorems}
 
 \author{Matteo Morena}
-\supervisor{Prof.~Marco Comini}
+\supervisor{Prof.\ Marco Comini}
 \date{2021--2022}
 
 \title{
@@ -76,6 +76,155 @@
   \chapter{Programming languages}
 
   % paradigms, modifiable variables, scoping,
+
+  \chapter{Haskell programming}
+
+  This chapter is gives an overview of the Haskell programming language. I'll
+  assume the reader is familiar with any imperative programming language like C,
+  C++ or Java.
+
+  Haskell is a purely functional programming language. Programs are not encoded
+  as a series of steps and procedures abstracting over them; in particular,
+  there is no such thing as a statement. Instead, everything in Haskell is an
+  expression; functions, which always have to return a value, are the building
+  blocks which abstract over expressions. Functions can't have side-effects:
+  they can only operate on their arguments and compute some result. If a
+  function gets called twice with the same arguments, it's guaranteed to yield
+  the same result: this is called \emph{referential transparency}. With this
+  property, every function application can be substituted with its corresponding
+  value; further, thinking about such a rewrite system can help improving
+  correctness while making it easier to reason about program behavior.
+
+  In Haskell, expressions are evaluated \emph{lazily} by default; what this
+  means is that their value is not computed until it is actually needed. Among
+  others, lazy evaluation allows to define and work on infinite data structures
+  such as the list of all primes. This execution model implies that the order of
+  computation isn't defined by the programmer; rather, it is up to the runtime
+  to decide when to evaluate what. This goes well with referential transparency
+  and it allows to think of programs as a series of transformations on data.
+
+  \section{Expressions and function definitions}
+
+  In Haskell, a program is a set of functions. For instance, the function for
+  calculating the hypotenuse of a triangle with catheti \lstinline@a@ and
+  \lstinline@b@ can be defined as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    pythagoras = \a b -> sqrt (a * a + b * b)
+  \end{lstlisting}
+
+  This binds the name \lstinline@pythagoras@ to a function of two arguments
+  which applies Pythagoras' theorem. The symbol \lstinline@\@ is pronounced
+  \emph{lambda}, as the notation recalls the one used in lambda calculus:
+  $\lambda a b . \sqrt{a^2 + b^2}$.
+
+  As we'll see, Haskell functions are first class citizens: they can be used
+  like ordinary values. The syntax used above makes this explicit, as
+  \lstinline@pythagoras@ is bound to a value which is a function. Alternatively,
+  syntactic sugar allows \lstinline@pythagoras@ to be defined as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    pythagoras a b = sqrt (a * a + b * b)
+  \end{lstlisting}
+
+  While not obvious from the syntax of both previous examples, Haskell is a
+  \emph{statically typed} language: a program won't compile if there's a call
+  like \lstinline@pythagoras 2 "three"@. In the definition for
+  \lstinline@pythagoras@, the arguments must support multiplication, addition
+  and exponentiation; thus, the compiler infers that \lstinline@a@ and
+  \lstinline@b@ must be floating-point numbers. Even if not strictly necessary,
+  top level definitions are conventionally type annotated:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    pythagoras :: Double -> Double -> Double
+    pythagoras a b = sqrt (a * a + b * b)
+  \end{lstlisting}
+
+  The type annotation specifies that \lstinline@pythagoras@ is of type
+  \lstinline@Double -> Double -> Double@. The parameter types are separated with
+  \lstinline@->@ and there's no special distinction between parameter and return
+  types.
+
+  \section{Fundamental data types}
+
+  Without importing other modules, Haskell supports the following numeric types:
+
+  \begin{itemize}
+    \item \lstinline@Int@: fixed-precision integers at least in the range
+    $\left[-2^{29}, 2^{29} - 1\right]$;
+
+    \item \lstinline@Word@: unsigned fixed-precision integers, with the same
+    size as \lstinline@Int@.
+
+    \item \lstinline@Integer@: arbitrary precision integers;
+
+    \item \lstinline@Float@: single-precision floating-point numbers;
+
+    \item \lstinline@Double@: double-precision floating-point numbers;
+
+    \item \lstinline@Rational@: rational numbers, represented as a ratio of two
+    \lstinline@Integer@ values.
+  \end{itemize}
+
+  All numeric types support addition, subtraction, multiplication and
+  comparison. The sign of a number $x$ can be extracted with
+  \lstinline[mathescape]@signum $x$@; its absolute value can be computed with
+  \lstinline[mathescape]@abs $x$@. The integral data types \lstinline@Int@,
+  \lstinline@Word@ and \lstinline@Integer@ support integer division towards
+  negative infinity via \lstinline@div@ and remainder via \lstinline@mod@. Two
+  numbers $x$ and $y$ of the same fractional type can be divided with
+  \lstinline[mathescape]@$x$ / $y$@. Further, many trigonometric, hyperbolic and
+  related functions like \lstinline@sin@, \lstinline@cos@ \lstinline@sqt@ and
+  \lstinline@log@ are supported for by floating-point data types
+  \lstinline@Float@ and \lstinline@Double@. More functions can be found in
+  Haskell's standard library; most of them are described in the documentation
+  for the automatically imported \lstinline@Prelude@ module.
+
+  Besides numeric types, Haskell provides \lstinline@Bool@ and \lstinline@Char@
+  as basic data types. These represent the boolean values
+  \lstinline@True@/\lstinline@False@ and Unicode characters respectively.
+  Strings are represented by lists of characters; lists are covered in the next
+  section.
+
+  \section{Tuples}
+
+  Multiple values can be grouped into \emph{tuples}. For example,
+  two-dimensional vectors $\left(x, y\right)$ can be stored in a 2-tuple of type
+  \lstinline@(Double, Double)@; addition, dot product and magnitude functions
+  can thus be defined as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    type Vector2D = (Double, Double)
+
+    sum2D :: Vector2D -> Vector2D -> Vector2D
+    sum2D (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
+
+    dot2D :: Vector2D -> Vector2D -> Double
+    dot2D (x1, y1) (x2, y2) = x1 * x2 + y1 * y2
+
+    magnitude2D :: Vector2D -> Double
+    magnitude2D v = sqrt (dot2D v v)
+  \end{lstlisting}
+
+  The functions \lstinline@sum2D@ and \lstinline@dot2D@ both deconstruct the
+  arguments via \emph{pattern matching}: this way, the individual components of
+  the vectors are bound to names to be used inside the function definitions.
+  As we'll see, pattern matching is extensively used in Haskell.
+
+  Tuples can have any number of components, each of which can be of any type.
+  For instance, \lstinline@(1, '2', "3")@ denotes a 3-tuple of type
+  \lstinline@(Int, Char, String)@. For 2-tuples, Haskell provides the
+  \lstinline@fst@ and \lstinline@snd@ functions to extract the first and second
+  item respectively. Using these, \lstinline@sum2D@ and \lstinline@dot2D@ could
+  have been defined as:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    sum2D :: Vector2D -> Vector2D -> Vector2D
+    sum2D v1 v2 = (fst v1 + fst v2, snd v1 + snd v2)
+
+    dot2D :: Vector2D -> Vector2D -> Double
+    dot2D v1 v2 = fst v1 * fst v2 + snd v1 * snd v2
+  \end{lstlisting}
 
   % \include{Haskell.tex}
 
@@ -373,7 +522,7 @@
 
   In addition to the items above, Devin has a \emph{unit type} named
   \lstinline@Unit@; it is inhabited by one value only: \lstinline@unit@. When a
-  procedure has side effects only, it marked as returning \lstinline@Unit@.
+  procedure has side-effects only, it marked as returning \lstinline@Unit@.
 
   With unit types, there's no need to distinguish between functions which return
   a value and procedures which do not: all which can be called always returns a
@@ -1958,7 +2107,7 @@
   \end{lstlisting}
 
   An \lstinline@Evaluator@ represents a computation which updates a
-  \lstinline@State@, possibly producing some side effect. To allow execution to
+  \lstinline@State@, possibly producing some side-effect. To allow execution to
   be interrupted by debug statements, the algebraic data type \lstinline@Result@
   is provided. It has three constructors:
 
