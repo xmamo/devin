@@ -120,16 +120,14 @@
 
   As we'll see, Haskell functions are first class citizens: they can be used
   like ordinary values. The syntax used above makes this explicit, as
-  \lstinline@pythagoras@ is bound to a value which is a function. Alternatively,
-  syntactic sugar allows \lstinline@pythagoras@ to be defined as follows:
+  \lstinline@pythagoras@ is bound to a value which is a function; alternatively,
+  syntactic sugar allows an equivalent definition:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     pythagoras a b = sqrt (a * a + b * b)
   \end{lstlisting}
 
-  While not obvious from the syntax of both previous examples, Haskell is a
-  \emph{statically typed} language: a program won't compile if there's a call
-  like \lstinline@pythagoras 2 "three"@. In the definition for
+  Haskell is a \emph{statically typed} language. In the definition for
   \lstinline@pythagoras@, the arguments must support multiplication, addition
   and exponentiation; thus, the compiler infers that \lstinline@a@ and
   \lstinline@b@ must be floating-point numbers. Even if not strictly necessary,
@@ -144,6 +142,109 @@
   \lstinline@Double -> Double -> Double@. The parameter types are separated with
   \lstinline@->@ and there's no special distinction between parameter and return
   types.
+
+  Data in Haskell is immutable; this includes arguments and local bindings.
+  Think of implementing function computing the factorial of a number $n$ in an
+  imperative language: probably, you'd have some accumulator initially set to
+  $1$ and loop repeatedly multiplying said accumulator with the numbers from $1$
+  to $n$. As there is no concept of mutable variables in Haskell, other
+  mechanisms have to be employed instead; the simplest purely functional
+  implementation may use linear recursion:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    factorial :: Int -> Int
+    factorial n
+      | n == 0 = 1
+      | n > 0 = n * factorial (n - 1)
+  \end{lstlisting}
+
+  The definition above may be read as follows: the factorial on \lstinline@n@ is
+  \lstinline@1@ if \lstinline@n == 0@, and is \lstinline@n * factorial (n - 1)@
+  if \lstinline@n > 0@. The boolean predicates \lstinline@n == 0@ and
+  \lstinline@n > 0@ are what are called \emph{guards}; the result of
+  \lstinline@factorial@ is undefined if \lstinline@n < 0@. An equivalent
+  definition could have been provided with conditionals:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    factorial :: Int -> Int
+    factorial n =
+      if n == 0 then
+        1
+      else if n > 0 then
+        n * factorial (n - 1)
+      else
+        undefined
+  \end{lstlisting}
+
+  Yet another alternative to define the factorial function is to employ tail
+  recursion:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    factorial' :: Int -> Int
+    factorial' n = go 1 n
+      where
+        go acc i
+          | i == 0 = acc
+          | i > 0 = go (acc * i) (i - 1)
+  \end{lstlisting}
+
+  The function \lstinline@factorial'@ (the single quote \lstinline@'@ is part of
+  its name) employs a local helper function \lstinline@go@ which performs the
+  actual computation. Notice that \lstinline@go@ sort of behaves like the
+  imperative loop from \lstinline@1@ to \lstinline@n@ which accumulates the
+  product into \lstinline@acc@. Since Haskell is lazily evaluated, the
+  difference in performance between the two implementations is negligible.
+
+  \begin{table}[h]
+    \centering
+
+    \begin{tabular}{|c|c|}
+      \hline
+
+      Without tail recursion &
+      With tail recursion \\
+
+      \hline
+
+      \begin{lstlisting}[gobble=8,basicstyle=\ttfamily\small]
+        factorial 5
+        5 * factorial 4
+        5 * (4 * factorial 3)
+        5 * (4 * (3 * factorial 2))
+        5 * (4 * (3 * (2 * factorial 1)))
+        5 * (4 * (3 * (2 * (1 * factorial 0))))
+        5 * (4 * (3 * (2 * (1 * 1))))
+        5 * (4 * (3 * (2 * 1)))
+        5 * (4 * (3 * 2))
+        5 * (4 * 6)
+        5 * 24
+        120
+      \end{lstlisting} &
+
+      \begin{lstlisting}[gobble=8,basicstyle=\ttfamily\small]
+        factorial' 5
+        go 1 5
+        go (1 * 5) 4
+        go ((1 * 5) * 4) 3
+        go (((1 * 5) * 4) * 3) 2
+        go ((((1 * 5) * 4) * 3) * 2) 1
+        go (((((1 * 5) * 4) * 3) * 2) * 1) 0
+        ((((1 * 5) * 4) * 3) * 2) * 1
+        (((5 * 4) * 3) * 2) * 1
+        ((20 * 3) * 2) * 1
+        (60 * 2) * 1
+        120 * 1
+        120
+      \end{lstlisting} \\
+
+      \hline
+    \end{tabular}
+
+    \caption{
+      Evaluation of \lstinline@factorial 5@ and \lstinline@factorial' 5@
+      respectively
+    }
+  \end{table}
 
   \section{Fundamental data types}
 
@@ -226,7 +327,9 @@
     dot2D v1 v2 = fst v1 * fst v2 + snd v1 * snd v2
   \end{lstlisting}
 
-  % \include{Haskell.tex}
+  \section{Lists}
+
+  % TODO
 
   \chapter{Parsing and processing languages}
 
