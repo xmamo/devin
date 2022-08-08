@@ -170,12 +170,9 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     factorial :: Integral a => a -> a
     factorial n =
-      if n == 0 then
-        1
-      else if n > 0 then
-        n * factorial (n - 1)
-      else
-        undefined
+      if n == 0 then 1
+      else if n > 0 then n * factorial (n - 1)
+      else undefined
   \end{lstlisting}
 
   Yet another alternative to define the factorial function is to employ tail
@@ -413,7 +410,7 @@
     \lstinline@words@. It joins a list of words with separating spaces.
   \end{itemize}
 
-  \section{User defined types, \lstinline@Maybe@ and \lstinline@Either@}
+  \section{User defined types, \texttt{Maybe} and \texttt{Either}}
 
   While lists and tuples are certainly useful, Haskell allows the definition of
   new data types. This form of abstraction improves upon the use of simple
@@ -442,7 +439,7 @@
 
   The deriving declaration of the next line instructs the compiler to generate
   three functions: \lstinline@(==), (/=) :: Complex -> Complex -> Bool@ to test
-  for equality between values, and \lstinline@show:: Complex -> String@ to
+  for equality between values, and \lstinline@show :: Complex -> String@ to
   obtain a string representation of a \lstinline@Complex@.
 
   The functions \lstinline@complexRe@ and \lstinline@complexIm@ defined on the
@@ -538,9 +535,35 @@
   \lstinline@Right@ constructor; in the second, a representation of the error is
   hold by \lstinline@Left@.
 
+  To illustrate how pattern matching can be used with algebraic data types,
+  implementations of a few utility functions from the
+  \lstinline@Data.Maybe@ module are listed below.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    isJust :: Maybe a -> Bool
+    isJust Nothing = False
+    isJust (Just _) = True
+
+    isNothing :: Maybe a -> Bool
+    isNothing mx = case mx of
+      Nothing -> True
+      Just _ -> False
+
+    fromJust :: Maybe a -> a
+    fromJust (Just x) = x
+
+    fromMaybe :: a -> Maybe a -> a
+    fromMaybe d mx = case mx of
+      Nothing -> default
+      Just x -> x
+  \end{lstlisting}
+
   The \lstinline@Prelude@ exports a very useful function operating on
-  association lists: \lstinline@lookup@. Given a list of pairs
-  \lstinline@(a, b)@
+  association lists: \lstinline@lookup@. Given a list of key-value pairs
+  \lstinline@(a, b)@, this function looks up the value corresponding to a given
+  key, if any. If no value is found, \lstinline@Nothing@ is returned; this
+  illustrates how the algebraic data type \lstinline@Maybe@ can be used to
+  indicate nullability.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookup :: Eq a => a -> [(a, b)] -> Maybe b
@@ -549,7 +572,50 @@
     lookup key (_ : xs) = lookup key xs
   \end{lstlisting}
 
-  \section{Higher order functions}
+  \section{Higher-order functions}
+
+  Arguably one of the most important features of any functional programming
+  language is the support for higher=order functions: that is, functions which
+  take another function as an argument or return a function as result. As
+  mentioned, Haskell functions are values: this makes implementing and using
+  higher-order functions very succint syntactically.
+
+  Let's consider two functions: one which calculates the sum every element of a
+  list, and one calculates the product of every element of a list. Such
+  functions could be defined as:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    sum :: Num a => [a] -> a
+    sum [] = 0
+    sum (x : xs) = x + sum xs
+
+    product :: Num a => [a] -> a
+    product [] = 1
+    product (x : xs) = x * product xs
+  \end{lstlisting}
+
+  Both implementations have the same shape:
+
+  \begin{itemize}
+    \item If the given list is empty, the base case is reached; some constant
+    value is returned.
+
+    \item Otherwise, a function is applied to head of the list and the recursive
+    function call.
+  \end{itemize}
+
+  The \lstinline@foldr@ function
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    foldr :: (a -> b -> b) -> b -> [a] -> b
+    foldr _ z [] = z
+    foldr f z (x : xs) = f x (foldr f z xs)
+
+    sum :: Num a => [a] -> a
+    sum xs = foldr f 0 xs
+      where
+        f x acc = x + acc
+  \end{lstlisting}
 
   % \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
   %   sort :: Ord a => [a] -> [a]
@@ -674,7 +740,7 @@
       \end{tikzpicture}
     \end{tabular}
 
-    \caption{Two semantically equivalent syntax trees for \lstinline@2+3*(4+5)@}
+    \caption{Two semantically equivalent syntax trees for \texttt{2+3*(4+5)}}
   \end{figure}
 
   For our purposes, the distinction between abstract and concrete syntax tree
