@@ -575,7 +575,7 @@
   \section{Higher-order functions}
 
   Arguably one of the most important features of any functional programming
-  language is the support for higher=order functions: that is, functions which
+  language is the support for higher-order functions: that is, functions which
   take another function as an argument or return a function as result. As
   mentioned, Haskell functions are values: this makes implementing and using
   higher-order functions very succint syntactically.
@@ -600,11 +600,13 @@
     \item If the given list is empty, the base case is reached; some constant
     value is returned.
 
-    \item Otherwise, a function is applied to head of the list and the recursive
-    function call.
+    \item Otherwise, a binary operator is applied to head of the list and the
+    result of the recursive function call.
   \end{itemize}
 
-  The \lstinline@foldr@ function
+  This idiom is called \emph{folding} over a list. The \lstinline@foldr@
+  function, which encapsulates this behavior, can be used to implememt both
+  \lstinline@sum@ and \lstinline@product@:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     foldr :: (a -> b -> b) -> b -> [a] -> b
@@ -615,17 +617,94 @@
     sum xs = foldr f 0 xs
       where
         f x acc = x + acc
+
+    product :: Num a => [a] -> a
+    product xs = foldr f 1 xs
+      where
+        f x acc = x * acc
   \end{lstlisting}
 
-  % \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-  %   sort :: Ord a => [a] -> [a]
-  %   sort = \case
-  %     [] -> []
+  Lambda syntax can be used in place of local bindings to increase succinctness:
 
-  %     (x : xs) =
-  %       let (xs1, xs2) = partition (< x) xs
-  %        in (sortList xs1) ++ [x] ++ (sortList xs2)
-  % \end{lstlisting}
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    sum :: Num a => [a] -> a
+    sum xs = foldr (\x acc -> x + acc) 0 xs
+
+    product :: Num a => [a] -> a
+    product xs = foldr (\x acc -> x * acc) 1 xs
+  \end{lstlisting}
+
+  Finally, given that \lstinline@(+)@ and \lstinline@(*)@ already denote the
+  binary operators of addition and multiplication respectively, the two
+  functions can be rewritten as:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    sum :: Num a => [a] -> a
+    sum xs = foldr (+) 0 xs
+
+    product :: Num a => [a] -> a
+    product xs = foldr (*) 1 xs
+  \end{lstlisting}
+
+  As a small note, lists are not the only kind of objects which can be folded
+  over. For example, \lstinline@Maybe@ values can be thought of lists which are
+  either empty or have exactly one element; as such, they can be folded over as
+  well. In general, a type constructor \lstinline@t@ is foldable if there is an
+  instance of the function \lstinline@foldr :: (a -> b -> b) -> b -> t a -> b@.
+  Given that \lstinline@foldr@ is already provided by the base library for all
+  types which can be folded over, \lstinline@sum@ and \lstinline@product@ can be
+  defined with more generic signatures as:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    sum :: (Foldable t, Num a) => t a -> a
+    sum xs = foldr (+) 0 xs
+
+    product :: (Foldable t, Num a) => t a -> a
+    product xs = foldr (*) 1 xs
+  \end{lstlisting}
+
+  Besides \lstinline@foldr@, another commonly used higher order function is
+  \lstinline@map@. Given a list, \lstinline@map@ returns a new list obtained by
+  applying a given input function to all elements of the list. \lstinline@map@
+  can be implemented in terms of \lstinline@foldr@:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    map :: (a -> b) -> [a] -> [b]
+    map f xs = foldr (\x acc -> f x : acc) [] xs
+  \end{lstlisting}
+
+  With \lstinline@map@, one can for instance double all the numbers in a list:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    doubleList :: Num a => [a] -> [a]
+    doubleList xs = map (\x -> 2 * x) xs
+  \end{lstlisting}
+
+  Using the \emph{section} \lstinline@(2 *)@, \lstinline@doubleList@ can be more
+  succinctly be expressed as:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    doubleList :: Num a => [a] -> [a]
+    doubleList xs = map (2 *) xs
+  \end{lstlisting}
+
+  Sections are just special syntax on infix operators for \emph{partial
+  application}: passing less than the full number of arguments to a function
+  that takes multiple arguments. Given that \lstinline@(*)@ takes two arguments,
+  yet another way to write \lstinline@doubleList@ is:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    doubleList :: Num a => [a] -> [a]
+    doubleList xs = map ((*) 2) xs
+  \end{lstlisting}
+
+  One final higher order function to know about is the \emph{application
+  operator} \lstinline@($)@.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    ($) :: (a -> b) -> a -> b
+    f $ x = f x
+  \end{lstlisting}
 
   \chapter{Parsing and processing languages}
 
