@@ -234,9 +234,7 @@ onActivate application = do
         typerThreadId <- readIORef typerThreadIdRef
         killThread typerThreadId
 
-        let typer = checkDevin devin
-
-        typerThreadId <- forkIO $ pure (runTyper typer predefinedEnv) >>= \case
+        typerThreadId <- forkIO $ case runTyper (checkDevin devin) predefinedEnv of
           -- Typer success:
           ((), env, []) -> do
             let (hasMain, _, _) = runTyper checkHasMain env

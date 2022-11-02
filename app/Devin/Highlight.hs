@@ -12,7 +12,6 @@ module Devin.Highlight (
 ) where
 
 import Control.Monad.IO.Class
-import Data.Traversable
 
 import Control.Monad.Extra
 
@@ -42,33 +41,19 @@ data Tags = Tags {
 
 generateTags :: (GtkSource.IsStyleScheme a, MonadIO m) => Maybe a -> m Tags
 generateTags scheme = do
-  let s1 = "search-match"
-  let s2 = "bracket-match"
-  let s3 = "def:keyword"
-  let s4 = "def:identifier"
-  let s5 = "def:function"
-  let s6 = "def:type"
-  let s7 = "def:number"
-  let s8 = "def:operator"
-  let s9 = "def:comment"
-  let s10 = "def:error"
-  let styleIds = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10]
-
   languageManager <- GtkSource.languageManagerGetDefault
   defaultLanguage <- GtkSource.languageManagerGetLanguage languageManager "def"
-
-  tags <- for styleIds $ \styleId -> do
-    maybeStyle <- case (scheme, defaultLanguage) of
-      (Just scheme, Just language) -> getStyle language scheme styleId
-      (Just scheme, Nothing) -> GtkSource.styleSchemeGetStyle scheme styleId
-      (Nothing, _) -> pure Nothing
-
-    tag <- GtkSource.tagNew Nothing
-    whenJust maybeStyle (\style -> GtkSource.styleApply style tag)
-    pure tag
-
-  let [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10] = tags
-  pure (Tags t1 t2 t3 t4 t5 t6 t7 t8 t9 t10)
+  tag01 <- getTag defaultLanguage scheme "search-match"
+  tag02 <- getTag defaultLanguage scheme "bracket-match"
+  tag03 <- getTag defaultLanguage scheme "def:keyword"
+  tag04 <- getTag defaultLanguage scheme "def:identifier"
+  tag05 <- getTag defaultLanguage scheme "def:function"
+  tag06 <- getTag defaultLanguage scheme "def:type"
+  tag07 <- getTag defaultLanguage scheme "def:number"
+  tag08 <- getTag defaultLanguage scheme "def:operator"
+  tag09 <- getTag defaultLanguage scheme "def:comment"
+  tag10 <- getTag defaultLanguage scheme "def:error"
+  pure (Tags tag01 tag02 tag03 tag04 tag05 tag06 tag07 tag08 tag09 tag10)
 
 
 applyTags :: (Gtk.IsTextTagTable a, MonadIO m) => Tags -> a -> m Bool
@@ -92,6 +77,20 @@ highlightInterval tag buffer interval = do
   startIter <- Gtk.textBufferGetIterAtOffset buffer (start interval)
   endIter <- Gtk.textBufferGetIterAtOffset buffer (end interval)
   Gtk.textBufferApplyTag buffer tag startIter endIter
+
+
+getTag ::
+  (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b, MonadIO m) =>
+  Maybe a -> Maybe b -> Text -> m GtkSource.Tag
+getTag language scheme styleId = do
+  maybeStyle <- case (scheme, language) of
+    (Just scheme, Just language) -> getStyle language scheme styleId
+    (Just scheme, Nothing) -> GtkSource.styleSchemeGetStyle scheme styleId
+    (Nothing, _) -> pure Nothing
+
+  tag <- GtkSource.tagNew Nothing
+  whenJust maybeStyle (\style -> GtkSource.styleApply style tag)
+  pure tag
 
 
 getStyle ::

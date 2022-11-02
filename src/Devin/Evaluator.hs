@@ -178,7 +178,7 @@ compareVals v1 v2 = case (v1, v2) of
       go n i = do
         x <- readRef (rs1 ! i)
         y <- readRef (rs2 ! i)
-        ifM (compareVals x y) (go n (i + 1)) (pure False)
+        compareVals x y &&^ go n (i + 1)
 
   (_, _) -> pure False
 

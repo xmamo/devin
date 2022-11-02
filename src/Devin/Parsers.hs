@@ -314,7 +314,7 @@ rationalExpression = flip label "number" $ try $ syntax $ do
   digits2 <- char '.' *> many1 (satisfy isDigit)
   let digits = digits1 ++ digits2
   let mantissa = foldl (\a d -> 10 * a + toRational (digitToInt d)) 0 digits
-  pure (RationalExpression (sign * mantissa * 0.1 ^^ length digits2))
+  pure (RationalExpression (sign * mantissa * 0.1 ^ length digits2))
 
 
 arrayExpression :: Stream s m Char => ParserT s m Expression
