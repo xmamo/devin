@@ -73,9 +73,9 @@
   \introduction
   % \label{ch:intro}
 
-  \chapter{Programming languages}
+  % \chapter{Programming languages}
 
-  % paradigms, modifiable variables, scoping,
+  % TODO: paradigms, modifiable variables, scoping
 
   \chapter{Haskell programming}
 
@@ -87,13 +87,13 @@
   as a series of steps and procedures abstracting over them; in particular,
   there is no such thing as a statement. Instead, everything in Haskell is an
   expression; functions, which always have to return a value, are the building
-  blocks which abstract over expressions. Functions can't have side-effects:
-  they can only operate on their arguments and compute some result. If a
-  function gets called twice with the same arguments, it's guaranteed to yield
-  the same result: this is called \emph{referential transparency}. With this
-  property, every function application can be substituted with its corresponding
-  value; thinking about execution as such a rewrite system can help improving
-  correctness while making it easier to reason about program behavior.
+  blocks which abstract over expressions. Functions can can only operate on
+  their arguments and compute some result; if a function gets called twice with
+  the same arguments, it's guaranteed to yield the same result: this is called
+  \emph{referential transparency}. This property guarantees that every function
+  application can be substituted with its corresponding value; thinking about
+  execution as such a rewrite system can help improving correctness while making
+  it easier to reason about program behavior.
 
   In Haskell, expressions are evaluated \emph{lazily} by default; what this
   means is that their value is not computed until it is actually needed. Among
@@ -121,14 +121,14 @@
 
   As we'll see, Haskell functions are first class citizens: they can be used
   like ordinary values. The syntax used above makes this explicit, as
-  \lstinline@pythagoras@ is bound to a value which is a function; alternatively,
+  \lstinline@pythagoras@ is bound to a value which is a function. Alternatively,
   syntactic sugar allows an equivalent definition:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     pythagoras a b = sqrt (a * a + b * b)
   \end{lstlisting}
 
-  Haskell is a \emph{statically typed} language. In the definition for
+  Haskell is a \emph{statically typed}. In the definition for
   \lstinline@pythagoras@, \lstinline@a@ and \lstinline@b@ must support
   multiplication, addition and exponentiation; thus, the compiler infers that
   they must be floating-point numbers. Explicit type annotations can be
@@ -191,7 +191,8 @@
   actual computation. Notice that \lstinline@go@ resembles the imperative loop
   from \lstinline@1@ to \lstinline@n@ which accumulates the product into
   \lstinline@acc@. Since Haskell is lazily evaluated, the difference in
-  performance between the two implementations is negligible.
+  performance between \lstinline@factorial@ and \lstinline@factorial'@ is
+  negligible.
 
   Haskell supports the definition of arbitrary infix operators. For instance,
   an integer exponentiation operator could be defined as follows:
@@ -209,13 +210,12 @@
   \lstinline|@|, \lstinline@\@, \lstinline@^@, \lstinline@|@, \lstinline@-@,
   \lstinline@~@, \lstinline@:@. In fact, given $b$ and $n$, the expression
   \lstinline[mathescape]@$b$ ^ $n$@ has an equivalent prefix form,
-  \lstinline[mathescape]@(^) $b$ $n$@. This allows a non-symbolic alias to be
-  defined as \lstinline@pow = (^)@, making \lstinline[mathescape]@$b$ ^ $n$@
-  equivalent to \lstinline[mathescape]@pow $b$ $n$@. Simmetrically, any binary
-  function can be used as an infix operator: given the operator
-  \lstinline@(div)@ for integer division towards negative infinity,
-  \lstinline[mathescape]@div $n$ $d$@ has an equivalent infix form,
-  \lstinline[mathescape]@$n$ `div` $d$@.
+  \lstinline[mathescape]@(^) $b$ $n$@; a non-symbolic alias can be defined as
+  \lstinline@pow = (^)@, making \lstinline[mathescape]@$b$ ^ $n$@ equivalent to
+  \lstinline[mathescape]@pow $b$ $n$@. Simmetrically, any binary function can be
+  used as an infix operator: given the operator \lstinline@(div)@ for integer
+  division towards negative infinity, \lstinline[mathescape]@div $n$ $d$@ has an
+  equivalent infix form, \lstinline[mathescape]@$n$ `div` $d$@.
 
   \section{Fundamental data types}
 
@@ -277,9 +277,9 @@
   \end{lstlisting}
 
   The functions \lstinline@sum2D@ and \lstinline@dot2D@ both deconstruct the
-  arguments via \emph{pattern matching}: this way, the individual components of
-  the vectors are bound to names to be used inside the function definitions.
-  As we'll see, pattern matching is extensively used in Haskell.
+  arguments via \emph{pattern matching}: the individual components of the tuples
+  are bound to names to be used inside the function definitions. As we'll see,
+  pattern matching is extensively used in Haskell.
 
   For 2-tuples, Haskell provides the \lstinline@fst@ and \lstinline@snd@
   functions to extract the first and second item respectively. Using these,
@@ -412,12 +412,13 @@
 
   \section{User defined types, \texttt{Maybe} and \texttt{Either}}
 
-  While lists and tuples are certainly useful, Haskell allows the definition of
-  new data types. This form of abstraction improves upon the use of simple
-  tuples, as structurally similar objects like 2D vectors and complex numbers
-  which are both pairs of numbers, are associated to different types.
+  While lists and tuples are certainly useful, Haskell of course allows the
+  definition of new data types. This form of abstraction improves upon the use
+  of simple tuples, as structurally similar objects like 2D vectors and complex
+  numbers which are both pairs of numbers, are associated to different types.
 
-  A data type for complex numbers $a + i b$ can be defined as follows:
+  For example, data type for complex numbers $a + i b$ can be defined as
+  follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Complex = Complex Double Double
@@ -432,15 +433,16 @@
 
   The data declaration on the first line introduces a new type,
   \lstinline@Complex@; a value of such a type can be constructed with the
-  constructor \lstinline@Complex Double Double@. Thus, if $a$ and $b$ are of
-  type \lstinline@Double@, the expression
+  constructor \lstinline@Complex :: Double -> Double -> Complex@. In other
+  words, if $a$ and $b$ are of type \lstinline@Double@, the expression
   \lstinline[mathescape]@Complex $a$ $b$@ constructs a new value of type
   \lstinline@Complex@.
 
-  The deriving declaration of the next line instructs the compiler to generate
-  three functions: \lstinline@(==), (/=) :: Complex -> Complex -> Bool@ to test
-  for equality between values, and \lstinline@show :: Complex -> String@ to
-  obtain a string representation of a \lstinline@Complex@.
+  The deriving declaration \lstinline@deriving (Eq, Show)@ instructs the
+  compiler to generate three functions:
+  \lstinline@(==), (/=) :: Complex -> Complex -> Bool@ to test for equality
+  between values, and \lstinline@show :: Complex -> String@ to obtain a string
+  representation of a \lstinline@Complex@.
 
   The functions \lstinline@complexRe@ and \lstinline@complexIm@ defined on the
   successive lines are what are called \emph{accessors}. Both definitions use
@@ -458,36 +460,9 @@
     } deriving (Eq, Show)
   \end{lstlisting}
 
-  When record syntax is used, values can be constructed and pattern matched in
-  two ways each. A few functions are provided as to exemplify all synctactic
-  possibilities:
-
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    complexFromPolar :: Double -> Double -> Complex
-    complexFromPolar magnitude phase =
-      let a = magnitude * cos phase
-          b = magnitude * sin phase
-       in Complex a b
-
-    complexAdd :: Complex -> Complex -> Complex
-    complexAdd (Complex a1 b1) (Complex a2 b2) =
-      let a = a1 + a2
-          b = b1 + b2
-       in Complex a b
-
-    complexMultiply :: Complex -> Complex -> Complex
-    complexMultiply (Complex a1 b1) (Complex a2 b2) =
-      let a = a1 * a2 - b1 * b2
-          b = a1 * b2 + b1 * a2
-       in Complex {complexRe = a, complexIm = b}
-
-    complexMagnitude :: Complex -> Double
-    complexMagnitude Complex {complexRe = a, complexIm = b} = sqrt (a * a + b * b)
-  \end{lstlisting}
-
   Data types can be defined with any number of constructors; further,
   constructors can have any number of arguments, including zero. For instance,
-  the academic grades can be defined as follows:
+  academic grades as used in the US can be defined as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Grade = F | D | C | B | A
@@ -501,8 +476,8 @@
   \lstinline@F < D@, \lstinline@D < C@, \lstinline@C < B@ and \lstinline@B < A@
   evaluate to \lstinline@True@.
 
-  Haskell's standard library provides two useful algebraic data types (for
-  simplicity, deriving clauses are omitted):
+  Two very useful algebraic data types are provided Haskell's standard library
+  are (for simplicity, deriving clauses are omitted):
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Maybe a
@@ -514,12 +489,12 @@
       | Right b
   \end{lstlisting}
 
-  Both \lstinline@Maybe@ and \lstinline@Either@ are \emph{type constructors},
-  as they are paramaterized by type variables: \lstinline@Maybe@ takes a single
-  parameter \lstinline@a@, while \lstinline@Either@ takes two parameters
-  \lstinline@a@ and \lstinline@b@. Syntactically, type variables are
-  distinguished from type constructors by casing: variables are lowercase, while
-  constructors are uppercase.
+  In this case, both \lstinline@Maybe@ and \lstinline@Either@ are called
+  \emph{type constructors}, as they are paramaterized by type variables:
+  \lstinline@Maybe@ takes a single parameter \lstinline@a@, while
+  \lstinline@Either@ takes two parameters \lstinline@a@ and \lstinline@b@.
+  Syntactically, type variables are distinguished from type constructors by
+  casing: variables are lowercase, while constructors are uppercase.
 
   \lstinline@Maybe@ encapsulates an optional value; a value of type
   \lstinline@Maybe a@ is either empty (represented as \lstinline@Nothing@), or
@@ -531,7 +506,7 @@
   cases, where functions may not yield any meaningful value, \lstinline@Maybe@
   is used; thinking in terms of C or Java, this resembles the possibility of a
   null return value. \lstinline@Either@ is conventionally used to represent
-  success or failure. In the first case, the resulting value is hold by the
+  success or failure: in the first case, the resulting value is hold by the
   \lstinline@Right@ constructor; in the second, a representation of the error is
   hold by \lstinline@Left@.
 
@@ -545,23 +520,21 @@
     isJust (Just _) = True
 
     isNothing :: Maybe a -> Bool
-    isNothing mx = case mx of
-      Nothing -> True
-      Just _ -> False
+    isNothing Nothing = True
+    isNothing (Just _) = False
 
     fromJust :: Maybe a -> a
     fromJust (Just x) = x
 
     fromMaybe :: a -> Maybe a -> a
-    fromMaybe d mx = case mx of
-      Nothing -> default
-      Just x -> x
+    fromMaybe x Nothing = x
+    fromMaybe _ (Just x) = x
   \end{lstlisting}
 
   The \lstinline@Prelude@ exports a very useful function operating on
   association lists: \lstinline@lookup@. Given a list of key-value pairs
   \lstinline@(a, b)@, this function looks up the value corresponding to a given
-  key, if any. If no value is found, \lstinline@Nothing@ is returned; this
+  key, if any. If no value is found, \lstinline@Nothing@ is returned---this
   illustrates how the algebraic data type \lstinline@Maybe@ can be used to
   indicate nullability.
 
@@ -585,75 +558,77 @@
   functions could be defined as:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    sum :: Num a => [a] -> a
-    sum [] = 0
-    sum (x : xs) = x + sum xs
+    listSum :: Num a => [a] -> a
+    listSum [] = 0
+    listSum (x : xs) = x + sum xs
 
-    product :: Num a => [a] -> a
-    product [] = 1
-    product (x : xs) = x * product xs
+    listProduct :: Num a => [a] -> a
+    listProduct [] = 1
+    listProduct (x : xs) = x * product xs
   \end{lstlisting}
 
-  Both implementations have the same shape:
+  Both functions have the same shape:
 
   \begin{itemize}
-    \item If the given list is empty, the base case is reached; some constant
+    \item If the given list is empty, the base case is reached and some constant
     value is returned.
 
     \item Otherwise, a binary operator is applied to head of the list and the
-    result of the recursive function call.
+    result of calling the function recursively with the tail of the list.
   \end{itemize}
 
-  This idiom is called \emph{folding} over a list. The \lstinline@foldr@
-  function, which encapsulates this behavior, can be used to implememt both
-  \lstinline@sum@ and \lstinline@product@:
+  This idiom is called \emph{folding} over a list. A helper function
+  \lstinline@foldList@, which encapsulates this behavior, can be used to
+  implememt both \lstinline@listSum@ and \lstinline@listProduct@:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    foldr :: (a -> b -> b) -> b -> [a] -> b
-    foldr _ z [] = z
-    foldr f z (x : xs) = f x (foldr f z xs)
+    foldList :: (a -> b -> b) -> b -> [a] -> b
+    foldList _ z [] = z
+    foldList f z (x : xs) = f x (foldr f z xs)
 
-    sum :: Num a => [a] -> a
-    sum xs = foldr f 0 xs
+    listSum :: Num a => [a] -> a
+    listSum xs = foldr f 0 xs
       where
         f x acc = x + acc
 
-    product :: Num a => [a] -> a
-    product xs = foldr f 1 xs
+    listProduct :: Num a => [a] -> a
+    listProduct xs = foldr f 1 xs
       where
         f x acc = x * acc
   \end{lstlisting}
 
-  Lambda syntax can be used in place of local bindings to increase succinctness:
+  To increase succintess of the implementation, lambda syntax can be used
+  instead:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    sum :: Num a => [a] -> a
-    sum xs = foldr (\x acc -> x + acc) 0 xs
+    listSum :: Num a => [a] -> a
+    listSum xs = foldr (\x acc -> x + acc) 0 xs
 
-    product :: Num a => [a] -> a
-    product xs = foldr (\x acc -> x * acc) 1 xs
+    listProduct :: Num a => [a] -> a
+    listProduct xs = foldr (\x acc -> x * acc) 1 xs
   \end{lstlisting}
 
-  Finally, given that \lstinline@(+)@ and \lstinline@(*)@ already denote the
+  Even better, given that \lstinline@(+)@ and \lstinline@(*)@ already denote the
   binary operators of addition and multiplication respectively, the two
   functions can be rewritten as:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    sum :: Num a => [a] -> a
-    sum xs = foldr (+) 0 xs
+    listSum :: Num a => [a] -> a
+    listSum xs = foldr (+) 0 xs
 
-    product :: Num a => [a] -> a
-    product xs = foldr (*) 1 xs
+    listProduct :: Num a => [a] -> a
+    listProduct xs = foldr (*) 1 xs
   \end{lstlisting}
 
-  As a small note, lists are not the only kind of objects which can be folded
-  over. For example, \lstinline@Maybe@ values can be thought of lists which are
-  either empty or have exactly one element; as such, they can be folded over as
-  well. In general, a type constructor \lstinline@t@ is foldable if there is an
-  instance of the function \lstinline@foldr :: (a -> b -> b) -> b -> t a -> b@.
-  Given that \lstinline@foldr@ is already provided by the base library for all
-  types which can be folded over, \lstinline@sum@ and \lstinline@product@ can be
-  defined with more generic signatures as:
+  Lists are not the only kind of objects which can be folded over. For example,
+  \lstinline@Maybe@s can be thought of lists which are either empty or have
+  exactly one element; as such, they can be folded over as well. In general, if
+  \lstinline@t@ is a type constructor, \lstinline@t a@ is foldable if there is
+  an instance of the function
+  \lstinline@foldr :: (a -> b -> b) -> b -> t a -> b@. Haskell's standard
+  library provides \lstinline@foldr@ for all types which can be folded over;
+  thus, \lstinline@listSum@ and \lstinline@listProduct@ can be defined more
+  generically as:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum :: (Foldable t, Num a) => t a -> a
@@ -663,21 +638,23 @@
     product xs = foldr (*) 1 xs
   \end{lstlisting}
 
-  Besides \lstinline@foldr@, another commonly used higher order function is
-  \lstinline@map@. Given a list, \lstinline@map@ returns a new list obtained by
-  applying a given input function to all elements of the list. \lstinline@map@
-  can be implemented in terms of \lstinline@foldr@:
+  Besides \lstinline@foldr@, another commonly used higher order functionprovided
+  by the standard library is \lstinline@fmap@. Given a list, \lstinline@fmap@
+  returns a new list obtained by applying a given input function to all elements
+  of the list. \lstinline@fmap@ can be for lists implemented in terms of
+  \lstinline@foldr@:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    map :: (a -> b) -> [a] -> [b]
-    map f xs = foldr (\x acc -> f x : acc) [] xs
+    mapList :: (a -> b) -> [a] -> [b]
+    mapList f xs = foldr (\x ys -> f x : ys) [] xs
   \end{lstlisting}
 
-  With \lstinline@map@, one can for instance double all the numbers in a list:
+  With \lstinline@mapList@, one can for instance double all the numbers in a
+  list:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     doubleList :: Num a => [a] -> [a]
-    doubleList xs = map (\x -> 2 * x) xs
+    doubleList xs = mapList (\x -> 2 * x) xs
   \end{lstlisting}
 
   Using the \emph{section} \lstinline@(2 *)@, \lstinline@doubleList@ can be more
@@ -685,7 +662,15 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     doubleList :: Num a => [a] -> [a]
-    doubleList xs = map (2 *) xs
+    doubleList xs = mapList (\x -> 2 * x) xs
+  \end{lstlisting}
+
+  Using the section \lstinline@(2 *)@, \lstinline@doubleList@ can be more
+  succinctly be expressed as:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    doubleList :: Num a => [a] -> [a]
+    doubleList xs = mapList (2 *) xs
   \end{lstlisting}
 
   Sections are just special syntax on infix operators for \emph{partial
@@ -695,15 +680,167 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     doubleList :: Num a => [a] -> [a]
-    doubleList xs = map ((*) 2) xs
+    doubleList xs = mapList ((*) 2) xs
   \end{lstlisting}
 
-  One final higher order function to know about is the \emph{application
-  operator} \lstinline@($)@.
+  Lastly, using Haskell's generic \lstinline@fmap@, a function for doubling
+  everything which can be mapped over can be defined as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    double :: (Functor f, Num a) => f a -> f a
+    double xs = fmap (2 *) xs
+  \end{lstlisting}
+
+  Besides \lstinline@foldr@ and \lstinline@fmap@, another commonly used higher
+  order function to know about is the application operator \lstinline@($)@. It
+  is defined as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     ($) :: (a -> b) -> a -> b
     f $ x = f x
+  \end{lstlisting}
+
+  While \lstinline@($)@ might seem redundant, it has low right-associative
+  binding precedence, allowing it to be used to omit parentheses. For example,
+  \lstinline@f $ g $ h x@ becomes \lstinline@f (g (h x))@. Haskell programmers
+  frequently employ this operator; to prevent confusion, I'll avoid using it
+  unless necessary.
+
+  Haskell's standard library base exposes many other higher order functions and
+  operators; these are all documented at
+  \lstinline@https://hackage.haskell.org/package/base@. It would be impractical
+  to describe them all; rather, I'll let the reader look up the documentation if
+  necessary. Hoogle, found at
+  \lstinline@https://hoogle.haskell.org/?scope=package:base@, can be used to
+  quickly search for functions by name or type.
+
+  \section{Type classes}
+
+  As mentioned in the previous section, \lstinline@fmap@---just like
+  \lstinline@foldr@---is an interface for a function which is implemented for a
+  class of different types, such as \lstinline@[a]@ and \lstinline@Maybe a@, for
+  any \lstinline@a@. These kinds of interfaces are encoded in Haskell through
+  type classes: a mechanism to allow for ad-hoc polymorphism.
+
+  The interface for objects which can be mapped over, called \emph{functors} in
+  category theory, can be described as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    class Functor f where
+      fmap :: (a -> b) -> f a -> f b
+  \end{lstlisting}
+
+  The snippet above is read as follows: declare a type class named
+  \lstinline@Functor@ which takes a single argument \lstinline@f@ (a type
+  constructor). Instances of this type class must implement a function
+  \lstinline@fmap :: (a -> b) -> f a -> f b@.
+
+  One of the most trivial instances of such type class can be defined for
+  \lstinline@Maybe@:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance Functor Maybe where
+      fmap _ Nothing = Nothing
+      fmap f (Just x) = Just (f x)
+  \end{lstlisting}
+
+  By default, signatures aren't allowed in instance definitions. Most Haskell
+  compilers, including GHC, support the \lstinline@InstanceSigs@ language
+  extension, eliminating this restriction:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    {-# LANGUAGE InstanceSigs #-}
+
+    instance Functor Maybe where
+      fmap :: (a -> b) -> Maybe a -> Maybe b
+      fmap _ Nothing = Nothing
+      fmap f (Just x) = Just (f x)
+  \end{lstlisting}
+
+  From the signature above, it is apparent that \lstinline@fmap@ is a higher
+  order function mapping a \lstinline@Maybe a@ to a \lstinline@Maybe b@ using a
+  given function \lstinline@a -> b@. An equivalent interpretation, using Haskell
+  lingo, is that \lstinline@fmap@ \emph{lifts} a unary function
+  \lstinline@a -> b@ so that its argument and return types are wrapped by a
+  \lstinline@Maybe@ type constructor, as in \lstinline@Maybe a -> Maybe b@. In
+  fact, given some \lstinline@f :: a -> b@, the partial application
+  \lstinline@fmap f@ has type \lstinline@Maybe a -> Maybe b@; more in general,
+  given any functor, \lstinline@fmap f@ is of type
+  \lstinline@Functor f => f b -> f b@.
+
+  Another kind of object which can be mapped over are lists. The following
+  instance implements \lstinline@fmap@ equivalently to the definition of
+  \lstinline@mapList@ from the previous section. For the sake of brevity, the
+  \lstinline@InstanceSigs@ extension will be assumed to be enabled from now on.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance Functor [] where
+      fmap :: (a -> b) -> [a] -> [b]
+      fmap _ [] = []
+      fmap f (x : xs) = f x : map f xs
+  \end{lstlisting}
+
+  Another example of a functor is \lstinline@Either@. Recall that this algebraic
+  data type represents failure or success through the \lstinline@Left@ and
+  \lstinline@Right@ constructors; given this semantic, the value wrapped by
+  \lstinline@Right@ can be somewhat arbitrarily chosen to be the subject of
+  mapping. Implementing a \lstinline@Functor@ instance for this class of types
+  requires the type constructor \lstinline@Either@ to be applied partially, as
+  follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance Functor (Either a) where
+      fmap :: (b -> c) -> Either a b -> Either a c
+      fmap _ (Left x) = Left x
+      fmap f (Right x) = Right (f x)
+  \end{lstlisting}
+
+  In actuality, all the previously implemented \lstinline@Functor@ instances had
+  employ partial application: the \lstinline@Maybe@ type constructor is
+  partially applied, and so is \lstinline@[]@. This is by no means a
+  requirement; for example, Haskell's standard library defines the type class
+  \lstinline@Eq@ providing equality \lstinline@(==)@ and inequality
+  \lstinline@(/=)@ methods:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    class Eq a where
+      (==) :: a -> a -> Bool
+      x == y = not (x /= y)
+
+      (/=) :: a -> a -> Bool
+      x /= y = not (x == y)
+  \end{lstlisting}
+
+  This declaration gives default method declarations for both \lstinline@(/=)@
+  and \lstinline@(==)@. Instances of this class should implement at least one of
+  the two operators; if neither \lstinline@(==)@ nor \lstinline@(/=)@ are
+  provided, then both will loop. Most predefined datatypes are instance of this
+  class.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Ordering = LT | EQ | GT
+
+    class Eq a => Ord a where
+      compare :: a -> a -> Ordering
+      compare x y = if x < y then LT else if x > y then GT else EQ
+
+      (<) :: a -> a -> Bool
+      x < y = compare x y == LT
+
+      (<=) :: a -> a -> Bool
+      x <= y = compare x y /= GT
+
+      (>) :: a -> a -> Bool
+      x > y = compare x y == GT
+
+      (>=) :: a -> a -> Bool
+      x >= y = compare x y /= LT
+
+      min :: a -> a -> a
+      min x y = if x <= y then x else y
+
+      max :: a -> a -> a
+      max x y = if x >= y then x else y
   \end{lstlisting}
 
   \chapter{Parsing and processing languages}
@@ -950,7 +1087,7 @@
   the purposes of this thesis, I'll discuss the processing of programming
   languages only.
 
-  \chapter{The GTK library}
+  % \chapter{The GTK library}
 
   % TODO
 
@@ -1914,14 +2051,14 @@
       liftA2 f mx my = Typer $ \env ->
         let (x, env', errors1) = runTyper mx env
             (y, env'', errors2) = runTyper my env'
-        in (f x y, env'', errors1 ++ errors2)
+         in (f x y, env'', errors1 ++ errors2)
 
     instance Monad Typer where
       (>>=) :: Typer a -> (a -> Typer b) -> Typer b
       mx >>= f = Typer $ \env ->
         let (x, env', errors1) = runTyper mx env
             (y, env'', errors2) = runTyper (f x) env'
-        in (y, env'', errors1 ++ errors2)
+         in (y, env'', errors1 ++ errors2)
   \end{lstlisting}
 
   Next, some utility functions are defined. The function \lstinline@defineType@
@@ -1937,7 +2074,7 @@
 
       scope : parents ->
         let types' = (name, t) : types scope
-        in (t, scope {types = types'} : parents, [])
+         in (t, scope {types = types'} : parents, [])
 
     lookupType :: String -> Typer (Maybe (Type, Int))
     lookupType name = Typer (\env -> (go 0 env, env, []))
@@ -1962,7 +2099,7 @@
 
       scope : parents ->
         let funs' = (name, signature) : funs scope
-        in ((), scope {funs = funs'} : parents, [])
+         in ((), scope {funs = funs'} : parents, [])
 
     lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
     lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
@@ -1984,7 +2121,7 @@
 
       scope : parents ->
         let vars' = (name, t) : vars scope
-        in ((), scope {vars = vars'} : parents, [])
+         in ((), scope {vars = vars'} : parents, [])
 
     lookupVarType :: String -> Typer (Maybe (Type, Int))
     lookupVarType name = Typer (\env -> (go 0 env, env, []))
@@ -2006,7 +2143,7 @@
     withNewScope :: Typer a -> Typer a
     withNewScope mx = Typer $ \env ->
       let (x, env', errors) = runTyper mx (Scope [] [] [] : env)
-      in (x, tail env', errors)
+       in (x, tail env', errors)
   \end{lstlisting}
 
   One last function is provided for utility: \lstinline@report@. As its name
