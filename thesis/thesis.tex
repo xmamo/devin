@@ -208,14 +208,14 @@
   \lstinline@%@, \lstinline@&@, \lstinline@*@, \lstinline@+@, \lstinline@.@,
   \lstinline@/@, \lstinline@<@, \lstinline@=@, \lstinline@>@, \lstinline@?@,
   \lstinline|@|, \lstinline@\@, \lstinline@^@, \lstinline@|@, \lstinline@-@,
-  \lstinline@~@, \lstinline@:@. In fact, given $b$ and $n$, the expression
-  \lstinline[mathescape]@$b$ ^ $n$@ has an equivalent prefix form,
-  \lstinline[mathescape]@(^) $b$ $n$@; a non-symbolic alias can be defined as
-  \lstinline@pow = (^)@, making \lstinline[mathescape]@$b$ ^ $n$@ equivalent to
-  \lstinline[mathescape]@pow $b$ $n$@. Simmetrically, any binary function can be
-  used as an infix operator: given the operator \lstinline@(div)@ for integer
-  division towards negative infinity, \lstinline[mathescape]@div $n$ $d$@ has an
-  equivalent infix form, \lstinline[mathescape]@$n$ `div` $d$@.
+  \lstinline@~@, \lstinline@:@. In fact, given \lstinline@b@ and \lstinline@n@,
+  the expression \lstinline@b ^ n@ has an equivalent prefix form,
+  \lstinline@(^) b n@; a non-symbolic alias can be defined as
+  \lstinline@pow = (^)@, making \lstinline@b ^ n@ equivalent to
+  \lstinline@pow b n@. Simmetrically, any binary function can be used as an
+  infix operator: given the operator \lstinline@(div)@ for integer division
+  towards negative infinity, \lstinline@div n d@ has an equivalent infix form,
+  \lstinline@n `div` d@.
 
   \section{Fundamental data types}
 
@@ -239,14 +239,14 @@
   \end{itemize}
 
   All numeric types support addition, subtraction, multiplication and
-  comparison. The sign of a number $x$ can be extracted with
-  \lstinline[mathescape]@signum $x$@; its absolute value can be computed with
-  \lstinline[mathescape]@abs $x$@. The integral data types \lstinline@Int@,
-  \lstinline@Word@ and \lstinline@Integer@ support integer division towards
-  negative infinity via \lstinline@div@ and remainder via \lstinline@mod@. Two
-  numbers $x$ and $y$ of the same fractional type can be divided with
-  \lstinline[mathescape]@$x$ / $y$@. Further, many trigonometric, hyperbolic and
-  related functions like \lstinline@sin@, \lstinline@cos@ \lstinline@sqt@ and
+  comparison. The sign of a number \lstinline@x@ can be extracted with
+  \lstinline@signum x@; its absolute value can be computed with
+  \lstinline@abs x@. The integral data types \lstinline@Int@, \lstinline@Word@
+  and \lstinline@Integer@ support integer division towards negative infinity via
+  \lstinline@div@ and remainder via \lstinline@mod@. Two numbers \lstinline@x@
+  and \lstinline@y@ of the same fractional type can be divided with
+  \lstinline@x / y@. Further, many trigonometric, hyperbolic and related
+  functions like \lstinline@sin@, \lstinline@cos@ \lstinline@sqt@ and
   \lstinline@log@ are supported by the floating-point data types
   \lstinline@Float@ and \lstinline@Double@. More functions can be found in
   Haskell's standard library; most of them are described in the documentation
@@ -434,8 +434,8 @@
   The data declaration on the first line introduces a new type,
   \lstinline@Complex@; a value of such a type can be constructed with the
   constructor \lstinline@Complex :: Double -> Double -> Complex@. In other
-  words, if $a$ and $b$ are of type \lstinline@Double@, the expression
-  \lstinline[mathescape]@Complex $a$ $b$@ constructs a new value of type
+  words, if \lstinline@a@ and \lstinline@b@ are of type \lstinline@Double@, the
+  expression \lstinline@Complex a b@ constructs a new value of type
   \lstinline@Complex@.
 
   The deriving declaration \lstinline@deriving (Eq, Show)@ instructs the
@@ -447,7 +447,7 @@
   The functions \lstinline@complexRe@ and \lstinline@complexIm@ defined on the
   successive lines are what are called \emph{accessors}. Both definitions use
   pattern matching to extract the required component; the underscore pattern
-  \lstinline@_@ is used as a convention, when its matched value is ignored.
+  \lstinline@_@ is used to mark an ignored matched value.
 
   As accessors are commonly required, an alternative way of defining the same
   data type is with \emph{record syntax}. This way, accessors are automatically
@@ -814,15 +814,69 @@
   This declaration gives default method declarations for both \lstinline@(/=)@
   and \lstinline@(==)@. Instances of this class should implement at least one of
   the two operators; if neither \lstinline@(==)@ nor \lstinline@(/=)@ are
-  provided, then both will loop. Most predefined datatypes are instance of this
-  class.
+  provided, then both will loop. Primitive datatypes are instance of this class.
+
+  Instances for the \lstinline@Eq@ are usually generated via deriving
+  declaraions as explained in earlier sections. Of course, such implementations
+  can be written by hand; for example:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance Eq Complex where
+      (==) :: Complex -> Complex -> Bool
+      Complex a1 b1 == Complex a2 b2 = a1 == a2 && b1 == b2
+  \end{lstlisting}
+
+  Interestingly, most composite types like lists and typles provided by
+  Haskell's base library implement \lstinline@Eq@ as well. For example,
+  \lstinline@Maybe@'s instance can be defined as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance Eq a => Eq (Maybe a) where
+      (==) :: Maybe a -> Maybe a -> Bool
+      Nothing == Nothing = True
+      Just x == Just y = x == y
+      _ == _ = False
+
+      (/=) :: Maybe a -> Maybe a -> Bool
+      Nothing /= Nothing = False
+      Just x /= Just y = x /= y
+      _ /= _ = True
+  \end{lstlisting}
+
+  Notice that an instance for \lstinline@Maybe a@ is defined only if
+  \lstinline@a@ implements \lstinline@Eq@ as well. The context
+  \lstinline@Eq a =>@ is lexically scoped to the instance declaration; thus, the
+  complete signature of \lstinline@(==)@ and \lstinline@(/=)@ is
+  \lstinline@Eq a => Maybe a -> Maybe a -> Bool@. Something similar happens in
+  the case of lists, where \lstinline@(==), (/=) :: Eq a => [a] -> [a] -> Bool@.
+
+  While Haskell's type classes can be considered to be similar to Java's and C\#
+  interfaces and base classes, this is indeed an example of how they are more
+  powerful. In both languages, all non-primitive datatypes inherit from
+  \lstinline@Object@; amomng others, all objects must implement the methods
+  \lstinline@boolean equals(Object obj)@ and \lstinline@int hashCode()@
+  (\lstinline@bool Equals(object? obj)@ and \lstinline@int GetHashCode()@ in the
+  case of C\#). The requirement that every object must be hashable stems from
+  the need to support a generic hash table container; further, given that
+  everything is comparable, composite objects can implement equality methods by
+  verifying that all components are equal as well. While the rationale for this
+  requirement certainly makes sense, it can be argued that there are objects
+  which shouldn't support these methods; however, contrary to Haskell, there's
+  no way in Java and C\# way to have classes implement methods with constraints.
+  In other words, Haskell allows sets of functions to be defined only if certain
+  conditions are met: for example, while the cons operator \lstinline@(:)@ is
+  defined for all lists, the operators \lstinline@(==)@ and \lstinline@(/=)@ are
+  defined \emph{only if} the list items can be checked for equality as well.
+
+  Extending \lstinline@Eq@, Haskell's standard library defines a type class for
+  ordered types called \lstinline@Ord@. It is defined as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Ordering = LT | EQ | GT
 
     class Eq a => Ord a where
       compare :: a -> a -> Ordering
-      compare x y = if x < y then LT else if x > y then GT else EQ
+      compare x y = if x == y then EQ else if x <= y then LT else GT
 
       (<) :: a -> a -> Bool
       x < y = compare x y == LT
@@ -840,7 +894,7 @@
       min x y = if x <= y then x else y
 
       max :: a -> a -> a
-      max x y = if x >= y then x else y
+      max x y = if x <= y then y else x
   \end{lstlisting}
 
   \chapter{Parsing and processing languages}

@@ -352,8 +352,8 @@ onActivate application = do
                   \  </object>\n\
                   \</interface>"
 
-            builder <- Gtk.builderNewFromString string -1
             let buildFn = Gtk.getObject Gtk.MessageDialog "dialog"
+            builder <- Gtk.builderNewFromString string -1
             dialog <- Gtk.buildWithBuilder buildFn builder
             Gtk.windowSetTransientFor dialog (Just window)
             Gtk.dialogRun dialog
