@@ -703,7 +703,7 @@
   While \lstinline@($)@ might seem redundant, it has low right-associative
   binding precedence, allowing it to be used to omit parentheses. For example,
   \lstinline@f $ g $ h x@ becomes \lstinline@f (g (h x))@. Haskell programmers
-  frequently employ this operator; to prevent confusion, I'll avoid using it
+  frequently employ this operator; to avoid any doubts, I'll avoid using it
   unless necessary.
 
   Haskell's standard library base exposes many other higher order functions and
@@ -868,7 +868,7 @@
   defined for all lists, the operators \lstinline@(==)@ and \lstinline@(/=)@ are
   defined \emph{only if} the list items can be checked for equality as well.
 
-  Extending \lstinline@Eq@, Haskell's standard library defines a type class for
+  Extending \lstinline@Eq@, Haskell's standard library defines a class for
   ordered types called \lstinline@Ord@. It is defined as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -895,6 +895,71 @@
 
       max :: a -> a -> a
       max x y = if x <= y then y else x
+  \end{lstlisting}
+
+  The primitive types \lstinline@Int@, \lstinline@Word@, \lstinline@Integer@,
+  \lstinline@Float@, \lstinline@Double@, \lstinline@Rational@, \lstinline@Bool@
+  and \lstinline@Char@ are all instances of this class, among \lstinline@[a]@,
+  \lstinline@Maybe a@ and \lstinline@Either b a@, for all \lstinline@a@.
+
+  Most type classes come with some laws. Among others, \lstinline@Ord@ demands
+  reflexivity; that is, for all \lstinline@x@, \lstinline@x <= x@ must be
+  \lstinline@True@. While these laws are quite useful and important in most
+  cases, they limit the way in which classes may be used. In fact,
+  \lstinline@Float@ and \lstinline@Double@ are two unlawful instances of
+  \lstinline@Ord@, since \lstinline@let nan = 0 / 0 in nan <= nan@ evaluates to
+  \lstinline@False@. Because some laws are somewhat difficult to understand, and
+  because even Haskell itself ignores these with unlawful instances, I'll avoid
+  mentioning other laws to prevent confusion. As it happens, one must really try
+  hard to come up with a datatype with unlawful operations, like the IEEE 754
+  committee did; in most cases, implementing a type class instance satisfies its
+  laws without thinking about them. Still, if the reader is interested in
+  reading about these laws, documentation for Haskell's \lstinline@Prelude@
+  module is a good place to start.
+
+  \section{The \texttt{Functor}, \texttt{Applicative} and \texttt{Monad} type
+  classes}
+
+  Arguably, the most important type classes defined in Haskell's
+  \lstinline@base@ library are \lstinline@Functor@, \lstinline@Applicative@ and
+  \lstinline@Monad@. To recap, the \lstinline@Functor@ class is defined as:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    class Functor f where
+      fmap :: (a -> b) -> f a -> f b
+  \end{lstlisting}
+
+  The definitions for the \lstinline@Applicative@ and \lstinline@Monad@ classes
+  are shown in the listing below. As a small note, the official Haskell language
+  report doesn't define the \lstinline@Applicative@ class; further, it doesn't
+  define any relationship between any of these classes. Since \lstinline@base@
+  is the library which is used to develop applications in practice, its
+  definitions are shown instead.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    class Functor f => Applicative f where
+      pure :: a -> f a
+
+      liftA2 :: (a -> b -> c) -> f a -> f b -> f c
+      liftA2 f mx my = f <$> mx <*> my
+
+      (<*>) :: f (a -> b) -> f a -> f b
+      mf <*> mx = liftA2 (\f -> f) mf mx
+
+      (*>) :: f a -> f b -> f b
+      mx *> my = liftA2 (\_ y -> y) mx my
+
+      (<*) :: f a -> f b -> f a
+      mx <* my = liftA2 (\x _ -> x) mx my
+
+    class Applicative m => Monad m where
+      (>>=) :: m a -> (a -> m b) -> m b
+
+      (>>) :: m a -> m b -> m b
+      mx >> my = mx *> my
+
+      return :: a -> m a
+      return x = pure x
   \end{lstlisting}
 
   \chapter{Parsing and processing languages}
@@ -3677,7 +3742,7 @@
   syntax highlighter works with indices. Luckily, there is a hack to get such
   arguably missing functionality back. Usually, the input of a
   \lstinline@parsec@ parser is some string; by writing new instances for the
-  \lstinline@Stream@ typeclass, other kinds of inputs can be supported. The
+  \lstinline@Stream@ type class, other kinds of inputs can be supported. The
   trick is to consider the parser's input to be pair: the first element is an
   integer character offset, the second is the underlying stream.
 
