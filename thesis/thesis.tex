@@ -869,7 +869,9 @@
   defined \emph{only if} the list items can be checked for equality as well.
 
   Extending \lstinline@Eq@, Haskell's standard library defines a class for
-  ordered types called \lstinline@Ord@. It is defined as follows:
+  ordered types called \lstinline@Ord@. It defines the methods
+  \lstinline@compare@, \lstinline@(<)@, \lstinline@(<=)@, \lstinline@(>)@,
+  \lstinline@(>=)@, \lstinline@min@ and \lstinline@max@:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Ordering = LT | EQ | GT
@@ -929,12 +931,14 @@
       fmap :: (a -> b) -> f a -> f b
   \end{lstlisting}
 
-  The definitions for the \lstinline@Applicative@ and \lstinline@Monad@ classes
-  are shown in the listing below. As a small note, the official Haskell language
-  report doesn't define the \lstinline@Applicative@ class; further, it doesn't
-  define any relationship between any of these classes. Since \lstinline@base@
-  is the library which is used to develop applications in practice, its
-  definitions are shown instead.
+  The definition for the \lstinline@Applicative@ class is listed below. As a
+  small note, the official Haskell language report doesn't define the
+  \lstinline@Applicative@ class; further, it doesn't define any relationship
+  between it and \lstinline@Monad@. Since \lstinline@base@ is the library which
+  is used to develop applications in practice, its definition is given for
+  completness, as the \lstinline@Monad@ type class extends
+  \lstinline@Applicative@'s interface. The operator \lstinline@(<$>)@ is used as
+  an infix alias of \lstinline@fmap@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     class Functor f => Applicative f where
@@ -951,16 +955,117 @@
 
       (<*) :: f a -> f b -> f a
       mx <* my = liftA2 (\x _ -> x) mx my
+  \end{lstlisting}
 
+  As explained, \lstinline@Functor@'s \lstinline@fmap@ lifts an unary function
+  \lstinline@a -> b@, into \lstinline@f a -> f b@. The \lstinline@Applicative@
+  class extends this notion by providing the method \lstinline@liftA2@ which
+  lifts a binary function \lstinline@a -> b -> c@ into
+  \lstinline@f a -> f b -> fc@. Further, it provides \lstinline@pure@ to lift
+  a value \lstinline@a@ into \lstinline@f a@. The functions \lstinline@(<*>)@,
+  \lstinline@(*>)@, \lstinline@(<*)@ can be derived in terms of
+  \lstinline@liftA2@.
+
+  Consider writing a function to sum two \lstinline@Maybe@s. Without the
+  \lstinline@Applicative@ class, the following verbose definition would be
+  needed:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    sum2Maybes :: Num a => Maybe a -> Maybe a -> Maybe a
+    sum2Maybes (Just x) (Just y) = Just (x + y)
+    sum2Maybes _ _ = Nothing
+  \end{lstlisting}
+
+  An overloaded function \lstinline@(+)@ working on \lstinline@Maybe@s would
+  help to decrease verobosity; alas, such an operator isn't defined. Complex
+  programs working with multitudes of functions would need to employ lots of
+  pattern matching to work with lifted values. This is the use case of the
+  higher order function \lstinline@liftA2@:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    sum2Maybes :: Num a => Maybe a -> Maybe a -> Maybe a
+    sum2Maybes mx my = liftA2 (+) mx my
+  \end{lstlisting}
+
+  Alternatively, \lstinline@(<$>)@ and the \emph{sequential application
+  operator} \lstinline@(<*>)@ can be used to obtain an equivalent definition:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    sum2Maybes' :: Num a => Maybe a -> Maybe a -> Maybe a
+    sum2Maybes' mx my = (+) <$> mx <*> my
+  \end{lstlisting}
+
+  Looking at it, the expression \lstinline@(+) <$> mx <*> my@ resembles a
+  regular application of the operator \lstinline@(+)@ in the form of
+  \lstinline@(+) mx my@. While the implementation for \lstinline@sum2Maybes'@ is
+  somewhat more complex than \lstinline@sum2Maybes@---using two higher order
+  functions instead of one---it is more general than the \lstinline@liftA2@
+  approach. In fact, using \lstinline@(<$>)@ and \lstinline@(<*>)@, functions of
+  any arity can be lifted and applied:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    sum3Maybes :: Num a => Maybe a -> Maybe a -> Maybe a -> Maybe a
+    sum3Maybes mx my mz = sum3 <$> mx <*> my <*> mz
+      where
+        sum3 x y z = x + y + z
+
+    sum4Maybes :: Num a => Maybe a -> Maybe a -> Maybe a -> Maybe a -> Maybe a
+    sum4Maybes mx my mz mw = sum4 <$> mx <*> my <*> mz <*> mw
+      where
+        sum4 x y z w = x + y + z + w
+  \end{lstlisting}
+
+  Given the definition for \lstinline@Applicative@, one might ask why it
+  subclasses \lstinline@Functor@. The reason for this is that, mathematically,
+  every applicative is also a functor. An implementation for \lstinline@fmap@
+  can be derived using only \lstinline@liftA2@ and \lstinline@pure@:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    amap :: Applicative f => (a -> b) -> f a -> f b
+    amap f mx = liftA2 (\_ x -> f x) (pure ()) mx
+  \end{lstlisting}
+
+  Here, \lstinline@()@ denotes the empty tuple; its value is ignored by the
+  function lifted by \lstinline@liftA2@. Using \lstinline@const x _ = x@ as
+  defined in the \lstinline@Prelude@, \lstinline@amap@ can be simplified to:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    amap :: Applicative f => (a -> b) -> f a -> f b
+    amap f mx = liftA2 (const f) (pure ()) mx
+  \end{lstlisting}
+
+  Extending \lstinline@Applicative@, there's the \lstinline@Monad@ type class.
+  It defines the \emph{bind operator} \lstinline@(>>=)@, along with
+  \lstinline@(>>)@ and \lstinline@return@. These last two functions are
+  maintained for backwards compatibility and can be ignored by the reader.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     class Applicative m => Monad m where
       (>>=) :: m a -> (a -> m b) -> m b
 
       (>>) :: m a -> m b -> m b
-      mx >> my = mx *> my
+      mx >> my = mx >>= const my
 
       return :: a -> m a
       return x = pure x
   \end{lstlisting}
+
+  Monads are perhaps Haskell's greatest innovation; in the next section, I'll
+  explain how the \lstinline@Monad@ type class turns out to be so useful. The
+  same way every applicative is a functor, every monad is an applicative; thus,
+  all three classes are of great importance in the Haskell ecosystem. The
+  snippet below demonstrates how to derive \lstinline@liftA2@ from just
+  \lstinline@(>>=)@ and \lstinline@return@, proving the relationship between
+  applicatives and monads:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    liftM2 :: Monad m => (a -> b -> c) -> m a -> m b -> m c
+    liftM2 f mx my = mx >>= \x -> my >>= \y -> return (f x y)
+  \end{lstlisting}
+
+  \section{Imperative programming}
+
+  TODO
 
   \chapter{Parsing and processing languages}
 
