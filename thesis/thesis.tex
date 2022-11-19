@@ -881,16 +881,16 @@
       compare x y = if x == y then EQ else if x <= y then LT else GT
 
       (<) :: a -> a -> Bool
-      x < y = compare x y == LT
+      x < y = case compare x y of LT -> True; _ -> False
 
       (<=) :: a -> a -> Bool
-      x <= y = compare x y /= GT
+      x <= y = case compare x y of GT -> False; _ -> True
 
       (>) :: a -> a -> Bool
-      x > y = compare x y == GT
+      x > y = case compare x y of GT -> True; _ -> False
 
       (>=) :: a -> a -> Bool
-      x >= y = compare x y /= LT
+      x >= y = case compare x y of LT -> False; _ -> True
 
       min :: a -> a -> a
       min x y = if x <= y then x else y
@@ -909,15 +909,15 @@
   \lstinline@True@. While these laws are quite useful and important in most
   cases, they limit the way in which classes may be used. In fact,
   \lstinline@Float@ and \lstinline@Double@ are two unlawful instances of
-  \lstinline@Ord@, since \lstinline@let nan = 0 / 0 in nan <= nan@ evaluates to
-  \lstinline@False@. Because some laws are somewhat difficult to understand, and
-  because even Haskell itself ignores these with unlawful instances, I'll avoid
-  mentioning other laws to prevent confusion. As it happens, one must really try
-  hard to come up with a datatype with unlawful operations, like the IEEE 754
-  committee did; in most cases, implementing a type class instance satisfies its
-  laws without thinking about them. Still, if the reader is interested in
-  reading about these laws, documentation for Haskell's \lstinline@Prelude@
-  module is a good place to start.
+  \lstinline@Ord@, since \lstinline@let nan = 0.0 / 0.0 in nan <= nan@ evaluates
+  to \lstinline@False@. Because some laws are somewhat difficult to understand,
+  and because even Haskell itself ignores these with unlawful instances, I'll
+  avoid mentioning other laws to prevent confusion. As it happens, one must
+  really try hard to come up with a datatype with unlawful operations, like the
+  IEEE 754 committee did; in most cases, implementing a type class instance
+  satisfies its laws without thinking about them. Still, if the reader is
+  interested in reading about these laws, documentation for Haskell's
+  \lstinline@Prelude@ module is a good place to start.
 
   \section{The \texttt{Functor}, \texttt{Applicative} and \texttt{Monad} type
   classes}
@@ -1025,9 +1025,10 @@
     amap f mx = liftA2 (\_ x -> f x) (pure ()) mx
   \end{lstlisting}
 
-  Here, \lstinline@()@ denotes the empty tuple; its value is ignored by the
-  function lifted by \lstinline@liftA2@. Using \lstinline@const x _ = x@ as
-  defined in the \lstinline@Prelude@, \lstinline@amap@ can be simplified to:
+  Here, \lstinline@()@ is the empty tuple, also known as \emph{unit}; its value
+  is ignored by the function lifted by \lstinline@liftA2@. Using
+  \lstinline@const x _ = x@ as defined in the \lstinline@Prelude@,
+  \lstinline@amap@ can be simplified to:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     amap :: Applicative f => (a -> b) -> f a -> f b
@@ -1063,9 +1064,135 @@
     liftM2 f mx my = mx >>= \x -> my >>= \y -> return (f x y)
   \end{lstlisting}
 
-  \section{Imperative programming}
+  \section{Imperative style programming}
+
+  Let's implement a very simple program which performs the following
+  computation:
+
+  \begin{enumerate}
+    \item Prompt the user to insert a number by printing \lstinline@n := @ to
+    standard output;
+
+    \item Read a number $n$ from standard input;
+
+    \item Compare the given number $n$ to $0$:
+    \begin{itemize}[noitemsep]
+      \item If $n < 0$, print \lstinline@n < 0@;
+      \item If $n > 0$, print \lstinline@n > 0@;
+      \item If $n = 0$, print \lstinline@n = 0@.
+    \end{itemize}
+  \end{enumerate}
+
+  In Java, such a program would be implemented in the following way:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    import java.util.*;
+
+    public class Main {
+        public static void main(String[] args) {
+            try (Scanner scanner = new Scanner(System.in)) {
+                // Computation 1
+                System.out.print("n := ");
+
+                // Computation 2
+                int n = scanner.nextInt();
+
+                // Computation 3
+                if (n < 0)
+                    System.out.println("n < 0");
+                else if (n > 0)
+                    System.out.println("n > 0");
+                else
+                    System.out.println("n = 0");
+            }
+        }
+    }
+  \end{lstlisting}
+
+  Haskell, being purely functional, doesn't define procedures which perform
+  side-effects like reading from standard input or writing to standard output.
+  However, each computation can be represented as an I/O action that, once run,
+  carries out the actual work. In this case, the three computations to perform
+  are:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    computation1 :: IO ()
+    computation1 = putStr "n := "
+
+    computation2 :: IO Integer
+    computation2 = readLn
+
+    computation3 :: Integer -> IO ()
+    computation3 n = case compare n 0 of
+      LT -> putStrLn "n < 0"
+      GT -> putStrLn "n > 0"
+      EQ -> putStrLn "n = 0"
+  \end{lstlisting}
+
+  With the bind operator \lstinline@(>>=)@, the computations can be sequenced,
+  binding the result of running one computation to a continuation determining
+  the next computation:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    main :: IO ()
+    main =
+      putStr "n := " >>= \_ ->
+        readLn >>= \n ->
+          case compare n 0 of
+            LT -> putStrLn "n < 0"
+            EQ -> putStrLn "n = 0"
+            GT -> putStrLn "n > 0"
+  \end{lstlisting}
+
+  As can be noted, the monadic interface allows for imperative looking code to
+  be written: the listing above already resembles the implementation in Java.
+  Unsing syntactic sugar in the form of Haskell's \lstinline@do@ notation,
+  \lstinline@main@ can be expressed in a more readable way as:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    main :: IO ()
+    main = do
+      putStr "n := "
+      n <- readLn
+
+      case compare n 0 of
+        LT -> putStrLn "n < 0"
+        EQ -> putStrLn "n = 0"
+        GT -> putStrLn "n > 0"
+  \end{lstlisting}
 
   TODO
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    import Numeric
+
+    main :: IO ()
+    main = do
+      putStrLn "Terms of the quadratic equation:"
+      putStr "a := "
+      a <- readLn
+      putStr "b := "
+      b <- readLn
+      putStr "c := "
+      c <- readLn
+
+      let d = b ^ 2 - 4 * a * c
+      let x1 = (-b - sqrt d) / (2 * a)
+      let x2 = (-b + sqrt d) / (2 * a)
+
+      if isNaN x1 || isInfinite x1 || isNaN x2 || isInfinite x2 then do
+        putStrLn ""
+        putStrLn "No solutions!"
+      else do
+        putStrLn ""
+        putStrLn "Solutions:"
+
+        if x1 /= x2 then do
+          putStrLn (showString "x1 = " . showFFloat Nothing x1 $ "")
+          putStrLn (showString "x2 = " . showFFloat Nothing x2 $ "")
+        else
+          putStrLn (showString "x1 = x2 = " . showFFloat Nothing x1 $ "")
+  \end{lstlisting}
 
   \chapter{Parsing and processing languages}
 
@@ -3947,7 +4074,7 @@
       digits2 <- char '.' *> many1 (satisfy isDigit)
       let digits = digits1 ++ digits2
       let mantissa = foldl (\a d -> 10 * a + toRational (digitToInt d)) 0 digits
-      pure (RationalExpression (sign * mantissa * 0.1 ^^ length digits2))
+      pure (RationalExpression (sign * mantissa * 0.1 ^ length digits2))
   \end{lstlisting}
 
   Array literals are parsed as a list of comma separated expressions surrounded
