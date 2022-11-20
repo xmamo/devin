@@ -249,8 +249,7 @@
   functions like \lstinline@sin@, \lstinline@cos@ \lstinline@sqt@ and
   \lstinline@log@ are supported by the floating-point data types
   \lstinline@Float@ and \lstinline@Double@. More functions can be found in
-  Haskell's standard library; most of them are described in the documentation
-  for the automatically imported \lstinline@Prelude@ module.
+  Haskell's standard library; most of them are described in the documentation.
 
   Besides numeric types, Haskell provides \lstinline@Bool@ and \lstinline@Char@
   as basic data types. These represent the boolean values
@@ -338,9 +337,8 @@
   the items of the two lists being concatenated doesn't matter, as long that
   both have items of the same type \lstinline@a@.
 
-  There are many functions operating on lists provided by the
-  \lstinline@Data.List@ module, many of which are re-exported by the
-  \lstinline@Prelude@ module. Some commonly used are:
+  haskell's standard library providesmany functions operating on lists. Some
+  commonly used are:
 
   \begin{itemize}
     \item \lstinline@head :: [a] -> a@: returns the first element of a list;
@@ -378,8 +376,8 @@
 
   As mentioned, Haskell strings are just lists of characters. For example, the
   word \lstinline@Hello@ is represented by the value \lstinline@"Hello"@, which
-  desugars to the list \lstinline@['H', 'e', 'l', 'l', 'o']@. The
-  \lstinline@Prelude@ exports the following type alias:
+  desugars to the list \lstinline@['H', 'e', 'l', 'l', 'o']@. The standard
+  librady exports the following type alias:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type String = [Char]
@@ -392,8 +390,8 @@
     olleh = reverse "Hello"
   \end{lstlisting}
 
-  In addition to all the list operations, the \lstinline@Prelude@ module exports
-  the following functions designed specifically to work with strings:
+  In addition to all the list operations, the following functions designed
+  specifically to work with strings:
 
   \begin{itemize}
     \item \lstinline@lines :: String -> [String]@: splits a string up into a
@@ -446,8 +444,8 @@
 
   The functions \lstinline@complexRe@ and \lstinline@complexIm@ defined on the
   successive lines are what are called \emph{accessors}. Both definitions use
-  pattern matching to extract the required component; the underscore pattern
-  \lstinline@_@ is used to mark an ignored matched value.
+  pattern matching to extract the required component; the wildcard pattern
+  \lstinline@_@ is used to mark an ignored value.
 
   As accessors are commonly required, an alternative way of defining the same
   data type is with \emph{record syntax}. This way, accessors are automatically
@@ -477,7 +475,7 @@
   evaluate to \lstinline@True@.
 
   Two very useful algebraic data types are provided Haskell's standard library
-  are (for simplicity, deriving clauses are omitted):
+  are listed below; for simplicity, deriving clauses are omitted.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Maybe a
@@ -489,16 +487,16 @@
       | Right b
   \end{lstlisting}
 
-  In this case, both \lstinline@Maybe@ and \lstinline@Either@ are called
-  \emph{type constructors}, as they are paramaterized by type variables:
-  \lstinline@Maybe@ takes a single parameter \lstinline@a@, while
-  \lstinline@Either@ takes two parameters \lstinline@a@ and \lstinline@b@.
-  Syntactically, type variables are distinguished from type constructors by
-  casing: variables are lowercase, while constructors are uppercase.
+  Both \lstinline@Maybe@ and \lstinline@Either@ are called \emph{type
+  constructors}, as they are paramaterized by type variables: \lstinline@Maybe@
+  takes a single parameter \lstinline@a@, while \lstinline@Either@ takes two
+  parameters \lstinline@a@ and \lstinline@b@. Syntactically, type variables are
+  distinguished from type constructors by casing: variables are lowercase, while
+  constructors are uppercase.
 
   \lstinline@Maybe@ encapsulates an optional value; a value of type
-  \lstinline@Maybe a@ is either empty (represented as \lstinline@Nothing@), or
-  it a value of type \lstinline@a@ (represented as \lstinline@Just a@).
+  \lstinline@Maybe a@ is either empty (represented as \lstinline@Nothing@), or a
+  value of type \lstinline@a@ (represented as \lstinline@Just a@).
   \lstinline@Either@ represents values of two possibilities; a value of type
   \lstinline@Either a b@ is either \lstinline@Left a@ or \lstinline@Right b@.
 
@@ -511,8 +509,8 @@
   hold by \lstinline@Left@.
 
   To illustrate how pattern matching can be used with algebraic data types,
-  implementations of a few utility functions from the
-  \lstinline@Data.Maybe@ module are listed below.
+  implementations of a few utility functions from Haskell's standard library
+  are listed below.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     isJust :: Maybe a -> Bool
@@ -531,12 +529,11 @@
     fromMaybe _ (Just x) = x
   \end{lstlisting}
 
-  The \lstinline@Prelude@ exports a very useful function operating on
-  association lists: \lstinline@lookup@. Given a list of key-value pairs
-  \lstinline@(a, b)@, this function looks up the value corresponding to a given
-  key, if any. If no value is found, \lstinline@Nothing@ is returned---this
-  illustrates how the algebraic data type \lstinline@Maybe@ can be used to
-  indicate nullability.
+  The standard library exports very useful function operating on association
+  lists: \lstinline@lookup@. Given a list of key-value pairs \lstinline@(a, b)@,
+  this function looks up the value corresponding to a given key, if any. If no
+  value is found, \lstinline@Nothing@ is returned---this illustrates how the
+  algebraic data type \lstinline@Maybe@ can be used to indicate nullability.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookup :: Eq a => a -> [(a, b)] -> Maybe b
@@ -641,7 +638,7 @@
   Besides \lstinline@foldr@, another commonly used higher order functionprovided
   by the standard library is \lstinline@fmap@. Given a list, \lstinline@fmap@
   returns a new list obtained by applying a given input function to all elements
-  of the list. \lstinline@fmap@ can be for lists implemented in terms of
+  of the list. For lists, \lstinline@fmap@ can be implemented in terms of
   \lstinline@foldr@:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -651,14 +648,6 @@
 
   With \lstinline@mapList@, one can for instance double all the numbers in a
   list:
-
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    doubleList :: Num a => [a] -> [a]
-    doubleList xs = mapList (\x -> 2 * x) xs
-  \end{lstlisting}
-
-  Using the \emph{section} \lstinline@(2 *)@, \lstinline@doubleList@ can be more
-  succinctly be expressed as:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     doubleList :: Num a => [a] -> [a]
@@ -706,8 +695,8 @@
   frequently employ this operator; to avoid any doubts, I'll avoid using it
   unless necessary.
 
-  Haskell's standard library base exposes many other higher order functions and
-  operators; these are all documented at
+  Haskell's standard library \lstinline@base@ exposes many other higher order
+  functions and operators; these are all documented at
   \lstinline@https://hackage.haskell.org/package/base@. It would be impractical
   to describe them all; rather, I'll let the reader look up the documentation if
   necessary. Hoogle, found at
@@ -777,7 +766,7 @@
     instance Functor [] where
       fmap :: (a -> b) -> [a] -> [b]
       fmap _ [] = []
-      fmap f (x : xs) = f x : map f xs
+      fmap f (x : xs) = f x : fmap f xs
   \end{lstlisting}
 
   Another example of a functor is \lstinline@Either@. Recall that this algebraic
@@ -816,9 +805,9 @@
   the two operators; if neither \lstinline@(==)@ nor \lstinline@(/=)@ are
   provided, then both will loop. Primitive datatypes are instance of this class.
 
-  Instances for the \lstinline@Eq@ are usually generated via deriving
-  declaraions as explained in earlier sections. Of course, such implementations
-  can be written by hand; for example:
+  Instances for the \lstinline@Eq@ are usually generated via
+  \lstinline@deriving@ declaraions as explained in earlier sections. Of course,
+  such implementations can be written by hand; for example:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Eq Complex where
@@ -961,7 +950,7 @@
   \lstinline@a -> b@, into \lstinline@f a -> f b@. The \lstinline@Applicative@
   class extends this notion by providing the method \lstinline@liftA2@ which
   lifts a binary function \lstinline@a -> b -> c@ into
-  \lstinline@f a -> f b -> fc@. Further, it provides \lstinline@pure@ to lift
+  \lstinline@f a -> f b -> f c@. Further, it provides \lstinline@pure@ to lift
   a value \lstinline@a@ into \lstinline@f a@. The functions \lstinline@(<*>)@,
   \lstinline@(*>)@, \lstinline@(<*)@ can be derived in terms of
   \lstinline@liftA2@.
@@ -978,7 +967,7 @@
 
   An overloaded function \lstinline@(+)@ working on \lstinline@Maybe@s would
   help to decrease verobosity; alas, such an operator isn't defined. Complex
-  programs working with multitudes of functions would need to employ lots of
+  programs working with multitudes of data types would need to employ lots of
   pattern matching to work with lifted values. This is the use case of the
   higher order function \lstinline@liftA2@:
 
@@ -999,9 +988,9 @@
   regular application of the operator \lstinline@(+)@ in the form of
   \lstinline@(+) mx my@. While the implementation for \lstinline@sum2Maybes'@ is
   somewhat more complex than \lstinline@sum2Maybes@---using two higher order
-  functions instead of one---it is more general than the \lstinline@liftA2@
-  approach. In fact, using \lstinline@(<$>)@ and \lstinline@(<*>)@, functions of
-  any arity can be lifted and applied:
+  functions instead of one---it is syntactically more general than the
+  \lstinline@liftA2@ approach. In fact, using \lstinline@(<$>)@ and
+  \lstinline@(<*>)@, functions of any arity can be lifted and applied:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum3Maybes :: Num a => Maybe a -> Maybe a -> Maybe a -> Maybe a
@@ -1027,7 +1016,7 @@
 
   Here, \lstinline@()@ is the empty tuple, also known as \emph{unit}; its value
   is ignored by the function lifted by \lstinline@liftA2@. Using
-  \lstinline@const x _ = x@ as defined in the \lstinline@Prelude@,
+  \lstinline@const x _ = x@ as defined Haskell's standard library,
   \lstinline@amap@ can be simplified to:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -1161,7 +1150,10 @@
         GT -> putStrLn "n > 0"
   \end{lstlisting}
 
-  TODO
+  With \lstinline@do@ notation, programs of arbitrary complexity can be written.
+  In fact, as long as imperative loops aren't required, programming in Haskell
+  is even more succint than languages which mainly focus on imperative style
+  programming:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Numeric
@@ -1188,10 +1180,10 @@
         putStrLn "Solutions:"
 
         if x1 /= x2 then do
-          putStrLn (showString "x1 = " . showFFloat Nothing x1 $ "")
-          putStrLn (showString "x2 = " . showFFloat Nothing x2 $ "")
+          putStrLn (showString "x1 = " (showFFloat Nothing x1 ""))
+          putStrLn (showString "x2 = " (showFFloat Nothing x2 ""))
         else
-          putStrLn (showString "x1 = x2 = " . showFFloat Nothing x1 $ "")
+          putStrLn (showString "x1 = x2 = " (showFFloat Nothing x1 ""))
   \end{lstlisting}
 
   \chapter{Parsing and processing languages}
