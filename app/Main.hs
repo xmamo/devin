@@ -54,7 +54,7 @@ main :: IO ()
 main = do
   setEnv "LC_ALL" "POSIX"
 
-  Gtk.applicationNew Nothing [] >>= \case
+  Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
     Nothing -> exitFailure
 
     Just application -> do
@@ -136,7 +136,7 @@ onActivate application = do
   Gtk.boxPackStart box paned2 True True 0
 
   window <- Gtk.applicationWindowNew application
-  Gtk.windowSetTitle window Text.empty
+  Gtk.windowSetTitle window ""
   Gtk.windowSetDefaultSize window 1280 720
   Gtk.containerAdd window box
 

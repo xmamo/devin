@@ -1053,7 +1053,7 @@
     liftM2 f mx my = mx >>= \x -> my >>= \y -> return (f x y)
   \end{lstlisting}
 
-  \section{Imperative style programming}
+  \section{Basic input and output}
 
   Let's implement a very simple program which performs the following
   computation:
@@ -1185,6 +1185,76 @@
         else
           putStrLn (showString "x1 = x2 = " (showFFloat Nothing x1 ""))
   \end{lstlisting}
+
+  \section{Imperative style programming}
+
+  With the power of monads, Haskell allows for imperative lookining code to be
+  expressed. Emphasis on \emph{looking}: there's no actual imperative control
+  flow; rather, referetially transparent representations of computations are
+  bound together with \lstinline@(>>=)@.
+
+  While imperative style programming is always an option, it should be preferred
+  to code in other ways, as Haskell doesn't have any syntax for constructs such
+  as while- or for-loops; even if higher order functions can be used to get
+  equivalent functionality, it is often times clumsy doing so.
+
+  As an example, consider, yet again, the function for computing the factorial
+  of a number. With the \lstinline@ST@ monad from the standard library, it is
+  possible to encode mutable references; these are encapsulated by the type
+  \lstinline@STRef s a@. The following operations are supported:
+
+  \begin{itemize}
+    \item \lstinline@newSTRef :: a -> ST s (STRef s a)@: build a new
+    \lstinline@STRef@ in the current \lstinline@ST@ monad;
+
+    \item \lstinline@readSTRef :: STRef s a -> ST s a@: read the value of an
+    \lstinline@STRef@;
+
+    \item \lstinline@writeSTRef :: STRef s a -> a -> ST s ()@: write a new value
+    into an \lstinline@STRef@;
+
+    \item \lstinline@modifySTRef :: STRef s a -> (a -> a) -> ST s ()@: mutate an
+    \lstinline@STRef@.
+  \end{itemize}
+
+  With these, \lstinline@factorial :: Integral a => a -> a@ can be implemented
+  in terms of a helper function, say
+  \lstinline@factorialST :: Integral a => a -> ST s a@. The latter operates
+  within the \lstinline@ST@ monad and uses the functions described above, while
+  the former is the one to be used by callers: it hides implementation details
+  by computing the value produced by the \lstinline@ST@ monad through
+  \lstinline@runST :: (forall s. ST s a) -> a@. Readers may safely ignore the
+  exact meaning of the provided function signatures, especially considering that
+  \lstinline@runST@ employs something called \emph{existensials} through the
+  keyword \lstinline@forall@. Apart fromm this example, I won't use or mention
+  existentials again.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    import Control.Monad.ST
+    import Data.STRef
+
+    factorial :: Integral a => a -> a
+    factorial n = runST (factorialST n)
+
+    factorialST :: Integral a => a -> ST s a
+    factorialST n = do
+      accRef <- newSTRef 1
+      go accRef n
+      readSTRef accRef
+
+      where
+        go _ 0 = pure ()
+
+        go accRef i | i > 0 = do
+          modifySTRef accRef (* i)
+          go accRef (i - 1)
+  \end{lstlisting}
+
+  The function \lstinline@factorialST@ may be read as follows: create a new
+  mutable reference called \lstinline@accRef@ and initialize it to
+  \lstinline@1@, call \lstinline@go@, and return the updated value of
+  \lstinline@accRef@. The helper \lstinline@go@ updates the accumulator
+  \lstinline@accRef@, iterating from \lstinline@n@ downwards.
 
   \chapter{Parsing and processing languages}
 
