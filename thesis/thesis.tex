@@ -409,6 +409,7 @@
   \end{itemize}
 
   \section{User defined types, \texttt{Maybe} and \texttt{Either}}
+  \label{section:udt}
 
   While lists and tuples are certainly useful, Haskell of course allows the
   definition of new data types. This form of abstraction improves upon the use
@@ -1255,6 +1256,113 @@
   \lstinline@1@, call \lstinline@go@, and return the updated value of
   \lstinline@accRef@. The helper \lstinline@go@ updates the accumulator
   \lstinline@accRef@, iterating from \lstinline@n@ downwards.
+
+  \section{Aside: desugaring type classes}
+
+  Before moving on to the next chapter, I want to mention an interesting aspect
+  most Haskell textbooks fail to mention: that is, how type classes may be
+  implemented by the compiler.
+
+  Type classes are, of course, an abstraction supported by Haskell at its core.
+  As such, this section discusses \emph{one} possible implementation strategy.
+  Even if this strategy would turn out not be used by compilers, this model
+  gives profound understanding on how type classes work and which problems they
+  solve.
+
+  Let's examine one application of the \lstinline@Eq@ type class again: looking
+  up for key in an association lists. Remember, the \lstinline@Eq@ class and
+  \lstinline@lookup@ function are defined as follows:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    class Eq a where
+      (==) :: a -> a -> Bool
+      x == y = not (x /= y)
+
+      (/=) :: a -> a -> Bool
+      x /= y = not (x == y)
+
+    lookup :: Eq a => a -> [(a, b)] -> Maybe b
+    lookup _ [] = Nothing
+    lookup key ((k, v) : _) | key == k = Just v
+    lookup key (_ : xs) = lookup key xs
+  \end{lstlisting}
+
+  Lookup requires \lstinline@(==)@ and \lstinline@(/=)@ to be implemented for
+  the key type \lstinline@a@ of the association list \lstinline@[(a, b)]@. It is
+  a compile time error to use \lstinline@lookup@ if this constraint isn't met.
+
+  How would such function operate without built-in type classes? The key insight
+  is to consider constrains to be implicitly passed parameters; with this model,
+  the \lstinline@Eq@ type class desugars into a record of functions:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    data Eq a = Eq {
+      (==) :: a -> a -> Bool,
+      (/=) :: a -> a -> Bool
+    }
+
+    lookup :: Eq a -> a -> [(a, b)] -> Maybe b
+    lookup _ _ [] = Nothing
+    lookup (Eq (==) _) key ((k, v) : _) | key == k = Just v
+    lookup eq key (_ : xs) = lookup eq key xs
+  \end{lstlisting}
+
+  If type classes become record types, it follows that type class instances
+  become record values. An \lstinline@Eq@ instance for the algebraic data type
+  \lstinline@Grade@ of section~\ref{section:udt} can be defined as:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    gradeEqInstance :: Eq Grade
+    gradeEqInstance = Eq f g
+      where
+        f :: Grade -> Grade -> Bool
+        f F F = True
+        f D D = True
+        f C C = True
+        f B B = True
+        f A A = True
+        f _ _ = False
+
+        g :: Grade -> Grade -> Bool
+        g x y = not (f x y)
+  \end{lstlisting}
+
+  Finally, many instances can be generated in terms of others:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    maybeEqInstanceGivenEq :: Eq a -> Eq (Maybe a)
+    maybeEqInstanceGivenEq (Eq (==) (/=)) = Eq f g
+      where
+        f :: Maybe a -> Maybe a -> Bool
+        f Nothing Nothing = True
+        f (Just x) (Just y) = x == y
+        f _ _ = False
+
+        g :: Maybe a -> Maybe a -> Bool
+        g Nothing Nothing = False
+        g (Just x) (Just y) = x /= y
+        g _ _ = True
+  \end{lstlisting}
+
+  This, of course, is the desugared version of:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    instance Eq a => Eq (Maybe a) where
+      (==) :: Maybe a -> Maybe a -> Bool
+      Nothing == Nothing = True
+      Just x == Just y = x == y
+      _ == _ = False
+
+      (/=) :: Maybe a -> Maybe a -> Bool
+      Nothing /= Nothing = False
+      Just x /= Just y = x /= y
+      _ /= _ = True
+  \end{lstlisting}
+
+  Much more can be said about this model of type classes. As this is not the
+  subject of this thesis, I'll just mention the fact that this implementation
+  technique is called \emph{dictionary passing style}. I suggest readers to
+  investigate the subject further if interested.
 
   \chapter{Parsing and processing languages}
 
