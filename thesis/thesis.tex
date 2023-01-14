@@ -1028,7 +1028,7 @@
   Extending \lstinline@Applicative@, there's the \lstinline@Monad@ type class.
   It defines the \emph{bind operator} \lstinline@(>>=)@, along with
   \lstinline@(>>)@ and \lstinline@return@. These last two functions are
-  maintained for backwards compatibility and can be ignored by the reader.
+  maintained for backwards compatibility and can be ignored by readers.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     class Applicative m => Monad m where
@@ -1056,8 +1056,7 @@
 
   \section{Basic input and output}
 
-  Let's implement a very simple program which performs the following
-  computation:
+  Let's implement a very simple program which performs the following task:
 
   \begin{enumerate}
     \item Prompt the user to insert a number by printing \lstinline@n := @ to
@@ -1134,9 +1133,9 @@
             GT -> putStrLn "n > 0"
   \end{lstlisting}
 
-  As can be noted, the monadic interface allows for imperative looking code to
-  be written: the listing above already resembles the implementation in Java.
-  Unsing syntactic sugar in the form of Haskell's \lstinline@do@ notation,
+  As can be seen, the monadic interface allows for imperative looking code to be
+  written: the listing above already resembles the implementation in Java.
+  Unsing syntactic sugar in the form of Haskell's \emph{do expressions},
   \lstinline@main@ can be expressed in a more readable way as:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -1151,14 +1150,12 @@
         GT -> putStrLn "n > 0"
   \end{lstlisting}
 
-  With \lstinline@do@ notation, programs of arbitrary complexity can be written.
-  In fact, as long as imperative loops aren't required, programming in Haskell
-  is even more succint than languages which mainly focus on imperative style
+  With this notation, programs of arbitrary complexity can be written. In fact,
+  as long as imperative loops aren't required, programming in Haskell is even
+  more succint than languages which mainly focus on imperative style
   programming:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    import Numeric
-
     main :: IO ()
     main = do
       putStrLn "Terms of the quadratic equation:"
@@ -1181,10 +1178,23 @@
         putStrLn "Solutions:"
 
         if x1 /= x2 then do
-          putStrLn (showString "x1 = " (showFFloat Nothing x1 ""))
-          putStrLn (showString "x2 = " (showFFloat Nothing x2 ""))
+          putStrLn ("x1 = " ++ show x1)
+          putStrLn ("x2 = " ++ show x2)
         else
-          putStrLn (showString "x1 = x2 = " (showFFloat Nothing x1 ""))
+          putStrLn ("x1 = x2 = " ++ show x1)
+  \end{lstlisting}
+
+  Note that \lstinline@readLn :: Read a => IO a@ is polymorphic and may read
+  values of any type from standard input. While the preceding examples compile
+  without problems, it may sometimes be necessary to add type annotations when
+  the desired output type of \lstinline@readLn@ can't be inferred:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    main :: IO ()
+    main = do
+      putStr "n := "
+      n <- readLn :: IO Integer
+      putStrLn ("n + 1 = " ++ show (succ n))
   \end{lstlisting}
 
   \section{Imperative style programming}
@@ -1225,10 +1235,7 @@
   the former is the one to be used by callers: it hides implementation details
   by computing the value produced by the \lstinline@ST@ monad through
   \lstinline@runST :: (forall s. ST s a) -> a@. Readers may safely ignore the
-  exact meaning of the provided function signatures, especially considering that
-  \lstinline@runST@ employs something called \emph{existensials} through the
-  keyword \lstinline@forall@. Apart fromm this example, I won't use or mention
-  existentials again.
+  exact meaning of the provided function signatures.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Control.Monad.ST
@@ -1251,11 +1258,143 @@
           go accRef (i - 1)
   \end{lstlisting}
 
-  The function \lstinline@factorialST@ may be read as follows: create a new
+  The function \lstinline@factorialST@ can be read as follows: create a new
   mutable reference called \lstinline@accRef@ and initialize it to
   \lstinline@1@, call \lstinline@go@, and return the updated value of
   \lstinline@accRef@. The helper \lstinline@go@ updates the accumulator
   \lstinline@accRef@, iterating from \lstinline@n@ downwards.
+
+  \section{Importing and creating modules}
+
+  In the previous section, I used import declarations to gain access to
+  functions and types provided in the \lstinline@Control.Monad.ST@ and
+  \lstinline@Data.STRef@ modules. Like most languages, Haskell provides a
+  namespacing mechanism; while in Java there is \lstinline@package@ and
+  \lstinline@import@, in C++ \lstinline@namespace@ and
+  \lstinline@using namespace@, in Haskell there is \lstinline@module@ and
+  \lstinline@import@.
+
+  Haskell's standard library is called \lstinline@base@; it provides many
+  modules, each one exporting any amount of functions, types and type classes.
+  Haskell's compiler implicitly imports the module named \lstinline@Prelude@;
+  thus, most of the functions and types described in earlier sections come from
+  \lstinline@base@'s \lstinline@Prelude@ module.
+
+  Entities exported by modules can be brought into scope via import
+  declarations. Let's consider the \lstinline@Data.List@ module from the
+  \lstinline@base@ package: this module exports additional functions to be used
+  on lists besides the ones exported by \lstinline@Prelude@; one of these is
+  \lstinline@nub :: Eq a => [a] -> [a]@, which removes duplicate elements from a
+  list.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    import qualified Data.List
+
+    main :: IO ()
+    main = do
+      putStrLn "Please insert a sequence of items delimited by white space."
+      input <- getLine
+      putStrLn ""
+      putStrLn "Without duplicates, the items are:"
+      putStrLn (unwords (Data.List.nub (words input)))
+  \end{lstlisting}
+
+  The function \lstinline@words@ from the \lstinline@Prelude@ splits a string on
+  white space; its dual, \lstinline@unwords@, joins a list of strings with
+  separating spaces.
+
+  Imported modules may be assigned an alias using the \lstinline@as@ clause:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    import qualified Data.List as L
+
+    main :: IO ()
+    main = do
+      putStrLn "Please insert a sequence of items delimited by white space."
+      input <- getLine
+      putStrLn ""
+      putStrLn "Without duplicates, the items are:"
+      putStrLn (unwords (L.nub (words input)))
+  \end{lstlisting}
+
+  Entities from another module can also be imported in an unqualified manner,
+  by omitting the \lstinline@qualified@ keyword and \lstinline@as@ clause:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    import Data.List
+
+    main :: IO ()
+    main = do
+      putStrLn "Please insert a sequence of items delimited by white space."
+      input <- getLine
+      putStrLn ""
+      putStrLn "Without duplicates, the items are:"
+      putStrLn (unwords (nub (words input)))
+  \end{lstlisting}
+
+  Let's move on to defining modules. Consider the implementation of a
+  \lstinline@Triangle2D@ module exporting types and functions to operate on
+  triangles defined on the Euclidean plane:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    {-# LANGUAGE InstanceSigs #-}
+
+    module Triangle2D (Triangle (..), perimeter, area) where
+
+    import Data.List (permutations)
+
+    data Triangle a = Triangle {x1, y1, x2, y2, x3, y3 :: a}
+      deriving (Show, Read)
+
+    instance Eq a => Eq (Triangle a) where
+      (==) :: Triangle a -> Triangle a -> Bool
+      Triangle x11 y11 x12 y12 x13 y13 == Triangle x21 y21 x22 y22 x23 y23 =
+        elem
+          [(x11, y11), (x12, y12), (x13, y13)]
+          (permutations [(x21, y21), (x22, y22), (x23, y23)])
+
+    perimeter :: Floating a => Triangle a -> a
+    perimeter (Triangle x1 y1 x2 y2 x3 y3) = a + b + c
+      where
+        a = segmentLength x1 y1 x2 y2
+        b = segmentLength x2 y2 x3 y3
+        c = segmentLength x3 y3 x1 y1
+
+    area :: Floating a => Triangle a -> a
+    area (Triangle x1 y1 x2 y2 x3 y3) = sqrt (s * (s - a) * (s - b) * (s - c))
+      where
+        s = (a + b + c) / 2
+        a = segmentLength x1 y1 x2 y2
+        b = segmentLength x2 y2 x3 y3
+        c = segmentLength x3 y3 x1 y1
+
+    segmentLength :: Floating a => a -> a -> a -> a -> a
+    segmentLength x1 y1 x2 y2 = sqrt ((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
+  \end{lstlisting}
+
+  The header
+  \lstinline@module Triangle2D (Triangle (..), perimeter, area) where@ declares
+  the name of the module being defined and the list of entities to be exported.
+  Note that the function \lstinline@segmentLength@ is not exported from the
+  \lstinline@Triangle2D@ module.
+
+  The module header is followed by the import declaration
+  \lstinline@import Data.List@, which, among others, brings the function
+  \lstinline@permutations@ into scope.
+
+  The import declaration is followed by a set top-level declarations: one data
+  declaration, one instance declaration, and three function bindings.
+  Implementations of \lstinline@perimeter@ and \lstinline@segmentLength@ are
+  trivial and don't require further explanation; the \lstinline@area@ function
+  computes its result using Heron's formula
+  $A = \sqrt{s \left(s - a\right) \left(s - b\right) \left(s - c\right)}$, where
+  $s = \frac{1}{2} \left(a + b + c\right)$ is the triangle's semiperimeter. The
+  \lstinline@Eq@ instance for \lstinline@Triangle@ verifies that the vertices of
+  one triangle equal the vertices of the other, independently of their order;
+  to do so, the functions
+  \lstinline@elem :: (Foldable t, Eq a) => a -> t a -> Bool@ from
+  \lstinline@Prelude@ and \lstinline@permutations :: [a] -> [[a]]@ from
+  \lstinline@Data.List@ are used.
 
   \section{Aside: desugaring type classes}
 
@@ -1315,7 +1454,6 @@
     gradeEqInstance :: Eq Grade
     gradeEqInstance = Eq f g
       where
-        f :: Grade -> Grade -> Bool
         f F F = True
         f D D = True
         f C C = True
@@ -1323,7 +1461,6 @@
         f A A = True
         f _ _ = False
 
-        g :: Grade -> Grade -> Bool
         g x y = not (f x y)
   \end{lstlisting}
 
@@ -1333,12 +1470,10 @@
     maybeEqInstanceGivenEq :: Eq a -> Eq (Maybe a)
     maybeEqInstanceGivenEq (Eq (==) (/=)) = Eq f g
       where
-        f :: Maybe a -> Maybe a -> Bool
         f Nothing Nothing = True
         f (Just x) (Just y) = x == y
         f _ _ = False
 
-        g :: Maybe a -> Maybe a -> Bool
         g Nothing Nothing = False
         g (Just x) (Just y) = x /= y
         g _ _ = True
@@ -1348,12 +1483,10 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Eq a => Eq (Maybe a) where
-      (==) :: Maybe a -> Maybe a -> Bool
       Nothing == Nothing = True
       Just x == Just y = x == y
       _ == _ = False
 
-      (/=) :: Maybe a -> Maybe a -> Bool
       Nothing /= Nothing = False
       Just x /= Just y = x /= y
       _ /= _ = True
