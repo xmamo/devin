@@ -111,13 +111,13 @@
   \lstinline@b@ can be defined as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    pythagoras = \a b -> sqrt (a * a + b * b)
+    pythagoras = \x y -> sqrt (x ^ 2  + y ^ 2)
   \end{lstlisting}
 
   This binds the name \lstinline@pythagoras@ to a function of two arguments
   which applies Pythagoras' theorem. The symbol \lstinline@\@ is pronounced
   \emph{lambda}, as the notation recalls the one used in lambda calculus:
-  $\lambda a b . \sqrt{a^2 + b^2}$.
+  $\lambda x y . \sqrt{x^2 + y^2}$.
 
   As we'll see, Haskell functions are first class citizens: they can be used
   like ordinary values. The syntax used above makes this explicit, as
@@ -125,11 +125,11 @@
   syntactic sugar allows an equivalent definition:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    pythagoras a b = sqrt (a * a + b * b)
+    pythagoras x y = sqrt (x ^ 2 + y ^ 2)
   \end{lstlisting}
 
   Haskell is a \emph{statically typed}. In the definition for
-  \lstinline@pythagoras@, \lstinline@a@ and \lstinline@b@ must support
+  \lstinline@pythagoras@, \lstinline@x@ and \lstinline@y@ must support
   multiplication, addition and exponentiation; thus, the compiler infers that
   they must be floating-point numbers. Explicit type annotations can be
   provided: in fact, top level definitions conventionally include them for
@@ -137,7 +137,7 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     pythagoras :: Floating a => a -> a -> a
-    pythagoras a b = sqrt (a * a + b * b)
+    pythagoras x y = sqrt (x ^ 2 + y ^ 2)
   \end{lstlisting}
 
   The type annotation specifies that, given any type \lstinline@a@ which
@@ -1053,6 +1053,49 @@
     liftM2 :: Monad m => (a -> b -> c) -> m a -> m b -> m c
     liftM2 f mx my = mx >>= \x -> my >>= \y -> return (f x y)
   \end{lstlisting}
+
+  \section{Behind the syntax of function types}
+
+  As mentioned, the definition
+  \lstinline@pythagoras x y = sqrt (x ^ 2 + y ^ 2)@ is synctactic sugar for
+  \lstinline@pythagoras = \x y -> sqrt (x ^ 2 + y ^ 2)@. This definition can be
+  further be desugared into the following:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    pythagoras :: Floating a => a -> a -> a
+    pythagoras = \x -> \y -> sqrt (x ^ 2 + y ^ 2)
+  \end{lstlisting}
+
+  Thus, if \lstinline@a@ is an instance of the type class \lstinline@Floating@,
+  \lstinline@pythagoras@ is in fact a function of argument \lstinline@x : a@
+  which yields a closure of argument \lstinline@y : a@ which evaluates the
+  expression \lstinline@sqrt (x ^ 2 + y ^ 2)@; in other words, there is no
+  concept of functions with multiple arguments in Haskell! This explains why in
+  \lstinline@pythagoras :: Floating a => a -> a -> a@ there's no apparent
+  distinction between parameter and return types: because the syntax mirrors how
+  function definitions are desugared.
+
+  Since \lstinline@(->)@ is right associative, the previous definition is also
+  equivalent to the following:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    pythagoras :: Floating a => a -> (a -> a)
+    pythagoras = \x -> (\y -> sqrt (x ^ 2 + y ^ 2))
+  \end{lstlisting}
+
+  Note that \lstinline@(->)@ doubles as a type constructor; given two types
+  \lstinline@a@ and \lstinline@b@, it constructs the function type
+  \lstinline@a -> b@. Thus, the following syntax can also be used:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    pythagoras :: Floating a => (->) a ((->) a a)
+    pythagoras = \a -> \b -> sqrt (a ^ 2 + b ^ 2)
+  \end{lstlisting}
+
+  It is worth mentioning that since \lstinline@(->)@ is a type constructor,
+  given any type \lstinline@r@, Haskell's standard library defines
+  \lstinline@Functor@, \lstinline@Applicative@ and \lstinline@Monad@ instances
+  for \lstinline@(->) r@. I won't make use such functionality in this thesis.
 
   \section{Basic input and output}
 
