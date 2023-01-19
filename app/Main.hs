@@ -350,7 +350,7 @@ onActivate application = do
                   \    <property name=\"text\">" ++ s''' ++ "</property>\n\
                   \    <property name=\"use-markup\">True</property>\n\
                   \  </object>\n\
-                  \</interface>"
+                  \</interface>\0"
 
             let buildFn = Gtk.getObject Gtk.MessageDialog "dialog"
             builder <- Gtk.builderNewFromString string -1
@@ -359,7 +359,6 @@ onActivate application = do
             Gtk.dialogRun dialog
             Gtk.widgetDestroy dialog
             Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
-
             cleanup
 
       cleanup = do

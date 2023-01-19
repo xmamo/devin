@@ -43,7 +43,6 @@
 }
 
 \lstset{
-  aboveskip=2\parskip,
   belowskip=0pt,
   basicstyle=\ttfamily,
   upquote=true,
@@ -79,7 +78,7 @@
 
   \chapter{Haskell programming}
 
-  This chapter is gives an overview of the Haskell programming language. I'll
+  This chapter gives an overview of the Haskell programming language. I'll
   assume the reader is familiar with any imperative programming language like C,
   C++ or Java.
 
@@ -245,7 +244,7 @@
   \lstinline@div@ and remainder via \lstinline@mod@. Two numbers \lstinline@x@
   and \lstinline@y@ of the same fractional type can be divided with
   \lstinline@x / y@. Further, many trigonometric, hyperbolic and related
-  functions like \lstinline@sin@, \lstinline@cos@ \lstinline@sqt@ and
+  functions like \lstinline@sin@, \lstinline@cos@, \lstinline@sqt@ and
   \lstinline@log@ are supported by the floating-point data types
   \lstinline@Float@ and \lstinline@Double@. More functions can be found in
   Haskell's standard library; most of them are described in the documentation.
@@ -263,13 +262,19 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type Vector2D = (Double, Double)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum2D :: Vector2D -> Vector2D -> Vector2D
     sum2D (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     dot2D :: Vector2D -> Vector2D -> Double
     dot2D (x1, y1) (x2, y2) = x1 * x2 + y1 * y2
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     magnitude2D :: Vector2D -> Double
     magnitude2D v = sqrt (dot2D v v)
   \end{lstlisting}
@@ -286,7 +291,9 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum2D :: Vector2D -> Vector2D -> Vector2D
     sum2D v1 v2 = (fst v1 + fst v2, snd v1 + snd v2)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     dot2D :: Vector2D -> Vector2D -> Double
     dot2D v1 v2 = fst v1 * fst v2 + snd v1 * snd v2
   \end{lstlisting}
@@ -314,7 +321,9 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     list3456 :: [Int]
     list3456 = 3 : list456
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     list123456 :: [Int]
     list123456 = [1, 2] ++ list3456
   \end{lstlisting}
@@ -421,10 +430,14 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Complex = Complex Double Double
       deriving (Eq, Show)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     complexRe :: Complex -> Double
     complexRe (Complex a _) = a
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     complexIm :: Complex -> Double
     complexIm (Complex _ b) = b
   \end{lstlisting}
@@ -481,7 +494,9 @@
     data Maybe a
       = Nothing
       | Just a
+    \end{lstlisting}
 
+    \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Either a b
       = Left a
       | Right b
@@ -516,14 +531,20 @@
     isJust :: Maybe a -> Bool
     isJust Nothing = False
     isJust (Just _) = True
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     isNothing :: Maybe a -> Bool
     isNothing Nothing = True
     isNothing (Just _) = False
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     fromJust :: Maybe a -> a
     fromJust (Just x) = x
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     fromMaybe :: a -> Maybe a -> a
     fromMaybe x Nothing = x
     fromMaybe _ (Just x) = x
@@ -558,7 +579,9 @@
     listSum :: Num a => [a] -> a
     listSum [] = 0
     listSum (x : xs) = x + sum xs
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listProduct :: Num a => [a] -> a
     listProduct [] = 1
     listProduct (x : xs) = x * product xs
@@ -582,10 +605,14 @@
     foldList :: (a -> b -> b) -> b -> [a] -> b
     foldList _ z [] = z
     foldList f z (x : xs) = f x (foldr f z xs)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listSum :: Num a => [a] -> a
     listSum xs = foldr (\x acc -> x + acc) 0 xs
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listProduct :: Num a => [a] -> a
     listProduct xs = foldr (\x acc -> x * acc) 1 xs
   \end{lstlisting}
@@ -597,7 +624,9 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listSum :: Num a => [a] -> a
     listSum xs = foldr (+) 0 xs
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listProduct :: Num a => [a] -> a
     listProduct xs = foldr (*) 1 xs
   \end{lstlisting}
@@ -615,7 +644,9 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum :: (Foldable t, Num a) => t a -> a
     sum xs = foldr (+) 0 xs
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     product :: (Foldable t, Num a) => t a -> a
     product xs = foldr (*) 1 xs
   \end{lstlisting}
@@ -683,7 +714,7 @@
   in through Haskell's type classes: a mechanism to allow for ad-hoc
   polymorphism.
 
-  As a firt example, the interface for objects which can be mapped over, called
+  As a first example, the interface for objects which can be mapped over, called
   \emph{functors} in category theory, can be described as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -721,7 +752,7 @@
   From the signature above, it is now apparent that \lstinline@fmap@ is a
   higher-order function mapping a value of type \lstinline@Maybe a@ to a value
   of type \lstinline@Maybe b@ using a given function \lstinline@a -> b@.
-  
+
   An equivalent interpretation is that \lstinline@fmap@ \emph{lifts} a unary
   function \lstinline@a -> b@ so that its argument and return types are wrapped
   by a \lstinline@Maybe@ type constructor: given some \lstinline@f :: a -> b@,
@@ -830,7 +861,9 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Ordering = LT | EQ | GT
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     class Eq a => Ord a where
       compare :: a -> a -> Ordering
       compare x y = if x == y then EQ else if x <= y then LT else GT
@@ -871,9 +904,7 @@
   avoid mentioning other laws to prevent confusion. As it happens, one must
   really try hard to come up with a data type with unlawful operations like the
   IEEE 754 committee did: in most cases, implementing a type class instance
-  satisfies its laws without thinking about them. Still, if the reader is
-  interested in reading about these laws, documentation for Haskell's
-  \lstinline@Prelude@ module is a good place to start.
+  satisfies its laws without thinking about them.
 
   \section{The \texttt{Functor}, \texttt{Applicative} and \texttt{Monad} type
   classes}
@@ -963,7 +994,9 @@
     sum3Maybes mx my mz = sum3 <$> mx <*> my <*> mz
       where
         sum3 x y z = x + y + z
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum4Maybes :: Num a => Maybe a -> Maybe a -> Maybe a -> Maybe a -> Maybe a
     sum4Maybes mx my mz mw = sum4 <$> mx <*> my <*> mz <*> mw
       where
@@ -1009,7 +1042,7 @@
 
   Monads are perhaps Haskell's greatest innovation; in the next section, I'll
   explain how the \lstinline@Monad@ type class turns out to be so useful.
-  
+
   The same way every applicative is a functor, every monad is an applicative;
   thus, all three classes are of great importance in the Haskell ecosystem. The
   listing below demonstrates how to derive \lstinline@liftA2@ in terms of just
@@ -1101,12 +1134,13 @@
                 int n = scanner.nextInt();
 
                 // Computation 3
-                if (n < 0)
+                if (n < 0) {
                     System.out.println("n < 0");
-                else if (n > 0)
+                } else if (n > 0) {
                     System.out.println("n > 0");
-                else
+                } else {
                     System.out.println("n = 0");
+                }
             }
         }
     }
@@ -1121,10 +1155,14 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     computation1 :: IO ()
     computation1 = putStr "n := "
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     computation2 :: IO Integer
     computation2 = readLn
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     computation3 :: Integer -> IO ()
     computation3 n = case compare n 0 of
       LT -> putStrLn "n < 0"
@@ -1172,10 +1210,13 @@
     main :: IO ()
     main = do
       putStrLn "Terms of the quadratic equation:"
+
       putStr "a := "
       a <- readLn
+
       putStr "b := "
       b <- readLn
+
       putStr "c := "
       c <- readLn
 
@@ -1253,10 +1294,14 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Control.Monad.ST
     import Data.STRef
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     factorial :: Integral a => a -> a
     factorial n = runST (factorialST n)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     factorialST :: Integral a => a -> ST s a
     factorialST n = do
       accRef <- newSTRef 1
@@ -1296,17 +1341,20 @@
   Entities exported by modules can be brought into scope via import
   declarations. Let's consider the \lstinline@Data.List@ module from the
   \lstinline@base@ package: this module exports additional functions to be used
-  on lists besides the ones exported by \lstinline@Prelude@; one of these is
+  on lists besides the ones provided by \lstinline@Prelude@; one of these is
   \lstinline@nub :: Eq a => [a] -> [a]@, which removes duplicate elements from a
-  list.
+  list:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import qualified Data.List
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     main :: IO ()
     main = do
       putStrLn "Please insert a sequence of items delimited by white space."
       input <- getLine
+
       putStrLn ""
       putStrLn "Without duplicates, the items are:"
       putStrLn (unwords (Data.List.nub (words input)))
@@ -1320,11 +1368,14 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import qualified Data.List as L
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     main :: IO ()
     main = do
       putStrLn "Please insert a sequence of items delimited by white space."
       input <- getLine
+
       putStrLn ""
       putStrLn "Without duplicates, the items are:"
       putStrLn (unwords (L.nub (words input)))
@@ -1335,11 +1386,14 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Data.List
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     main :: IO ()
     main = do
       putStrLn "Please insert a sequence of items delimited by white space."
       input <- getLine
+
       putStrLn ""
       putStrLn "Without duplicates, the items are:"
       putStrLn (unwords (nub (words input)))
@@ -1350,29 +1404,37 @@
   triangles defined on the Euclidean plane:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    {-# LANGUAGE InstanceSigs #-}
-
     module Triangle2D (Triangle (..), perimeter, area) where
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Data.List (permutations)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Triangle a = Triangle {x1, y1, x2, y2, x3, y3 :: a}
       deriving (Show, Read)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Eq a => Eq (Triangle a) where
       (==) :: Triangle a -> Triangle a -> Bool
       Triangle x11 y11 x12 y12 x13 y13 == Triangle x21 y21 x22 y22 x23 y23 =
         elem
           [(x11, y11), (x12, y12), (x13, y13)]
           (permutations [(x21, y21), (x22, y22), (x23, y23)])
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     perimeter :: Floating a => Triangle a -> a
     perimeter (Triangle x1 y1 x2 y2 x3 y3) = a + b + c
       where
         a = segmentLength x1 y1 x2 y2
         b = segmentLength x2 y2 x3 y3
         c = segmentLength x3 y3 x1 y1
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     area :: Floating a => Triangle a -> a
     area (Triangle x1 y1 x2 y2 x3 y3) = sqrt (s * (s - a) * (s - b) * (s - c))
       where
@@ -1380,7 +1442,9 @@
         a = segmentLength x1 y1 x2 y2
         b = segmentLength x2 y2 x3 y3
         c = segmentLength x3 y3 x1 y1
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     segmentLength :: Floating a => a -> a -> a -> a -> a
     segmentLength x1 y1 x2 y2 = sqrt ((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
   \end{lstlisting}
@@ -1432,7 +1496,9 @@
 
       (/=) :: a -> a -> Bool
       x /= y = not (x == y)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookup :: Eq a => a -> [(a, b)] -> Maybe b
     lookup _ [] = Nothing
     lookup key ((k, v) : _) | key == k = Just v
@@ -1452,7 +1518,9 @@
       (==) :: a -> a -> Bool,
       (/=) :: a -> a -> Bool
     }
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookup :: Eq a -> a -> [(a, b)] -> Maybe b
     lookup _ _ [] = Nothing
     lookup (Eq (==) _) key ((k, v) : _) | key == k = Just v
@@ -1512,23 +1580,26 @@
 
   \chapter{Parsing and processing languages}
 
+  Implementing programming languages is not a trivial matter; thus, it is
+  traditional to split up this task into a series of steps, or \emph{phases}.
   The first phase of any compiler or interpreter is called \emph{parsing}. Given
   an input string, it is determined if it conforms to some set of rules; if it
   does, a logical representation of the input is constructed.
 
   \section{Languages and grammars}
 
-  Consider a parser for arithmetic expressions. The input of the parser are
-  sequences of characters. Syntactically invalid strings like \lstinline@1+@ and
-  \lstinline@3//4@ get rejected; valid strings like \lstinline@2*(3+4)@ get
-  accepted.
+  Consider the process of parsing arithmetic expressions. Given a sequence of
+  characters as input, syntactically invalid strings like \lstinline@1+@ and
+  \lstinline@3//4@ have to be rejected, while valid strings like
+  \lstinline@2*(3+4)@ have to be accepted.
 
   The set of all possible inputs which a parser may accept is called the
   \emph{language} accepted by that parser. The set of rules which dictate which
-  inputs are accepted is called the \emph{grammar} of the language.
+  inputs are to be accepted is called the \emph{grammar} of the language.
 
-  The grammar for arithmetic expressions can be defined recursively, asserting
-  that an \emph{expression} is any of the following items:
+  For example, the grammar for arithmetic expressions can be defined
+  recursively, asserting that an \emph{expression} is any of the following
+  items:
 
   \begin{itemize}
     \item Any sequence of characters representing a number is a \emph{literal
@@ -1566,10 +1637,16 @@
     \item \lstinline@2*(3+4)@ is a multiplicative expression.
   \end{itemize}
 
+  Once a grammar is specified, a parser for the language in question can be
+  defined. Crucially, the output of the parser has to be a structure which is
+  easy to manipulate in the following phases. For most implementations, the
+  output data structure is a tree.
+
   \section{Syntax tree}
 
-  When a parser accepts an input, a \emph{syntax tree} is built. It is a data
-  structure which represents the syntactic structure of the accepted string.
+  The syntactic structure of a string accepted by a parser is represented by a a
+  \emph{syntax tree}. In literature, two cathegories are usually defined:
+  \emph{concrete} and \emph{abstract} syntax trees.
 
   A syntax tree that retains all information necessary to identically
   reconstruct the original input it is called a \emph{concrete} syntax tree.
@@ -1587,11 +1664,12 @@
   \begin{figure}[h]
     \centering
 
+    \usetikzlibrary {shapes.misc}
+
     \begin{tabular}{cc}
       \begin{tikzpicture}[
-        every node/.style={circle,draw},
-        execute at begin node=\begin{ttfamily}\strut,
-        execute at end node=\strut\end{ttfamily}
+        semithick,
+        every node/.style={circle,draw,font=\ttfamily}
       ]
         \node {+}
           child {node {2}}
@@ -1605,9 +1683,8 @@
       \end{tikzpicture} &
 
       \begin{tikzpicture}[
-        every node/.style={circle,draw},
-        execute at begin node=\begin{ttfamily}\strut,
-        execute at end node=\strut\end{ttfamily}
+        semithick,
+        every node/.style={circle,draw,font=\ttfamily}
       ]
         \node {+}
           child {node {2}}
@@ -1631,7 +1708,6 @@
   \emph{syntax tree}.
 
   \section{Parser combinators}
-  % \label{section:parsercombinators}
 
   There are many ways to recognize some input and generate an associated syntax
   tree. There has been much academic research, and there are many readily
@@ -1753,10 +1829,6 @@
   languages, but also the structure of markup or other kinds of languages. For
   the purposes of this thesis, I'll discuss the processing of programming
   languages only.
-
-  % \chapter{The GTK library}
-
-  % TODO
 
   \chapter{The Devin programming language}
 
@@ -2044,14 +2116,8 @@
   including blocks nested within other blocks. Variables are lexically scoped:
   they can't be accessed from outside the block they are defined in. As in C, a
   block consists of a sequence of statements wrapped between a pair of curly
-  braces (\lstinline@{@, \lstinline@}@).
-
-  Statements are always terminated with semicolons. Empty statements are
-  disallowed: in other words, a semicolon on its own is not a valid statement.
-
-  % TODO: io terrei i commenti nel listing, in quanto hanno senso in questa
-  % sezione (Variable definitions and scoping). Aggiungerò però una sezione
-  % aggiuntiva sullo scoping nell'introduzione.
+  braces (\lstinline@{@, \lstinline@}@). Statements are always terminated with
+  semicolons.
 
   \begin{lstlisting}[
     float=h,
@@ -2093,11 +2159,6 @@
   predicate and $s_1$ and $s_2$ are statements.
 
   \subsection{Assertions}
-
-  % TODO: non è necessario aggiungere "should". Anche Rust spiega gli assert
-  % in maniera simile: "Asserts that a boolean expression is true at runtime."
-  % (https://doc.rust-lang.org/std/macro.assert.html). Ho però esplicitato
-  % che è un errore se il predicato è falso.
 
   Devin provides a mechanism for asserting that predicates evaluate to
   \lstinline@true@ at runtime; if they are not, an error is generated, causing
@@ -2154,6 +2215,7 @@
   \end{lstlisting}
 
   \section{Editor features}
+  \label{section:editorfeatures}
 
   Devin is bundled with a code editing UI built upon GTK+, a popular library for
   creating graphical user interfaces. GTK+ works on Windows, macOS and many
@@ -2167,7 +2229,7 @@
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\textwidth]{4.png}
+    \includegraphics[width=\textwidth]{4.png}
     \caption{Semantic error reporting and highlighting}
   \end{figure}
 
@@ -2200,7 +2262,7 @@
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\textwidth]{5.png}
+    \includegraphics[width=\textwidth]{5.png}
     \caption{The debugger displaying the current state of the stack}
   \end{figure}
 
@@ -2211,7 +2273,7 @@
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=0.9\textwidth]{6.png}
+    \includegraphics[width=\textwidth]{6.png}
     \caption{Runtime error reporting and highlighting}
   \end{figure}
 
@@ -2237,42 +2299,6 @@
 
   This design decision is largely inspired by how Haskell deals with numbers.
   Examples of other languages which lack implicit conversions are Go and Rust.
-
-  \subsection{Independence between evaluator and type checker}
-
-  As customary, type checking is followed by evaluation. While some data could
-  be computed during the first phase to be reused in the second, Devin's
-  implementation makes the type checker and the evaluator are independent; in
-  other words, evaluation doesn't require the type checker to be run at all. The
-  type checker's computed environment---the data structure binding identifiers
-  to variables and functions definitions---is not used by the evaluator.
-
-  This design decision makes it trivial to make Devin's evaluation functions
-  \emph{total}: every input tree can be mapped to some step of computation. It
-  is the step itself which, once evaluated, may fail.
-
-  \begin{figure}[h]
-    \centering
-
-    \begin{tikzpicture}[
-      execute at begin node=\begin{small}\strut,
-        execute at end node=\strut\end{small}
-    ]
-      \node(a){};
-      \node[ellipse,draw,right=1cm of a](parse){parse};
-      \node[ellipse,draw,above right=0.5cm and 2.6cm of parse](typecheck){type check};
-      \node[ellipse,draw,below right=0.5cm and 2.6cm of parse](evaluate){evaluate};
-      \node[right=2.4cm of typecheck](b){};
-      \node[right=0.8cm of evaluate](c){};
-      \draw[->] (a) to [edge label={text}] (parse);
-      \draw[->] (parse) to [edge label={syntax tree}, sloped] (typecheck);
-      \draw[->] (parse) to [edge label'={syntax tree}, sloped] (evaluate);
-      \draw[->] (typecheck) to [edge label={environment}, edge label'={ok/error}] (b);
-      \draw[->] (evaluate) to [edge label={etc.}] (c);
-    \end{tikzpicture}
-
-    \caption{Data-flow diagram for the Devin interpreter}
-  \end{figure}
 
   \subsection{Optional types}
 
@@ -2324,7 +2350,9 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data SymbolId = SymbolId {name :: String, interval :: (Int, Int)}
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Token = Token {interval :: (Int, Int)}
   \end{lstlisting}
 
@@ -2391,7 +2419,9 @@
         varName :: String,
         interval :: (Int, Int)
       } -> Expression
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       IntegerExpression :: {
         integer :: Integer,
         interval :: (Int, Int)
@@ -2661,14 +2691,14 @@
       | Placeholder String
   \end{lstlisting}
 
-  While types could be compared by simple equality, the relation
-  \lstinline@(<:)@ is provided. This operator allows for simpler error
-  propagation.
+  To compare types, the relation operator \lstinline@(<:)@ is provided:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     (<:) :: Type -> Type -> Bool
     t1 <: t2 = isJust (merge t1 t2)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     merge :: Type -> Type -> Maybe Type
     merge Unknown _ = Just Unknown
     merge _ Unknown = Just Unknown
@@ -2681,6 +2711,11 @@
     merge _ _ = Nothing
   \end{lstlisting}
 
+  Given two types, the helper function \lstinline@merge@ yields a type
+  compatible to both, if possible. All types except for \lstinline@Unknown@ are
+  only compatible with themselves; \lstinline@Unknown@, on the other hand, is
+  compatible with all other types.
+
   The module \lstinline@Devin.Typer@ implements the type checker interface. In
   order to account for Devin's lexical scoping rules, the environment is
   represented as a list of association lists.
@@ -2691,9 +2726,13 @@
       funs :: [(String, ([Type], Type))],
       vars :: [(String, Type)]
     }
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type Environment = [Scope]
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Typer a = Typer {runTyper :: Environment -> (a, Environment, [Error])}
       deriving Functor
   \end{lstlisting}
@@ -2719,7 +2758,9 @@
         let (x, env', errors1) = runTyper mx env
             (y, env'', errors2) = runTyper my env'
          in (f x y, env'', errors1 ++ errors2)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Typer where
       (>>=) :: Typer a -> (a -> Typer b) -> Typer b
       mx >>= f = Typer $ \env ->
@@ -2742,7 +2783,9 @@
       scope : parents ->
         let types' = (name, t) : types scope
          in (t, scope {types = types'} : parents, [])
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupType :: String -> Typer (Maybe (Type, Int))
     lookupType name = Typer (\env -> (go 0 env, env, []))
       where
@@ -2767,7 +2810,9 @@
       scope : parents ->
         let funs' = (name, signature) : funs scope
          in ((), scope {funs = funs'} : parents, [])
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
     lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
       where
@@ -2778,8 +2823,8 @@
           Nothing -> go (depth + 1) parents
   \end{lstlisting}
 
-  Finally, variables can be defined and looked up with
-  \lstinline@defineVarType@ and \lstinline@lookupVarType@.
+  Finally, variables can be defined and looked up with \lstinline@defineVarType@
+  and \lstinline@lookupVarType@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     defineVarType :: String -> Type -> Typer ()
@@ -2789,7 +2834,9 @@
       scope : parents ->
         let vars' = (name, t) : vars scope
          in ((), scope {vars = vars'} : parents, [])
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupVarType :: String -> Typer (Maybe (Type, Int))
     lookupVarType name = Typer (\env -> (go 0 env, env, []))
       where
@@ -2836,9 +2883,13 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression IntegerExpression {} = pure Int
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression RationalExpression {} = pure Float
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression VarExpression {varName, interval} =
       lookupVarType varName >>= \case
         Just (t, _) -> pure t
@@ -2866,7 +2917,9 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression ArrayExpression {elems = []} = pure (Array Unknown)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression ArrayExpression {elems = elem : elems} = do
       t <- checkExpression elem
       go elems t
@@ -2916,7 +2969,9 @@
           Int -> pure Int
           Float -> pure Float
           _ -> report' (InvalidUnary unary operandT)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression UnaryExpression {unary, operand}
       | MinusOperator {} <- unary = do
         operandT <- checkExpression operand
@@ -2958,20 +3013,18 @@
   As can be seen, there is a certain degree of code repetition within
   \lstinline@checkExpression@. While \emph{DRY} (Don't Repeat Yourself) is
   usually a good software development practice, it does become impractical when
-  there are edge cases to consider. For instance, while both binary operators
+  edge cases have to be considered. For instance, while both binary operators
   \lstinline@+@ and \lstinline@-@ operate on arithmetic types, \lstinline@+@
   also works with arrays. The problem becomes worse in the evaluator, where both
   \lstinline@+@ and \lstinline@and@ compute some result based on their operands,
   but the evaluation strategy of \lstinline@and@ differs from that of
-  \lstinline@+@. While source code could certainly be rearranged to avoid some
-  amount of repetition, to some extent it would become less readable.
+  \lstinline@+@. Source code could certainly be rearranged to avoid some amount
+  of repetition; however, it would become less readable to some extent.
 
   What follows is the implementation to type check expressions with the binary
   operator~\lstinline@/@. Both operands have to be of the same type; if they
   are, the result of evaluating the whole expression has the same type as the
-  operands. The binary operators \lstinline@-@ and \lstinline@%@ are type
-  checked in a similar manner, with the exception of the fact that the operator
-  \lstinline@%@ only accepts \lstinline@Int@ operands.
+  operands.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression {left, binary, right}
@@ -2986,6 +3039,10 @@
           (Float, Float) -> pure Float
           (_, _) -> report' (InvalidBinary binary leftT rightT)
   \end{lstlisting}
+
+  The binary operators \lstinline@-@ and \lstinline@%@ are type
+  checked similarly to \lstinline@/@, except for the fact that
+  \lstinline@%@ only accepts operands of type \lstinline@Int@.
 
   The semantic meaning of the binary operator \lstinline@+@ depends on the type
   of the operands. If both of them are numeric, the operator denotes an
@@ -3007,7 +3064,9 @@
           (Float, Float) -> pure Float
           (Array t1, Array t2) | Just t <- merge t1 t2 -> pure (Array t)
           (_, _) -> report' (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression {left, binary, right}
       | MultiplyOperator {} <- binary = do
         leftT <- checkExpression left
@@ -3057,7 +3116,9 @@
         checkExpression left
         checkExpression right
         pure Bool
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression {left, binary, right}
       | NotEqualOperator {} <- binary = do
         checkExpression left
@@ -3153,7 +3214,9 @@
     checkStatement _ ExpressionStatement {value} = do
       checkExpression value
       pure False
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement _ DefinitionStatement {definition} = do
       checkDefinitions [definition]
       pure False
@@ -3193,7 +3256,9 @@
       unless (t <: Bool) (report (InvalidType predicate Bool t))
       withNewScope (checkStatement expectedT body)
       pure False
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement expectedT DoWhileStatement {body, predicate} = do
       doesReturn <- withNewScope (checkStatement expectedT body)
       t <- checkExpression predicate
@@ -3210,7 +3275,9 @@
       t <- checkExpression result
       unless (t <: expectedT) (report (InvalidType result expectedT t))
       pure True
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement expectedT statement @ ReturnStatement {result = Nothing} = do
       unless (Unit <: expectedT) (report (MissingReturnValue statement expectedT))
       pure True
@@ -3261,11 +3328,11 @@
 
   \subsection{Checking variable and function definitions}
 
-  Given a block, definitions are checked using a two pass strategy. The first
+  Given a block, definitions are checked using a two-pass strategy. The first
   pass looks for function definitions and stores the relevant signatures in the
   environment; the body of the functions is not checked at this stage. The
   second pass processes variable definitions and statements within those
-  function definitions. Without two pass type checking, mutually recursive
+  function definitions. Without two-pass type checking, mutually recursive
   function definitions would not be supported---at least not without a mechanism
   like C's forward declarations.
 
@@ -3295,7 +3362,9 @@
           Nothing -> pure Unknown
 
         defineFunSignature name (paramTs, returnT)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     getType :: Value -> Evaluator Type
     getType = \case
       PlainTypeId {name, interval} -> lookupType name >>= \case
@@ -3354,9 +3423,13 @@
       funs :: [(String, Function)],
       vars :: [(String, Reference)]
     }
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type State = [Frame]
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Evaluator a = Evaluator (State -> IO (Result a, State))
       deriving Functor
   \end{lstlisting}
@@ -3373,9 +3446,11 @@
 
   Values are not stored directly inside \lstinline@State@: each identifier is
   bound to a cell which holds the actual value. This way, multiple identifiers
-  can refer to the same value. In Devin, cells are implemented by the
-  \lstinline@Reference@ data type; it wraps Haskell's \lstinline@IORef@, which
-  provides mutable references in the \lstinline@IO@ monad.
+  can refer to the same value.
+
+  In Devin, cells are implemented by the \lstinline@Reference@ data type; it
+  wraps Haskell's \lstinline@IORef@, which provides mutable references in the
+  \lstinline@IO@ monad.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Value
@@ -3384,7 +3459,9 @@
       | Int Int64
       | Float Double
       | Array (Vector Reference)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Reference = Reference (IORef Value)
   \end{lstlisting}
 
@@ -3421,10 +3498,14 @@
     newRef v = liftIO $ do
       ref <- newIORef v
       pure (Reference ref)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     readRef :: MonadIO m => Reference -> m Value
     readRef (Reference ref) = liftIO (readIORef ref)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     writeRef :: MonadIO m => Reference -> Value -> m ()
     writeRef (Reference ref) v = liftIO (writeIORef ref v)
   \end{lstlisting}
@@ -3454,7 +3535,9 @@
             ifM (compareVals x y) (go n (i + 1)) (pure False)
 
       (_, _) -> pure False
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     compareRefs :: MonadIO m => Reference -> Reference -> m Bool
     compareRefs r1 r2 = do
       v1 <- readRef r1
@@ -3478,7 +3561,9 @@
       Array rs -> do
         rs' <- Vector.forM rs cloneRef
         pure (Array rs')
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     cloneRef :: MonadIO m => Reference -> m Reference
     cloneRef r = do
       v <- readRef r
@@ -3486,15 +3571,16 @@
       newRef v'
   \end{lstlisting}
 
-  As an \lstinline@Evaluator@ wraps a function which executes a single step of
-  computation, it makes sense to provide two functions: one to run a single
-  step, and one to run all remaining steps. These are implemented by the
-  \lstinline@runEvaluatorStep@ and \lstinline@runEvaluator@ functions.
+  As for the \lstinline@Evaluator@, two functions are provided:
+  \lstinline@runEvaluatorStep@ and \lstinline@runEvaluator@. The former runs a
+  single step of computation, while the latter runs all remaining steps.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     runEvaluatorStep :: MonadIO m => Evaluator a -> State -> m (Result a, State)
     runEvaluatorStep (Evaluator f) state = liftIO (f state)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     runEvaluator :: MonadIO m => Evaluator a -> State -> m (Either Error a, State)
     runEvaluator mx state = do
       (result, state') <- runEvaluatorStep mx state
@@ -3523,7 +3609,9 @@
           Done x -> runEvaluatorStep (f x <$> my) state'
           Debug statement mx -> pure (Debug statement (liftA2 f mx my), state')
           Error error -> pure (Error error, state')
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Evaluator where
       (>>=) :: Evaluator a -> (a -> Evaluator b) -> Evaluator b
       mx >>= f = Evaluator $ \state -> do
@@ -3538,7 +3626,7 @@
   For convenience, an instance for \lstinline@MonadIO@ is provided as well. This
   instance permits, among others, \lstinline@newRef@, \lstinline@readRef@,
   \lstinline@writeRef@, \lstinline@cloneRef@, \lstinline@compareRefs@,
-  \lstinline@cloneVals@ and \lstinline@compareVals@ to be used with the
+  \lstinline@cloneVals@ and \lstinline@compareVals@ to be used within the
   \lstinline@Evaluator@ monad as well.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -3587,7 +3675,9 @@
       frame : parents -> do
         let funs' = (name, fun) : funs frame
         pure (Done (), frame {funs = funs'} : parents)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupFun :: String -> Evaluator (Maybe (Function, Int))
     lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
       where
@@ -3596,7 +3686,9 @@
         go depth (Frame {offset, funs} : parents) = case lookup name funs of
           Just fun -> Just (fun, depth)
           Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     defineVar :: String -> Reference -> Evaluator ()
     defineVar name r = Evaluator $ \case
       [] -> pure (Done (), [Frame 0 [] [(name, r)]])
@@ -3604,7 +3696,9 @@
       frame : parents -> do
         let vars' = (name, r) : vars frame
         pure (Done (), frame {vars = vars'} : parents)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupVar :: String -> Evaluator (Maybe (Reference, Int))
     lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
       where
@@ -3637,7 +3731,9 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     debug :: Statement -> Evaluator ()
     debug statement = Evaluator (\state -> pure (Debug statement (pure ()), state))
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     raise :: Error -> Evaluator a
     raise error = Evaluator (\state -> pure (Error error, state))
   \end{lstlisting}
@@ -3659,10 +3755,14 @@
       case toIntegralSized integer of
         Just x -> newRef (Int x)
         Nothing -> raise (IntegerOverflow expression)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression RationalExpression {rational} =
       newRef (Float (fromRat rational))
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression VarExpression {varName, interval} =
       lookupVar varName >>= \case
         Just (r, _) -> pure r
@@ -3729,7 +3829,9 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     safeUnary op x = toIntegralSized (toInteger (op x))
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     safeBinary op x y = toIntegralSized (toInteger x `op` toInteger y)
   \end{lstlisting}
 
@@ -3748,7 +3850,9 @@
           _ -> do
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression expression @ UnaryExpression {unary, operand}
       | MinusOperator {} <- unary = do
         operandR <- evalExpression operand
@@ -3763,7 +3867,9 @@
           _ -> do
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression UnaryExpression {unary, operand}
       | NotOperator {} <- unary = do
         operandR <- evalExpression operand
@@ -3775,7 +3881,9 @@
           _ -> do
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression UnaryExpression {unary, operand}
       | LenOperator {} <- unary = do
         operandR <- evalExpression operand
@@ -3851,7 +3959,9 @@
             leftT <- getType leftV
             rightT <- getType rightV
             raise (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression expression @ BinaryExpression {left, binary, right}
       | MultiplyOperator {} <- binary = do
         leftR <- evalExpression left
@@ -3926,7 +4036,9 @@
         rightR <- evalExpression right
         x <- compareRefs leftR rightR
         newRef (Bool x)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression BinaryExpression {left, binary, right}
       | NotEqualOperator {} <- binary = do
         leftR <- evalExpression left
@@ -4108,7 +4220,9 @@
     evalExpression DefinitionStatement {definition} = do
       evalDefinitions [definition]
       pure Nothing
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression ExpressionStatement {value} = do
       evalExpression value
       pure Nothing
@@ -4132,7 +4246,9 @@
         _ -> do
           t <- getType v
           raise (InvalidType predicate Type.Bool t)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression IfElseStatement {predicate, trueBranch, falseBranch} = do
       r <- evalExpression predicate
       v <- readRef r
@@ -4165,7 +4281,9 @@
         _ -> do
           t <- getType v
           raise (InvalidType predicate Type.Bool t)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression statement @ DoWhileStatement {body, predicate} =
       withNewFrame 1 (evalStatement body) >>= \case
         Just r -> pure (Just r)
@@ -4189,7 +4307,9 @@
     evalExpression ReturnStatement {result = Just result} = do
       r <- evalExpression result
       pure (Just r)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression ReturnStatement {result = Nothing} = do
       r <- newRef Unit
       pure (Just r)
@@ -4259,14 +4379,18 @@
     evalDefinitions definitions = do
       for_ definitions evalDefinition1
       for_ definitions evalDefinition2
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalDefinition1 :: Definition -> Evaluator ()
     evalDefinition1 definition = case definition of
       VarDefinition {} -> pure ()
 
       FunDefinition {funId = SymbolId {name}} ->
         defineFun name (UserDefined definition)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalDefinition2 :: Definition -> Evaluator ()
     evalDefinition2 = \case
       VarDefinition {varId = SymbolId {name}, value} -> do
@@ -4300,7 +4424,9 @@
       uncons (offset, stream) = uncons stream >>= \case
         Just (token, rest) -> pure (Just (token, (offset + 1, rest)))
         Nothing -> pure Nothing
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     getOffset :: Monad m => ParsecT (a, s) u m a
     getOffset = do
       State {stateInput = (offset, _)} <- getParserState
@@ -4427,10 +4553,14 @@
     token literal = syntax $ do
       text literal
       pure Token
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     text :: Stream s m Char => String -> ParserT s m String
     text literal = try (string literal) <?> ("“" ++ literal ++ "”")
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     s :: Stream s m Char => ParserT s m ()
     s = skipMany (skipMany1 (space <?> "") <|> void (comment <?> ""))
   \end{lstlisting}
@@ -4536,7 +4666,9 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression :: Stream s m Char => ParserT s m Expression
     expression = expression1
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression1 :: Stream s m Char => ParserT s m Expression
     expression1 = chainl1 expression2 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4547,7 +4679,9 @@
         ]
 
       pure (\left right -> BinaryExpression left binary right)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression2 :: Stream s m Char => ParserT s m Expression
     expression2 = chainl1 expression3 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4557,7 +4691,9 @@
         ]
 
       pure (\left right -> BinaryExpression left binary right)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression3 :: Stream s m Char => ParserT s m Expression
     expression3 = chainl1 expression4 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4569,7 +4705,9 @@
         ]
 
       pure (\left right -> BinaryExpression left binary right)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression4 :: Stream s m Char => ParserT s m Expression
     expression4 = chainl1 expression5 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4579,7 +4717,9 @@
         ]
 
       pure (\left right -> BinaryExpression left binary right)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression5 :: Stream s m Char => ParserT s m Expression
     expression5 = chainl1 expression6 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4664,7 +4804,9 @@
       predicate <- s *> expression
       body <- s *> statement
       pure (WhileStatement whileKeyword predicate body)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     doWhileStatement :: Stream s m Char => ParserT s m Statement
     doWhileStatement = do
       doKeyword <- keyword "do"
@@ -4686,7 +4828,9 @@
       result <- s *> optionMaybe expression
       semicolon <- s *> token ";"
       pure (ReturnStatement returnKeyword result semicolon)
+  \end{lstlisting}
 
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     assertStatement :: Stream s m Char => ParserT s m Statement
     assertStatement = do
       assertKeyword <- keyword "assert"
@@ -4805,6 +4949,233 @@
       pure (refKeyword, paramId, paramInfo)
   \end{lstlisting}
 
+  \section{The user interface}
+
+  As explained in section \ref{section:editorfeatures}, Devin's graphical user
+  interface depends on the GTK+ library. For those unfamiliar, GTK+ is the
+  standard GUI library used for Gnome applications; being cross-platform, GTK+
+  can be used in other platforms beside the Gnome desktop environment. One
+  notable application using GTK+ is GIMP, the GNU Image Manipulation Program; In
+  fact, GTK+ was formerly known as the GIMP ToolKit.
+
+  GTK+ is a library written in C and meant to be consumed in C. Given it's
+  popularity, many language bindings exist. Devin's implementation utilizes the
+  bindings provided by the package \lstinline@gi-gtk@. This package is mostly a
+  thin wrapper on top GTK+; as a consequence, windows and widgets are to be
+  constructed imperatively rather than declaratively.
+
+  Devin's UI implementation is somewhat complex, requiring more than 1100 lines
+  of code. Many considerations were made while programming the UI; describing
+  them all would require a thesis on its own. To be short, I'll highlight two
+  of them:
+
+  \begin{itemize}
+    \item Source code editing features are provided on top of the GtkSourceView
+    library. This library provides a text widget which can be edited by users;
+    there's built-in support for showing line numbers, automatic indentation,
+    and syntax highlighting.
+
+    GtkSourceView's syntax highlighting functionality is quite handy: all that
+    would be required to do is to write a text file describing Devin's grammar
+    and let the library do it's magic. However, should such functionality be
+    used? Two grammars would have to be carefully kept in sync: the one
+    implicitly defining Devin's parser, and the one providing syntax
+    highlighting. One could say that allowing for minor potential discrepancies
+    between the two which few would notice is good enough. Or, one could be
+    pedantic and say that there should be only one source of truth. Readers can
+    guess that I choose the second option.
+
+    This consideration gives rise to the first problem: using part of
+    GtkSourceView's features, while performing syntax highlighting based on the
+    output of Devin's parser. The library operates on such an abstraction level
+    that understanding how to do syntax highlighting from scratch is not
+    trivial; in fact, I had to read GtkSourceView's implementation of automatic
+    syntax highlighting in order to do so.
+
+    \item The second problem relies in the fact that the binding
+    \lstinline@gi-gtk@ is incomplete; in particular, some of the functionality
+    available in C isn't exposed by \lstinline@gi-gtk@. One example of such
+    missing functionality is the creation of the dialog boxes.
+
+    To get around such limitations, I had again to investigate the source code
+    of GTK+. One of the tricks I employed is to use a subset of GTK+
+    functionality, exposed through \lstinline@gi-gtk@, which allows for widgets
+    to be loaded from XML strings.
+  \end{itemize}
+
+  The focus of this thesis is programming language implementation, not GUI
+  development. Rather than explaining all code pertaining to Devin's UI, I'll
+  give one example on how GTK+ may be used within Haskell. Devin's UI
+  implementation is listed in the appendix, starting at section
+  \ref{section:appmain}.
+
+  Let's consider developing a simple graphical counting application. It should
+  display a number $n$ and provide two buttons: one to increment $n$, and one to
+  decrement $n$. Of course, the initial value of $n$ should be $0$.
+
+  \begin{figure}[h]
+    \centering
+    \includegraphics[scale=0.8]{7.png}
+    \caption{A simple counting UI}
+  \end{figure}
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    module Main (main) where
+  \end{lstlisting}
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    import Control.Monad
+    import System.Exit
+    import qualified Data.Text as Text
+    import qualified GI.Gio as G
+    import qualified GI.Gtk as Gtk
+  \end{lstlisting}
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    main :: IO ()
+    main = do
+      Just application <- Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags]
+      G.onApplicationActivate application (onActivate application)
+      status <- G.applicationRun application Nothing
+      when (status /= 0) (exitWith (ExitFailure (fromIntegral status)))
+  \end{lstlisting}
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
+    onActivate application = do
+      label <- Gtk.labelNew (Just (Text.pack "0"))
+      buttonMinus  <- Gtk.buttonNewWithLabel (Text.pack "-")
+      buttonPlus <- Gtk.buttonNewWithLabel (Text.pack "+")
+
+      buttonBox <- Gtk.buttonBoxNew Gtk.OrientationHorizontal
+      Gtk.boxSetSpacing buttonBox 4
+      Gtk.containerAdd buttonBox buttonMinus
+      Gtk.containerAdd buttonBox buttonPlus
+
+      box <- Gtk.boxNew Gtk.OrientationVertical 4
+      Gtk.widgetSetMarginStart box 4
+      Gtk.widgetSetMarginEnd box 4
+      Gtk.widgetSetMarginTop box 4
+      Gtk.widgetSetMarginBottom box 4
+      Gtk.containerAdd box label
+      Gtk.containerAdd box buttonBox
+
+      window <- Gtk.applicationWindowNew application
+      Gtk.windowSetTitle window Text.empty
+      Gtk.windowSetResizable window False
+      Gtk.containerAdd window box
+
+      Gtk.onButtonClicked buttonMinus $ do
+        t <- Gtk.labelGetLabel label
+        Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) - 1)))
+
+      Gtk.onButtonClicked buttonPlus $ do
+        t <- Gtk.labelGetLabel label
+        Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) + 1)))
+
+      Gtk.widgetShowAll window
+  \end{lstlisting}
+
+  The entry point \lstinline@main@ is just some boilerplate code to invoke a
+  callback which starts the actual application. The window and all its contents
+  are built in \lstinline@onActivate@.
+
+  The first three lines of \lstinline@onActivate@ create a label initially set
+  to \lstinline@0@ and two buttons: \lstinline@buttonMinus@ and
+  \lstinline@buttonPlus@. Note that \lstinline@gi-gtk@ employs the
+  \lstinline@Text@ data type instead of \lstinline@String@ for efficiency;
+  to convert between the two, \lstinline@Text.packpack :: String -> Text@ and
+  \lstinline@Text.unpack :: Text -> String@ have to be used.
+
+  To position the two buttons horizontally, a \lstinline@Gtk.ButtonBox@
+  container has to be employed. Buttons are added to such container with
+  \lstinline@Gtk.containerAdd@; spacing between buttons is configured with
+  \lstinline@Gtk.boxSetSpacing@.
+
+  To position the button box below the label created earlier, a
+  \lstinline@Gtk.Box@ container is used. Some margin is added on all four sides
+  of the container with \lstinline@Gtk.widgetSetMarginStart@,
+  \lstinline@Gtk.widgetSetMarginEnd@, \lstinline@Gtk.widgetSetMarginTop@,
+  \lstinline@Gtk.widgetSetMarginBottom@.
+
+  The main window is created with \lstinline@Gtk.applicationWindowNew@. Its
+  title is set to the empty string and it is configured not to be resizable.
+  Finally, event handlers for button clicks are registered with
+  \lstinline@Gtk.onButtonClicked@. After all is done, the application window is
+  displayed to the user with \lstinline@Gtk.widgetShowAll@.
+
+  As can be seen, using GTK+ within Haskell is not too difficult, even if
+  imperative-style programming is required. In most circumstances, code working
+  in C has an almost direct relationship with code producing the same result,
+  but written in Haskell.
+
+  The package \lstinline@gi-gtk-hs@ provides an idiomatic API on top of
+  \lstinline@gi-gtk@ to load widgets from XML strings. The following listing
+  illustrates its usage:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    import qualified Data.GI.Gtk.BuildFn as Gtk
+
+    onActivate' :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
+    onActivate' application = do
+      let string = Text.pack $
+            "<interface>\n\
+            \  <object class=\"GtkApplicationWindow\" id=\"window\">\n\
+            \    <property name=\"title\"></property>\n\
+            \    <property name=\"resizable\">false</property>\n\
+            \    <child>\n\
+            \      <object class=\"GtkBox\">\n\
+            \        <property name=\"orientation\">vertical</property>\n\
+            \        <property name=\"spacing\">4</property>\n\
+            \        <property name=\"margin\">4</property>\n\
+            \        <child>\n\
+            \          <object class=\"GtkLabel\" id=\"label\">\n\
+            \            <property name=\"label\">0</property>\n\
+            \          </object>\n\
+            \        </child>\n\
+            \        <child>\n\
+            \          <object class=\"GtkButtonBox\">\n\
+            \            <property name=\"orientation\">horizontal</property>\n\
+            \            <property name=\"spacing\">4</property>\n\
+            \            <child>\n\
+            \              <object class=\"GtkButton\" id=\"buttonMinus\">\n\
+            \                <property name=\"label\">-</property>\n\
+            \              </object>\n\
+            \            </child>\n\
+            \            <child>\n\
+            \              <object class=\"GtkButton\" id=\"buttonPlus\">\n\
+            \                <property name=\"label\">+</property>\n\
+            \              </object>\n\
+            \            </child>\n\
+            \          </object>\n\
+            \        </child>\n\
+            \      </object>\n\
+            \    </child>\n\
+            \  </object>\n\
+            \</interface>\0"
+
+      let buildFn = do
+            label <- Gtk.getObject Gtk.Label (Text.pack "label")
+            buttonMinus <- Gtk.getObject Gtk.Button (Text.pack "buttonMinus")
+            buttonPlus <- Gtk.getObject Gtk.Button (Text.pack "buttonPlus")
+            window <- Gtk.getObject Gtk.ApplicationWindow (Text.pack "window")
+
+            Gtk.onButtonClicked buttonMinus $ do
+              t <- Gtk.labelGetLabel label
+              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) - 1)))
+
+            Gtk.onButtonClicked buttonPlus $ do
+              t <- Gtk.labelGetLabel label
+              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) + 1)))
+
+            pure window
+
+      builder <- Gtk.builderNewFromString string (-1)
+      window <- Gtk.buildWithBuilder buildFn builder
+      Gtk.windowSetApplication window (Just application)
+      Gtk.widgetShowAll window
+  \end{lstlisting}
+
   \backmatter
 
   % TODO: insert index
@@ -4916,6 +5287,7 @@
     {../test/Devin/TypersSpec.hs}
 
   \section{\texttt{app/Main.hs}}
+  \label{section:appmain}
 
   \lstinputlisting
     [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
