@@ -341,19 +341,19 @@ onActivate application = do
             let s'' = "<tt>" ++ s' ++ "</tt>"
             let s''' = replace ">" "&gt;" (replace "<" "&lt;" (replace "&" "&amp;" s''))
 
-            let string = Text.pack $
+            let string =
                   "<interface>\n\
                   \  <object class=\"GtkMessageDialog\" id=\"dialog\">\n\
                   \    <property name=\"title\">Error</property>\n\
                   \    <property name=\"message-type\">error</property>\n\
                   \    <property name=\"buttons\">close</property>\n\
                   \    <property name=\"text\">" ++ s''' ++ "</property>\n\
-                  \    <property name=\"use-markup\">True</property>\n\
+                  \    <property name=\"use-markup\">true</property>\n\
                   \  </object>\n\
                   \</interface>\0"
 
             let buildFn = Gtk.getObject Gtk.MessageDialog "dialog"
-            builder <- Gtk.builderNewFromString string -1
+            builder <- Gtk.builderNewFromString (Text.pack string) -1
             dialog <- Gtk.buildWithBuilder buildFn builder
             Gtk.windowSetTransientFor dialog (Just window)
             Gtk.dialogRun dialog

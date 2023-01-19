@@ -5118,7 +5118,7 @@
 
     onActivate' :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
     onActivate' application = do
-      let string = Text.pack $
+      let string =
             "<interface>\n\
             \  <object class=\"GtkApplicationWindow\" id=\"window\">\n\
             \    <property name=\"title\"></property>\n\
@@ -5170,7 +5170,7 @@
 
             pure window
 
-      builder <- Gtk.builderNewFromString string (-1)
+      builder <- Gtk.builderNewFromString (Text.pack string) (-1)
       window <- Gtk.buildWithBuilder buildFn builder
       Gtk.windowSetApplication window (Just application)
       Gtk.widgetShowAll window
