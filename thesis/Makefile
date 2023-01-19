@@ -6,11 +6,11 @@ thesis.pdf: PhdThesis theorems
 
 PhdThesis:
 	rm -rf PhdThesis
-	curl -k 'https://users.dimi.uniud.it/~marco.comini/LaTeX/PhdThesis/PhdThesis.tbz' | tar -xf -
+	curl -k 'https://users.dimi.uniud.it/~marco.comini/LaTeX/PhdThesis/PhdThesis.tbz' | tar -xjf -
 
 theorems:
 	rm -rf theorems
-	curl -k 'https://users.dimi.uniud.it/~marco.comini/LaTeX/Theorems/theorems.tbz' | tar -xf -
+	curl -k 'https://users.dimi.uniud.it/~marco.comini/LaTeX/Theorems/theorems.tbz' | tar -xjf -
 
 .PHONY: clean
 clean:
