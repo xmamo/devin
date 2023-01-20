@@ -54,7 +54,7 @@ main :: IO ()
 main = do
   setEnv "LC_ALL" "POSIX"
 
-  Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
+  Gtk.applicationNew Nothing [G.ApplicationFlagsFlagsNone] >>= \case
     Nothing -> exitFailure
 
     Just application -> do
