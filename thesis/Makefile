@@ -14,8 +14,8 @@ theorems:
 
 .PHONY: clean
 clean:
-	test -f PhdThesis/Makefile && $(MAKE) -C PhdThesis clean
-	test -f theorems/Makefile && $(MAKE) -C theorems clean
+	if [ -f PhdThesis/Makefile ]; then $(MAKE) -C PhdThesis clean; fi
+	if [ -f theorems/Makefile ]; then $(MAKE) -C theorems clean; fi
 	latexmk -C
 	rm -f *.bbl
 	rm -f *.run.xml
