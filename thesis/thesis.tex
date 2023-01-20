@@ -70,11 +70,6 @@
   \chaptertitlestyle{serifbig}
 
   \introduction
-  % \label{ch:intro}
-
-  % \chapter{Programming languages}
-
-  % TODO: paradigms, modifiable variables, scoping
 
   \chapter{Haskell programming}
 
@@ -210,7 +205,7 @@
   the expression \lstinline@b ^ n@ has an equivalent prefix form,
   \lstinline@(^) b n@; a non-symbolic alias can be defined as
   \lstinline@pow = (^)@, making \lstinline@b ^ n@ equivalent to
-  \lstinline@pow b n@. Simmetrically, any binary function can be used as an
+  \lstinline@pow b n@. Symmetrically, any binary function can be used as an
   infix operator: given the function \lstinline@div@ for integer division
   towards negative infinity, \lstinline@div n d@ has an equivalent infix form,
   \lstinline@n `div` d@.
@@ -385,7 +380,7 @@
   As mentioned, Haskell strings are just lists of characters. For example, the
   word \lstinline@Hello@ is represented by the value \lstinline@"Hello"@, which
   desugars to the list \lstinline@['H', 'e', 'l', 'l', 'o']@. The standard
-  librady exports the following type alias:
+  library exports the following type alias:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type String = [Char]
@@ -503,7 +498,7 @@
   \end{lstlisting}
 
   Both \lstinline@Maybe@ and \lstinline@Either@ are called \emph{type
-  constructors}, as they are paramaterized by type variables: \lstinline@Maybe@
+  constructors}, as they are parameterized by type variables: \lstinline@Maybe@
   takes a single parameter \lstinline@a@, while \lstinline@Either@ takes two
   parameters \lstinline@a@ and \lstinline@b@. Syntactically, type variables are
   distinguished from type constructors by casing: variables are lowercase, while
@@ -569,7 +564,7 @@
   language is the support for higher-order functions, that is, functions which
   take other functions as arguments or yield a function as result. Since Haskell
   functions are first-class, implementing and using higher-order functions is
-  very succint syntactically.
+  very succinct syntactically.
 
   Let's consider two functions: one which calculates the sum every element of a
   list, and one calculates the product of every element of a list. Such
@@ -599,7 +594,7 @@
 
   This idiom is called \emph{folding} over a list. A higher-order function
   \lstinline@foldList@, which encapsulates this behavior, can be used to
-  implememt both \lstinline@listSum@ and \lstinline@listProduct@:
+  implement both \lstinline@listSum@ and \lstinline@listProduct@:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     foldList :: (a -> b -> b) -> b -> [a] -> b
@@ -805,7 +800,7 @@
   provided, then both will loop. Primitive data types are instance of this class.
 
   Instances for the \lstinline@Eq@ are usually generated via
-  \lstinline@deriving@ declaraions as explained in earlier sections. Of course,
+  \lstinline@deriving@ declarations as explained in earlier sections. Of course,
   such implementations can be written by hand---for example:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -839,7 +834,7 @@
 
   While Haskell's type classes can be considered to be similar to Java's and C\#
   interfaces or abstract classes, this is indeed an example of how they are more
-  powerful. In both object-oriented languages, all non-primitive datatypes
+  powerful. In both object-oriented languages, all non-primitive data types
   inherit from \lstinline@Object@; among others, all objects must implement the
   methods \lstinline@boolean equals(Object obj)@ and \lstinline@int hashCode()@
   (\lstinline@bool Equals(object? obj)@ and \lstinline@int GetHashCode()@ in the
@@ -923,7 +918,7 @@
   \lstinline@Applicative@ class; further, it doesn't define any relationship
   between it and \lstinline@Monad@. Since \lstinline@base@ is the library which
   is used to develop applications in practice, its definition is given for
-  completness, as the \lstinline@Monad@ type class extends
+  completeness, as the \lstinline@Monad@ type class extends
   \lstinline@Applicative@'s interface. The operator \lstinline@(<$>)@ is used as
   an infix alias of \lstinline@fmap@.
 
@@ -1057,7 +1052,7 @@
   \section{Behind the syntax of function types}
 
   As mentioned, the definition
-  \lstinline@pythagoras x y = sqrt (x ^ 2 + y ^ 2)@ is synctactic sugar for
+  \lstinline@pythagoras x y = sqrt (x ^ 2 + y ^ 2)@ is syntactic sugar for
   \lstinline@pythagoras = \x y -> sqrt (x ^ 2 + y ^ 2)@. This definition can be
   further be desugared into the following:
 
@@ -1185,8 +1180,8 @@
   \end{lstlisting}
 
   As can be seen, the monadic interface allows for imperative looking code to be
-  written: the listing above already resembles the implementation in Java.
-  Unsing syntactic sugar in the form of Haskell's \emph{do expressions},
+  written: the listing above already resembles the implementation in Java. Using
+  syntactic sugar in the form of Haskell's \emph{do expressions},
   \lstinline@main@ can be expressed in a more readable way as:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -1203,7 +1198,7 @@
 
   With this notation, programs of arbitrary complexity can be written. In fact,
   as long as imperative loops aren't required, programming in Haskell is even
-  more succint than languages which mainly focus on imperative-style
+  more succinct than languages which mainly focus on imperative-style
   programming:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -1253,9 +1248,9 @@
 
   \section{Imperative-style programming}
 
-  With the power of monads, Haskell allows for imperative lookining code to be
+  With the power of monads, Haskell allows for imperative looking code to be
   expressed. Emphasis on \emph{looking}: there's no actual imperative control
-  flow; rather, referetially transparent representations of computations are
+  flow; rather, referentially transparent representations of computations are
   bound together with \lstinline@(>>=)@.
 
   While imperative-style is always an option, it should be preferred to program
@@ -1326,8 +1321,8 @@
 
   In the previous section, I used import declarations to gain access to
   functions and types provided in the \lstinline@Control.Monad.ST@ and
-  \lstinline@Data.STRef@ modules. Like most languages, Haskell provides a
-  namespacing mechanism; while in Java there is \lstinline@package@ and
+  \lstinline@Data.STRef@ modules. Like most languages, Haskell provides a name
+  spacing mechanism; while in Java there is \lstinline@package@ and
   \lstinline@import@, in C++ \lstinline@namespace@ and
   \lstinline@using namespace@, in Haskell there is \lstinline@module@ and
   \lstinline@import@.
@@ -1465,7 +1460,7 @@
   trivial and don't require further explanation; the \lstinline@area@ function
   computes its result using Heron's formula
   $A = \sqrt{s \left(s - a\right) \left(s - b\right) \left(s - c\right)}$, where
-  $s = \frac{1}{2} \left(a + b + c\right)$ is the triangle's semiperimeter. The
+  $s = \frac{1}{2} \left(a + b + c\right)$ is the triangle's semi-perimeter. The
   \lstinline@Eq@ instance for \lstinline@Triangle@ verifies that the vertices of
   one triangle equal the vertices of the other, independently of their order;
   to do so, the functions
@@ -1645,7 +1640,7 @@
   \section{Syntax tree}
 
   The syntactic structure of a string accepted by a parser is represented by a a
-  \emph{syntax tree}. In literature, two cathegories are usually defined:
+  \emph{syntax tree}. In literature, two categories are usually defined:
   \emph{concrete} and \emph{abstract} syntax trees.
 
   A syntax tree that retains all information necessary to identically
@@ -1708,6 +1703,7 @@
   \emph{syntax tree}.
 
   \section{Parser combinators}
+  \label{section:parsercombinators}
 
   There are many ways to recognize some input and generate an associated syntax
   tree. There has been much academic research, and there are many readily
@@ -1798,7 +1794,7 @@
   \begin{itemize}
     \item An \emph{evaluator} would associate the nodes of the syntax tree with
     actions to execute. Examples of such actions are performing arithmetic
-    calculations, conditionally executing subtrees and assigning or retrieving
+    calculations, conditionally executing sub-trees and assigning or retrieving
     values from variables.
 
     \item A \emph{compiler} would translate the syntax tree into some other
@@ -1834,7 +1830,7 @@
 
   In this thesis, I'll discuss the implementation of a simple imperative
   programming language which I decided to call Devin. The name Devin is an
-  homage to Duino, the city I'm currently living in; its slovenian name is, in
+  homage to Duino, the city I'm currently living in; its Slovenian name is, in
   fact, Devin.
 
   Alongside Devin, I developed a graphical text editor for the language. The
@@ -2110,7 +2106,7 @@
   \lstinline[mathescape]@var $x$ = $y$@, where $x$ is an identifier and $y$ is
   an expression. The type of of the new variable $x$ is inferred from $y$.
   Variables can be defined at any point, whether globally or as function locals.
-  Their visibility extends from the point of their definition onwards.
+  Their visibility extends from the point of their definition onward.
 
   Devin is \emph{block-structured}: it allows for the creation of blocks,
   including blocks nested within other blocks. Variables are lexically scoped:
@@ -2404,8 +2400,8 @@
 
   Literals, numbers and variables are the simplest kinds of expressions, as they
   are atomic. More complex expressions can be built from simpler ones: for
-  example, a binary expression is constructed by two subexpressions and a binary
-  operator.
+  example, a binary expression is constructed by two sub-expressions and a
+  binary operator.
 
   Expressions are described by a single algebraic data type:
   \lstinline@Expression@. Opening and closing parentheses are stored in the
@@ -3107,7 +3103,7 @@
 
   Notice that \lstinline@left@ and \lstinline@right@ are recursively type
   checked even though the result type (\lstinline@Bool@) is known. This is
-  important, as failing to check subexpressions could lead to runtime errors
+  important, as failing to check sub-expressions could lead to runtime errors
   during evaluation.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -4134,7 +4130,7 @@
   \end{lstlisting}
 
   Executing function calls is probably the most complex part of Devin's
-  evaluator. The called function is looked up, rasing an error if it is not
+  evaluator. The called function is looked up, raising an error if it is not
   found. Arguments are evaluated from left to right; if an argument has the
   wrong type, or if too many or to few arguments are passed, an exception is
   raised. The built-in functions \lstinline@toFloat@ and \lstinline@toInt@
@@ -4566,7 +4562,7 @@
   \end{lstlisting}
 
   The function \lstinline@string@ is provided by \lstinline@parsec@; it parses a
-  sequence of characters, consuming characters even if the whole string could't
+  sequence of characters, consuming characters even if the whole string couldn't
   be matched: \lstinline@try@ has to be used to disable this odd behavior.
   \lstinline@skipMany@ and \lstinline@skipMany1@ are similar to \lstinline@many@
   and \lstinline@many1@, except that they ignore the result. The combinator
@@ -4596,7 +4592,7 @@
 
   Variable and function names are parsed following Unicode's definitions of
   general-purpose identifiers~\cite{identifier-syntax}, albeit with some minor
-  variations applied to their recomandations. Simplifying, identifiers start
+  variations applied to their recommendations. Simplifying, identifiers start
   with a letter and continue with either letters or numbers; the more general
   Unicode definition allows characters like \lstinline[literate={è}{\`e}{1}]@è@
   or \lstinline[literate={ß}{\ss}{1}]@ß@ to be accepted as well.
