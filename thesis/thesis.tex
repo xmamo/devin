@@ -43,6 +43,7 @@
 }
 
 \lstset{
+  aboveskip=\parskip,
   belowskip=0pt,
   basicstyle=\ttfamily,
   upquote=true,
@@ -51,7 +52,8 @@
   belowcaptionskip=\belowcaptionskip,
   columns=fullflexible,
   keepspaces=true,
-  literate={‘}{`}{1}{’}{'}{1}{“}{`}{1}{”}{'}{1}
+  literate={‘}{`}{1}{’}{'}{1}{“}{`}{1}{”}{'}{1},
+  frame=single
 }
 
 \begin{document}
@@ -257,19 +259,13 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type Vector2D = (Double, Double)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum2D :: Vector2D -> Vector2D -> Vector2D
     sum2D (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     dot2D :: Vector2D -> Vector2D -> Double
     dot2D (x1, y1) (x2, y2) = x1 * x2 + y1 * y2
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     magnitude2D :: Vector2D -> Double
     magnitude2D v = sqrt (dot2D v v)
   \end{lstlisting}
@@ -286,9 +282,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum2D :: Vector2D -> Vector2D -> Vector2D
     sum2D v1 v2 = (fst v1 + fst v2, snd v1 + snd v2)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     dot2D :: Vector2D -> Vector2D -> Double
     dot2D v1 v2 = fst v1 * fst v2 + snd v1 * snd v2
   \end{lstlisting}
@@ -316,9 +310,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     list3456 :: [Int]
     list3456 = 3 : list456
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     list123456 :: [Int]
     list123456 = [1, 2] ++ list3456
   \end{lstlisting}
@@ -425,14 +417,10 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Complex = Complex Double Double
       deriving (Eq, Show)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     complexRe :: Complex -> Double
     complexRe (Complex a _) = a
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     complexIm :: Complex -> Double
     complexIm (Complex _ b) = b
   \end{lstlisting}
@@ -526,20 +514,14 @@
     isJust :: Maybe a -> Bool
     isJust Nothing = False
     isJust (Just _) = True
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     isNothing :: Maybe a -> Bool
     isNothing Nothing = True
     isNothing (Just _) = False
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     fromJust :: Maybe a -> a
     fromJust (Just x) = x
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     fromMaybe :: a -> Maybe a -> a
     fromMaybe x Nothing = x
     fromMaybe _ (Just x) = x
@@ -574,9 +556,7 @@
     listSum :: Num a => [a] -> a
     listSum [] = 0
     listSum (x : xs) = x + sum xs
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listProduct :: Num a => [a] -> a
     listProduct [] = 1
     listProduct (x : xs) = x * product xs
@@ -600,14 +580,10 @@
     foldList :: (a -> b -> b) -> b -> [a] -> b
     foldList _ z [] = z
     foldList f z (x : xs) = f x (foldr f z xs)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listSum :: Num a => [a] -> a
     listSum xs = foldr (\x acc -> x + acc) 0 xs
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listProduct :: Num a => [a] -> a
     listProduct xs = foldr (\x acc -> x * acc) 1 xs
   \end{lstlisting}
@@ -619,9 +595,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listSum :: Num a => [a] -> a
     listSum xs = foldr (+) 0 xs
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listProduct :: Num a => [a] -> a
     listProduct xs = foldr (*) 1 xs
   \end{lstlisting}
@@ -639,9 +613,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum :: (Foldable t, Num a) => t a -> a
     sum xs = foldr (+) 0 xs
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     product :: (Foldable t, Num a) => t a -> a
     product xs = foldr (*) 1 xs
   \end{lstlisting}
@@ -856,9 +828,7 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Ordering = LT | EQ | GT
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     class Eq a => Ord a where
       compare :: a -> a -> Ordering
       compare x y = if x == y then EQ else if x <= y then LT else GT
@@ -989,9 +959,7 @@
     sum3Maybes mx my mz = sum3 <$> mx <*> my <*> mz
       where
         sum3 x y z = x + y + z
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum4Maybes :: Num a => Maybe a -> Maybe a -> Maybe a -> Maybe a -> Maybe a
     sum4Maybes mx my mz mw = sum4 <$> mx <*> my <*> mz <*> mw
       where
@@ -1150,14 +1118,10 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     computation1 :: IO ()
     computation1 = putStr "n := "
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     computation2 :: IO Integer
     computation2 = readLn
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     computation3 :: Integer -> IO ()
     computation3 n = case compare n 0 of
       LT -> putStrLn "n < 0"
@@ -1289,14 +1253,10 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Control.Monad.ST
     import Data.STRef
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     factorial :: Integral a => a -> a
     factorial n = runST (factorialST n)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     factorialST :: Integral a => a -> ST s a
     factorialST n = do
       accRef <- newSTRef 1
@@ -1342,14 +1302,11 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import qualified Data.List
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     main :: IO ()
     main = do
       putStrLn "Please insert a sequence of items delimited by white space."
       input <- getLine
-
       putStrLn ""
       putStrLn "Without duplicates, the items are:"
       putStrLn (unwords (Data.List.nub (words input)))
@@ -1363,14 +1320,11 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import qualified Data.List as L
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     main :: IO ()
     main = do
       putStrLn "Please insert a sequence of items delimited by white space."
       input <- getLine
-
       putStrLn ""
       putStrLn "Without duplicates, the items are:"
       putStrLn (unwords (L.nub (words input)))
@@ -1381,14 +1335,11 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Data.List
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     main :: IO ()
     main = do
       putStrLn "Please insert a sequence of items delimited by white space."
       input <- getLine
-
       putStrLn ""
       putStrLn "Without duplicates, the items are:"
       putStrLn (unwords (nub (words input)))
@@ -1400,36 +1351,26 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     module Triangle2D (Triangle (..), perimeter, area) where
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Data.List (permutations)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Triangle a = Triangle {x1, y1, x2, y2, x3, y3 :: a}
       deriving (Show, Read)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Eq a => Eq (Triangle a) where
       (==) :: Triangle a -> Triangle a -> Bool
       Triangle x11 y11 x12 y12 x13 y13 == Triangle x21 y21 x22 y22 x23 y23 =
         elem
           [(x11, y11), (x12, y12), (x13, y13)]
           (permutations [(x21, y21), (x22, y22), (x23, y23)])
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     perimeter :: Floating a => Triangle a -> a
     perimeter (Triangle x1 y1 x2 y2 x3 y3) = a + b + c
       where
         a = segmentLength x1 y1 x2 y2
         b = segmentLength x2 y2 x3 y3
         c = segmentLength x3 y3 x1 y1
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     area :: Floating a => Triangle a -> a
     area (Triangle x1 y1 x2 y2 x3 y3) = sqrt (s * (s - a) * (s - b) * (s - c))
       where
@@ -1437,9 +1378,7 @@
         a = segmentLength x1 y1 x2 y2
         b = segmentLength x2 y2 x3 y3
         c = segmentLength x3 y3 x1 y1
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     segmentLength :: Floating a => a -> a -> a -> a -> a
     segmentLength x1 y1 x2 y2 = sqrt ((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
   \end{lstlisting}
@@ -1491,9 +1430,7 @@
 
       (/=) :: a -> a -> Bool
       x /= y = not (x == y)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookup :: Eq a => a -> [(a, b)] -> Maybe b
     lookup _ [] = Nothing
     lookup key ((k, v) : _) | key == k = Just v
@@ -1513,9 +1450,7 @@
       (==) :: a -> a -> Bool,
       (/=) :: a -> a -> Bool
     }
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookup :: Eq a -> a -> [(a, b)] -> Maybe b
     lookup _ _ [] = Nothing
     lookup (Eq (==) _) key ((k, v) : _) | key == k = Just v
@@ -2346,9 +2281,7 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data SymbolId = SymbolId {name :: String, interval :: (Int, Int)}
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Token = Token {interval :: (Int, Int)}
   \end{lstlisting}
 
@@ -2415,9 +2348,7 @@
         varName :: String,
         interval :: (Int, Int)
       } -> Expression
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       IntegerExpression :: {
         integer :: Integer,
         interval :: (Int, Int)
@@ -2692,9 +2623,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     (<:) :: Type -> Type -> Bool
     t1 <: t2 = isJust (merge t1 t2)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     merge :: Type -> Type -> Maybe Type
     merge Unknown _ = Just Unknown
     merge _ Unknown = Just Unknown
@@ -2722,13 +2651,9 @@
       funs :: [(String, ([Type], Type))],
       vars :: [(String, Type)]
     }
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type Environment = [Scope]
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Typer a = Typer {runTyper :: Environment -> (a, Environment, [Error])}
       deriving Functor
   \end{lstlisting}
@@ -2754,9 +2679,7 @@
         let (x, env', errors1) = runTyper mx env
             (y, env'', errors2) = runTyper my env'
          in (f x y, env'', errors1 ++ errors2)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Typer where
       (>>=) :: Typer a -> (a -> Typer b) -> Typer b
       mx >>= f = Typer $ \env ->
@@ -2779,9 +2702,7 @@
       scope : parents ->
         let types' = (name, t) : types scope
          in (t, scope {types = types'} : parents, [])
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupType :: String -> Typer (Maybe (Type, Int))
     lookupType name = Typer (\env -> (go 0 env, env, []))
       where
@@ -2806,9 +2727,7 @@
       scope : parents ->
         let funs' = (name, signature) : funs scope
          in ((), scope {funs = funs'} : parents, [])
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
     lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
       where
@@ -2830,9 +2749,7 @@
       scope : parents ->
         let vars' = (name, t) : vars scope
          in ((), scope {vars = vars'} : parents, [])
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupVarType :: String -> Typer (Maybe (Type, Int))
     lookupVarType name = Typer (\env -> (go 0 env, env, []))
       where
@@ -2879,13 +2796,9 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression IntegerExpression {} = pure Int
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression RationalExpression {} = pure Float
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression VarExpression {varName, interval} =
       lookupVarType varName >>= \case
         Just (t, _) -> pure t
@@ -2913,9 +2826,7 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression ArrayExpression {elems = []} = pure (Array Unknown)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression ArrayExpression {elems = elem : elems} = do
       t <- checkExpression elem
       go elems t
@@ -2965,9 +2876,7 @@
           Int -> pure Int
           Float -> pure Float
           _ -> report' (InvalidUnary unary operandT)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression UnaryExpression {unary, operand}
       | MinusOperator {} <- unary = do
         operandT <- checkExpression operand
@@ -3060,9 +2969,7 @@
           (Float, Float) -> pure Float
           (Array t1, Array t2) | Just t <- merge t1 t2 -> pure (Array t)
           (_, _) -> report' (InvalidBinary binary leftT rightT)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression {left, binary, right}
       | MultiplyOperator {} <- binary = do
         leftT <- checkExpression left
@@ -3112,9 +3019,7 @@
         checkExpression left
         checkExpression right
         pure Bool
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression {left, binary, right}
       | NotEqualOperator {} <- binary = do
         checkExpression left
@@ -3210,9 +3115,7 @@
     checkStatement _ ExpressionStatement {value} = do
       checkExpression value
       pure False
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement _ DefinitionStatement {definition} = do
       checkDefinitions [definition]
       pure False
@@ -3252,9 +3155,7 @@
       unless (t <: Bool) (report (InvalidType predicate Bool t))
       withNewScope (checkStatement expectedT body)
       pure False
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement expectedT DoWhileStatement {body, predicate} = do
       doesReturn <- withNewScope (checkStatement expectedT body)
       t <- checkExpression predicate
@@ -3271,9 +3172,7 @@
       t <- checkExpression result
       unless (t <: expectedT) (report (InvalidType result expectedT t))
       pure True
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement expectedT statement @ ReturnStatement {result = Nothing} = do
       unless (Unit <: expectedT) (report (MissingReturnValue statement expectedT))
       pure True
@@ -3358,9 +3257,7 @@
           Nothing -> pure Unknown
 
         defineFunSignature name (paramTs, returnT)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     getType :: Value -> Evaluator Type
     getType = \case
       PlainTypeId {name, interval} -> lookupType name >>= \case
@@ -3419,13 +3316,9 @@
       funs :: [(String, Function)],
       vars :: [(String, Reference)]
     }
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type State = [Frame]
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Evaluator a = Evaluator (State -> IO (Result a, State))
       deriving Functor
   \end{lstlisting}
@@ -3455,9 +3348,7 @@
       | Int Int64
       | Float Double
       | Array (Vector Reference)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Reference = Reference (IORef Value)
   \end{lstlisting}
 
@@ -3494,14 +3385,10 @@
     newRef v = liftIO $ do
       ref <- newIORef v
       pure (Reference ref)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     readRef :: MonadIO m => Reference -> m Value
     readRef (Reference ref) = liftIO (readIORef ref)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     writeRef :: MonadIO m => Reference -> Value -> m ()
     writeRef (Reference ref) v = liftIO (writeIORef ref v)
   \end{lstlisting}
@@ -3531,9 +3418,7 @@
             ifM (compareVals x y) (go n (i + 1)) (pure False)
 
       (_, _) -> pure False
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     compareRefs :: MonadIO m => Reference -> Reference -> m Bool
     compareRefs r1 r2 = do
       v1 <- readRef r1
@@ -3557,9 +3442,7 @@
       Array rs -> do
         rs' <- Vector.forM rs cloneRef
         pure (Array rs')
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     cloneRef :: MonadIO m => Reference -> m Reference
     cloneRef r = do
       v <- readRef r
@@ -3574,9 +3457,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     runEvaluatorStep :: MonadIO m => Evaluator a -> State -> m (Result a, State)
     runEvaluatorStep (Evaluator f) state = liftIO (f state)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     runEvaluator :: MonadIO m => Evaluator a -> State -> m (Either Error a, State)
     runEvaluator mx state = do
       (result, state') <- runEvaluatorStep mx state
@@ -3605,9 +3486,7 @@
           Done x -> runEvaluatorStep (f x <$> my) state'
           Debug statement mx -> pure (Debug statement (liftA2 f mx my), state')
           Error error -> pure (Error error, state')
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Evaluator where
       (>>=) :: Evaluator a -> (a -> Evaluator b) -> Evaluator b
       mx >>= f = Evaluator $ \state -> do
@@ -3671,9 +3550,7 @@
       frame : parents -> do
         let funs' = (name, fun) : funs frame
         pure (Done (), frame {funs = funs'} : parents)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupFun :: String -> Evaluator (Maybe (Function, Int))
     lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
       where
@@ -3682,9 +3559,7 @@
         go depth (Frame {offset, funs} : parents) = case lookup name funs of
           Just fun -> Just (fun, depth)
           Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     defineVar :: String -> Reference -> Evaluator ()
     defineVar name r = Evaluator $ \case
       [] -> pure (Done (), [Frame 0 [] [(name, r)]])
@@ -3692,9 +3567,7 @@
       frame : parents -> do
         let vars' = (name, r) : vars frame
         pure (Done (), frame {vars = vars'} : parents)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupVar :: String -> Evaluator (Maybe (Reference, Int))
     lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
       where
@@ -3727,9 +3600,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     debug :: Statement -> Evaluator ()
     debug statement = Evaluator (\state -> pure (Debug statement (pure ()), state))
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     raise :: Error -> Evaluator a
     raise error = Evaluator (\state -> pure (Error error, state))
   \end{lstlisting}
@@ -3751,14 +3622,10 @@
       case toIntegralSized integer of
         Just x -> newRef (Int x)
         Nothing -> raise (IntegerOverflow expression)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression RationalExpression {rational} =
       newRef (Float (fromRat rational))
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression VarExpression {varName, interval} =
       lookupVar varName >>= \case
         Just (r, _) -> pure r
@@ -3825,9 +3692,7 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     safeUnary op x = toIntegralSized (toInteger (op x))
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     safeBinary op x y = toIntegralSized (toInteger x `op` toInteger y)
   \end{lstlisting}
 
@@ -3846,9 +3711,7 @@
           _ -> do
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression expression @ UnaryExpression {unary, operand}
       | MinusOperator {} <- unary = do
         operandR <- evalExpression operand
@@ -3863,9 +3726,7 @@
           _ -> do
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression UnaryExpression {unary, operand}
       | NotOperator {} <- unary = do
         operandR <- evalExpression operand
@@ -3877,9 +3738,7 @@
           _ -> do
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression UnaryExpression {unary, operand}
       | LenOperator {} <- unary = do
         operandR <- evalExpression operand
@@ -3955,9 +3814,7 @@
             leftT <- getType leftV
             rightT <- getType rightV
             raise (InvalidBinary binary leftT rightT)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression expression @ BinaryExpression {left, binary, right}
       | MultiplyOperator {} <- binary = do
         leftR <- evalExpression left
@@ -4032,9 +3889,7 @@
         rightR <- evalExpression right
         x <- compareRefs leftR rightR
         newRef (Bool x)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression BinaryExpression {left, binary, right}
       | NotEqualOperator {} <- binary = do
         leftR <- evalExpression left
@@ -4216,9 +4071,7 @@
     evalExpression DefinitionStatement {definition} = do
       evalDefinitions [definition]
       pure Nothing
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression ExpressionStatement {value} = do
       evalExpression value
       pure Nothing
@@ -4242,9 +4095,7 @@
         _ -> do
           t <- getType v
           raise (InvalidType predicate Type.Bool t)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression IfElseStatement {predicate, trueBranch, falseBranch} = do
       r <- evalExpression predicate
       v <- readRef r
@@ -4277,9 +4128,7 @@
         _ -> do
           t <- getType v
           raise (InvalidType predicate Type.Bool t)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression statement @ DoWhileStatement {body, predicate} =
       withNewFrame 1 (evalStatement body) >>= \case
         Just r -> pure (Just r)
@@ -4303,9 +4152,7 @@
     evalExpression ReturnStatement {result = Just result} = do
       r <- evalExpression result
       pure (Just r)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression ReturnStatement {result = Nothing} = do
       r <- newRef Unit
       pure (Just r)
@@ -4375,18 +4222,14 @@
     evalDefinitions definitions = do
       for_ definitions evalDefinition1
       for_ definitions evalDefinition2
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalDefinition1 :: Definition -> Evaluator ()
     evalDefinition1 definition = case definition of
       VarDefinition {} -> pure ()
 
       FunDefinition {funId = SymbolId {name}} ->
         defineFun name (UserDefined definition)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalDefinition2 :: Definition -> Evaluator ()
     evalDefinition2 = \case
       VarDefinition {varId = SymbolId {name}, value} -> do
@@ -4420,9 +4263,7 @@
       uncons (offset, stream) = uncons stream >>= \case
         Just (token, rest) -> pure (Just (token, (offset + 1, rest)))
         Nothing -> pure Nothing
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     getOffset :: Monad m => ParsecT (a, s) u m a
     getOffset = do
       State {stateInput = (offset, _)} <- getParserState
@@ -4549,14 +4390,10 @@
     token literal = syntax $ do
       text literal
       pure Token
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     text :: Stream s m Char => String -> ParserT s m String
     text literal = try (string literal) <?> ("“" ++ literal ++ "”")
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     s :: Stream s m Char => ParserT s m ()
     s = skipMany (skipMany1 (space <?> "") <|> void (comment <?> ""))
   \end{lstlisting}
@@ -4662,9 +4499,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression :: Stream s m Char => ParserT s m Expression
     expression = expression1
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression1 :: Stream s m Char => ParserT s m Expression
     expression1 = chainl1 expression2 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4675,9 +4510,7 @@
         ]
 
       pure (\left right -> BinaryExpression left binary right)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression2 :: Stream s m Char => ParserT s m Expression
     expression2 = chainl1 expression3 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4687,9 +4520,7 @@
         ]
 
       pure (\left right -> BinaryExpression left binary right)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression3 :: Stream s m Char => ParserT s m Expression
     expression3 = chainl1 expression4 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4701,9 +4532,7 @@
         ]
 
       pure (\left right -> BinaryExpression left binary right)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression4 :: Stream s m Char => ParserT s m Expression
     expression4 = chainl1 expression5 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4713,9 +4542,7 @@
         ]
 
       pure (\left right -> BinaryExpression left binary right)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression5 :: Stream s m Char => ParserT s m Expression
     expression5 = chainl1 expression6 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4800,9 +4627,7 @@
       predicate <- s *> expression
       body <- s *> statement
       pure (WhileStatement whileKeyword predicate body)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     doWhileStatement :: Stream s m Char => ParserT s m Statement
     doWhileStatement = do
       doKeyword <- keyword "do"
@@ -4824,9 +4649,7 @@
       result <- s *> optionMaybe expression
       semicolon <- s *> token ";"
       pure (ReturnStatement returnKeyword result semicolon)
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     assertStatement :: Stream s m Char => ParserT s m Statement
     assertStatement = do
       assertKeyword <- keyword "assert"
@@ -4979,7 +4802,7 @@
     highlighting. One could say that allowing for minor potential discrepancies
     between the two which few would notice is good enough. Or, one could be
     pedantic and say that there should be only one source of truth. Readers can
-    guess that I choose the second option.
+    guess that I chose the second option.
 
     This consideration gives rise to the first problem: using part of
     GtkSourceView's features, while performing syntax highlighting based on the
@@ -5017,26 +4840,20 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     module Main (main) where
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Control.Monad
     import System.Exit
     import qualified Data.Text as Text
     import qualified GI.Gio as G
     import qualified GI.Gtk as Gtk
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     main :: IO ()
     main = do
       Just application <- Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags]
       G.onApplicationActivate application (onActivate application)
       status <- G.applicationRun application Nothing
       when (status /= 0) (exitWith (ExitFailure (fromIntegral status)))
-  \end{lstlisting}
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
     onActivate application = do
       label <- Gtk.labelNew (Just (Text.pack "0"))
