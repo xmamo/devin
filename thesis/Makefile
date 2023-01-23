@@ -1,17 +1,17 @@
 .PHONY: all
 all: thesis.pdf
 
-thesis.pdf: PhdThesis theorems
+thesis.pdf: PhdThesis theorems thesis.tex
 	TEXINPUTS=:PhdThesis:theorems latexmk -pdf thesis.tex
 
 PhdThesis:
 	rm -rf PhdThesis
-	curl -k 'https://users.dimi.uniud.it/~marco.comini/LaTeX/PhdThesis/PhdThesis.tbz' | tar -xjf -
+	wget -O - 'https://users.dimi.uniud.it/~marco.comini/LaTeX/PhdThesis/PhdThesis.tbz' | tar -xjf -
 	$(MAKE) -C PhdThesis
 
 theorems:
 	rm -rf theorems
-	curl -k 'https://users.dimi.uniud.it/~marco.comini/LaTeX/Theorems/theorems.tbz' | tar -xjf -
+	wget -O - 'https://users.dimi.uniud.it/~marco.comini/LaTeX/Theorems/theorems.tbz' | tar -xjf -
 	$(MAKE) -C theorems
 
 .PHONY: clean
