@@ -336,10 +336,8 @@ onActivate application = do
             -- ugly, but it works.
 
             (line, column) <- getLineColumn startIter
-            let s = showsLineColumn (line, column) (showChar ' ' (display error))
-            let s' = replace ">" "&gt;" (replace "<" "&lt;" (replace "&" "&amp;" s))
-            let s'' = "<tt>" ++ s' ++ "</tt>"
-            let s''' = replace ">" "&gt;" (replace "<" "&lt;" (replace "&" "&amp;" s''))
+            let t = showsLineColumn (line, column) (' ' : display error)
+            let t' = "&lt;tt&gt;" ++ escapeXML t ++ "&lt;/tt&gt;"
 
             let string =
                   "<interface>\n\
@@ -347,7 +345,7 @@ onActivate application = do
                   \    <property name=\"title\">Error</property>\n\
                   \    <property name=\"message-type\">error</property>\n\
                   \    <property name=\"buttons\">close</property>\n\
-                  \    <property name=\"text\">" ++ s''' ++ "</property>\n\
+                  \    <property name=\"text\">" ++ t' ++ "</property>\n\
                   \    <property name=\"use-markup\">true</property>\n\
                   \  </object>\n\
                   \</interface>\0"
@@ -460,3 +458,12 @@ showMessages messages =
     f (Expect _) = True
     f (Message _) = True
     f _ = False
+
+
+escapeXML :: String -> String
+escapeXML s =
+  let s' = replace "&" "&amp;" s
+      s'' = replace "\0" "&#0;" s'
+      s''' = replace "<" "&lt;" s''
+      s'''' = replace ">" "&gt;" s'''
+   in s''''
