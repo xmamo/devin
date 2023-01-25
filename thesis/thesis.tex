@@ -1,4 +1,4 @@
-\documentclass[UdineBachThesis,american,11pt,draft]{PhdThesis}
+\documentclass[UdineBachThesis,american,11pt]{PhdThesis}
 
 \usepackage{babel}
 \usepackage[final]{graphicx}
@@ -22,7 +22,7 @@
 
 \author{Matteo Morena}
 \supervisor{Prof.\ Marco Comini}
-\date{2022--2023}
+\date{2021--2022}
 
 \title{
   Implementation of an interpreter with graphical interface of a simple
@@ -114,6 +114,8 @@
     pythagoras = \x y -> sqrt (x ^ 2  + y ^ 2)
   \end{lstlisting}
 
+  \pagebreak
+
   This declaration binds the name \lstinline@pythagoras@ to a function of two
   arguments which applies Pythagoras' theorem. The symbol \lstinline@\@ is
   pronounced \emph{lambda}, as the notation recalls the one used in lambda
@@ -177,6 +179,8 @@
 
   Yet another alternative to define the factorial function is to employ tail
   recursion:
+
+  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     factorial' :: Integral a => a -> a
@@ -372,6 +376,8 @@
     highest.
   \end{itemize}
 
+  \newpage
+
   \section{Strings}
 
   As mentioned, Haskell strings are just lists of characters. For example, the
@@ -429,6 +435,8 @@
     complexIm :: Complex -> Double
     complexIm (Complex _ b) = b
   \end{lstlisting}
+
+  \pagebreak
 
   The data declaration on the first line introduces a new type,
   \lstinline@Complex@; a value of such a type can be constructed with the
@@ -553,6 +561,8 @@
   functions are first-class, implementing and using higher-order functions is
   very succinct syntactically.
 
+  \pagebreak
+
   Let's consider two functions: one which calculates the sum every element of a
   list, and one calculates the product of every element of a list. Such
   functions could be defined as:
@@ -618,7 +628,11 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum :: (Foldable t, Num a) => t a -> a
     sum xs = foldr (+) 0 xs
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     product :: (Foldable t, Num a) => t a -> a
     product xs = foldr (*) 1 xs
   \end{lstlisting}
@@ -750,6 +764,8 @@
   somewhat arbitrarily chosen to be the subject of mapping. Implementing a
   \lstinline@Functor@ instance for requires the type constructor
   \lstinline@Either@ to be applied partially, as follows:
+
+  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Functor (Either a) where
@@ -1069,6 +1085,8 @@
   that passing less than the appropriate amount of arguments to invocations
   implies partial application.
 
+  \newpage
+
   \section{Basic input and output}
 
   Let's implement a very simple program which performs the following task:
@@ -1126,7 +1144,11 @@
 
     computation2 :: IO Integer
     computation2 = readLn
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     computation3 :: Integer -> IO ()
     computation3 n = case compare n 0 of
       LT -> putStrLn "n < 0"
@@ -1187,7 +1209,11 @@
       let d = b ^ 2 - 4 * a * c
       let x1 = (-b - sqrt d) / (2 * a)
       let x2 = (-b + sqrt d) / (2 * a)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       if isNaN x1 || isInfinite x1 || isNaN x2 || isInfinite x2 then do
         putStrLn ""
         putStrLn "No solutions!"
@@ -1355,13 +1381,21 @@
   triangles defined on the Euclidean plane:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    module Triangle2D (Triangle (..), perimeter, area) where
+    module Triangle2D (
+      Triangle (..),
+      perimeter,
+      area
+    ) where
 
-    import Data.List (permutations)
+    import Data.List
 
     data Triangle a = Triangle {x1, y1, x2, y2, x3, y3 :: a}
       deriving (Show, Read)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Eq a => Eq (Triangle a) where
       (==) :: Triangle a -> Triangle a -> Bool
       Triangle x11 y11 x12 y12 x13 y13 == Triangle x21 y21 x22 y22 x23 y23 =
@@ -1451,10 +1485,7 @@
   the \lstinline@Eq@ type class desugars into a record of functions:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    data Eq a = Eq {
-      (==) :: a -> a -> Bool,
-      (/=) :: a -> a -> Bool
-    }
+    data Eq a = Eq {(==), (/=) :: a -> a -> Bool}
 
     lookup :: Eq a -> a -> [(a, b)] -> Maybe b
     lookup _ _ [] = Nothing
@@ -1479,6 +1510,8 @@
 
         g x y = not (f x y)
   \end{lstlisting}
+
+  \pagebreak
 
   Finally, many instances can be generated in terms of others:
 
@@ -1559,6 +1592,8 @@
     additive expression.
   \end{itemize}
 
+  \pagebreak
+
   According to such rules, the string \lstinline@2*(3+4)@ is a valid arithmetic
   expression. By definition:
 
@@ -1604,6 +1639,7 @@
     \begin{tabular}{cc}
       \begin{tikzpicture}[
         semithick,
+        level distance=14mm,
         every node/.style={circle,draw,font=\ttfamily}
       ]
         \node {+}
@@ -1619,6 +1655,7 @@
 
       \begin{tikzpicture}[
         semithick,
+        level distance=14mm,
         every node/.style={circle,draw,font=\ttfamily}
       ]
         \node {+}
@@ -2016,6 +2053,8 @@
     \label{table:assignmentoperators}
   \end{table}
 
+  \newpage
+
   \section{Working with arrays}
 
   Arrays support the following operations:
@@ -2075,6 +2114,8 @@
         }  // 'i', 't' go out of scope
     }  // 'array' goes out of scope
   \end{lstlisting}
+
+  \newpage
 
   \subsection{Branching and looping mechanisms}
 
@@ -2202,6 +2243,8 @@
     \caption{The debugger displaying the current state of the stack}
   \end{figure}
 
+  \pagebreak
+
   Runtime errors are handled as well. When an error occurs, the offending code
   fragment is highlighted and a message dialog describing the problem is shown
   to the user. Runtime errors include, but are not limited to, index out of
@@ -2290,6 +2333,8 @@
     data Token = Token {interval :: (Int, Int)}
   \end{lstlisting}
 
+  \newpage
+
   \subsection{Representing expressions}
 
   Devin supports 4 unary operators: \lstinline@+@, \lstinline@-@,
@@ -2353,7 +2398,11 @@
         varName :: String,
         interval :: (Int, Int)
       } -> Expression
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       IntegerExpression :: {
         integer :: Integer,
         interval :: (Int, Int)
@@ -2403,6 +2452,8 @@
         close :: Token
       } -> Expression
   \end{lstlisting}
+
+  \newpage
 
   \subsection{Representing statements}
 
@@ -2458,7 +2509,11 @@
         result :: Maybe Expression,
         semicolon :: Token
       } -> statement
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       AssertStatement :: {
         assertKeyword :: Token,
         predicate :: Expression,
@@ -2516,6 +2571,8 @@
       } -> Definition
   \end{lstlisting}
 
+  \newpage
+
   \section{Representing semantic errors}
 
   Both the evaluator and the type checker require some data type to represent
@@ -2568,7 +2625,11 @@
       MissingReturnStatement :: {
         funId :: SymbolId
       } -> Error
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       -- Runtime errors:
 
       IntegerOverflow :: {
@@ -2622,6 +2683,8 @@
       | Array Type
       | Placeholder String
   \end{lstlisting}
+
+  \pagebreak
 
   To compare types, the relation operator \lstinline@(<:)@ is provided:
 
@@ -2684,7 +2747,11 @@
         let (x, env', errors1) = runTyper mx env
             (y, env'', errors2) = runTyper my env'
          in (f x y, env'', errors1 ++ errors2)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Typer where
       (>>=) :: Typer a -> (a -> Typer b) -> Typer b
       mx >>= f = Typer $ \env ->
@@ -2742,6 +2809,8 @@
           Just signature -> Just (signature, depth)
           Nothing -> go (depth + 1) parents
   \end{lstlisting}
+
+  \newpage
 
   Finally, variables can be defined and looked up with \lstinline@defineVarType@
   and \lstinline@lookupVarType@.
@@ -2803,7 +2872,11 @@
     checkExpression IntegerExpression {} = pure Int
 
     checkExpression RationalExpression {} = pure Float
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression VarExpression {varName, interval} =
       lookupVarType varName >>= \case
         Just (t, _) -> pure t
@@ -2979,7 +3052,11 @@
       | MultiplyOperator {} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case (leftT, rightT) of
           (Unknown, _) -> pure Unknown
           (_, Unknown) -> pure Unknown
@@ -3040,7 +3117,11 @@
       | AndOperator {} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case (leftT, rightT) of
           (Unknown, _) -> pure Unknown
           (_, Unknown) -> pure Unknown
@@ -3099,6 +3180,8 @@
 
         Nothing -> report' (UnknownFun name interval)
   \end{lstlisting}
+
+  \newpage
 
   \subsection{Checking statements}
 
@@ -3160,7 +3243,11 @@
       unless (t <: Bool) (report (InvalidType predicate Bool t))
       withNewScope (checkStatement expectedT body)
       pure False
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement expectedT DoWhileStatement {body, predicate} = do
       doesReturn <- withNewScope (checkStatement expectedT body)
       t <- checkExpression predicate
@@ -3226,6 +3313,8 @@
         check statement = checkStatement expectedT statement
   \end{lstlisting}
 
+  \newpage
+
   \subsection{Checking variable and function definitions}
 
   Given a block, definitions are checked using a two-pass strategy. The first
@@ -3233,8 +3322,7 @@
   environment; the body of the functions is not checked at this stage. The
   second pass processes variable definitions and statements within those
   function definitions. Without two-pass type checking, mutually recursive
-  function definitions would not be supported---at least not without a mechanism
-  like C's forward declarations.
+  function definitions could not be supported.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkDefinitions :: [Definition] -> Typer ()
@@ -3285,7 +3373,11 @@
       VarDefinition {varId = SymbolId {name}, value} -> do
         t <- checkExpression value
         defineVarType name t
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       FunDefinition {funId, params, returnInfo, body} -> withNewScope $ do
         for_ params $ \(_, SymbolId {name}, typeInfo) -> case typeInfo of
           Just (_, paramTypeId) -> do
@@ -3341,6 +3433,8 @@
   Values are not stored directly inside \lstinline@State@: each identifier is
   bound to a cell which holds the actual value. This way, multiple identifiers
   can refer to the same value.
+
+  \pagebreak
 
   In Devin, cells are implemented by the \lstinline@Reference@ data type; it
   wraps Haskell's \lstinline@IORef@, which provides mutable references in the
@@ -3408,7 +3502,11 @@
       (Bool x, Bool y) -> pure (x == y)
       (Int x, Int y) -> pure (x == y)
       (Float x, Float y) -> pure (x == y)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       (Array rs1, Array rs2) -> do
         let n1 = Vector.length rs1
         let n2 = Vector.length rs2
@@ -3466,7 +3564,11 @@
     runEvaluator :: MonadIO m => Evaluator a -> State -> m (Either Error a, State)
     runEvaluator mx state = do
       (result, state') <- runEvaluatorStep mx state
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       case result of
         Done x -> pure (Right x, state')
         Debug _ mx -> runEvaluator mx state'
@@ -3525,9 +3627,12 @@
   Contrary to the environment used in static type checking, there's not a
   one-to-one correspondence between the evaluator's runtime stack and lexical
   scoping. As such, each frame has to keep track which of is its lexical parent;
-  this is done with the \lstinline@offset@ field. This value is used in
-  \lstinline@lookupFun@ and \lstinline@lookupVar@, as it indicates how many
-  frames need to be skipped during search:
+  this is done with the \lstinline@offset@ field. This \linebreak
+
+  \pagebreak
+
+  value is used in \lstinline@lookupFun@ and \lstinline@lookupVar@, as it
+  indicates how many frames need to be skipped during search:
 
   \begin{itemize}
     \item When $\text{\lstinline@offset@} = 1$, the previous frame coincides
@@ -3582,6 +3687,8 @@
           Just ref -> Just (ref, depth)
           Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
   \end{lstlisting}
+
+  \newpage
 
   The function \lstinline@withNewFrame@ runs another \lstinline@Evaluator@ on
   a modified state here a new \lstinline@Frame@ is added; when the function
@@ -3703,6 +3810,8 @@
 
   Unary expressions are evaluated as follows:
 
+  \newpage
+
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression UnaryExpression {unary, operand}
       | PlusOperator {} <- unary = do
@@ -3756,6 +3865,8 @@
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
   \end{lstlisting}
+
+  \pagebreak
 
   The binary arithmetic operators \lstinline@-@, \lstinline@/@ and \lstinline@%@
   have similar implementations between themselves, with the exception that
@@ -3814,7 +3925,11 @@
                 let f i = cloneRef (if i < n1 then rs1 ! i else rs2 ! (i - n1))
                 rs3 <- Vector.generateM n3 f
                 newRef (Array rs3)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
           (_, _) -> do
             leftT <- getType leftV
             rightT <- getType rightV
@@ -3871,7 +3986,11 @@
       | LessOperator {} <- binary = do
         leftR <- evalExpression left
         leftV <- readRef leftR
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         rightR <- evalExpression right
         rightV <- readRef rightR
 
@@ -3928,6 +4047,8 @@
                 rightT <- getType rightV
                 raise (InvalidBinary binary leftT rightT)
   \end{lstlisting}
+
+  \newpage
 
   For \lstinline@xor@, both operands need to be evaluated.
 
@@ -4039,7 +4160,11 @@
 
               case argV of
                 Float x -> newRef (Int (round x))
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
                 _ -> do
                   argT <- getType argV
                   raise (InvalidType (head args) Type.Float argT)
@@ -4096,7 +4221,11 @@
       case v of
         Bool True -> withNewFrame 1 (evalStatement trueBranch)
         Bool False -> pure Nothing
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         _ -> do
           t <- getType v
           raise (InvalidType predicate Type.Bool t)
@@ -4150,6 +4279,8 @@
               t <- getType v
               raise (InvalidType predicate Type.Bool t)
   \end{lstlisting}
+
+  \newpage
 
   Return statements are evaluated as follows:
 
@@ -4209,6 +4340,8 @@
         eval statement = evalStatement statement
   \end{lstlisting}
 
+  \newpage
+
   \subsection{Evaluating variable and function definitions}
 
   As mentioned previously, the evaluator is independent from the type checker.
@@ -4258,9 +4391,13 @@
   syntax highlighter works with indices. Luckily, there is a hack to get such
   arguably missing functionality back. Usually, the input of a
   \lstinline@parsec@ parser is some string; by writing new instances for the
-  \lstinline@Stream@ type class, other kinds of inputs can be supported. The
-  trick is to consider the parser's input to be pair: the first element is an
-  integer character offset, the second is the underlying stream.
+  \lstinline@Stream@ type class, other kinds of \linebreak
+
+  \pagebreak
+
+  inputs can be supported. The trick is to consider the parser's input to be a
+  pair: the first element is an integer character offset, the second is the
+  underlying stream.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance (Num a, Stream s m t) => Stream (a, s) m t where
@@ -4319,11 +4456,12 @@
   \lstinline@-@ (sign $-1$); if neither character could be parsed,
   \lstinline@pure 1@ does nothing and yields $+1$.
 
+  \pagebreak
+
   Digits are parsed with \lstinline@satisfy isDigit@. The parser
   \lstinline[mathescape]@satisfy $p$@ succeeds for any character for which the
   predicate $p$ is true and returns the parsed character. The combinator
   \lstinline[mathescape]@many1 $p$@ applies a parser $p$ one or more times.
-  Thus, \lstinline@many1 (satisfy isDigit)@ parses one or more digits.
 
   The constructor \lstinline@IntegerExpression@ has two fields, the second of
   which is a \lstinline@(Int, Int)@: it marks the start and end offset where the
@@ -4439,6 +4577,8 @@
   Unicode definition allows characters like \lstinline[literate={è}{\`e}{1}]@è@
   or \lstinline[literate={ß}{\ss}{1}]@ß@ to be accepted as well.
 
+  \newpage
+
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     identifier :: Stream s m Char => ParserT s m String
     identifier = flip label "identifier" $ do
@@ -4504,7 +4644,11 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression :: Stream s m Char => ParserT s m Expression
     expression = expression1
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression1 :: Stream s m Char => ParserT s m Expression
     expression1 = chainl1 expression2 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4620,6 +4764,8 @@
           pure (IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch)
   \end{lstlisting}
 
+  \pagebreak
+
   While statements are parsed as a \lstinline@while@ keyword, followed by an
   expression, followed by a statement. Do-while statements are parsed in a
   similar manner, except for the additional \lstinline@do@ keyword and the
@@ -4675,6 +4821,8 @@
 
   Finally, block statements are parsed as an open brace, followed by zero or
   more statements, followed by a closing brace.
+
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     blockStatement :: Stream s m Char => ParserT s m Statement
@@ -4733,7 +4881,11 @@
           pure (first : map snd rest, map fst rest)
 
       close <- s *> token ")"
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       returnInfo <- s *> optionMaybe (token "->") >>= \case
         Nothing -> pure Nothing
 
@@ -4837,6 +4989,8 @@
   display a number $n$ and provide two buttons: one to increment $n$, and one to
   decrement $n$. Of course, the initial value of $n$ should be $0$.
 
+  \newpage
+
   \begin{figure}[h]
     \centering
     \includegraphics[scale=0.8]{7.png}
@@ -4882,7 +5036,11 @@
       Gtk.windowSetTitle window Text.empty
       Gtk.windowSetResizable window False
       Gtk.containerAdd window box
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       Gtk.onButtonClicked buttonMinus $ do
         t <- Gtk.labelGetLabel label
         Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) - 1)))
@@ -4936,6 +5094,26 @@
 
     onActivate' :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
     onActivate' application = do
+      let buildFn = do
+            label <- Gtk.getObject Gtk.Label (Text.pack "label")
+            buttonMinus <- Gtk.getObject Gtk.Button (Text.pack "buttonMinus")
+            buttonPlus <- Gtk.getObject Gtk.Button (Text.pack "buttonPlus")
+            window <- Gtk.getObject Gtk.ApplicationWindow (Text.pack "window")
+  \end{lstlisting}
+
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+            Gtk.onButtonClicked buttonMinus $ do
+              t <- Gtk.labelGetLabel label
+              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) - 1)))
+
+            Gtk.onButtonClicked buttonPlus $ do
+              t <- Gtk.labelGetLabel label
+              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) + 1)))
+
+            pure window
+
       let string =
             "<interface>\n\
             \  <object class=\"GtkApplicationWindow\" id=\"window\">\n\
@@ -4971,22 +5149,6 @@
             \    </child>\n\
             \  </object>\n\
             \</interface>\0"
-
-      let buildFn = do
-            label <- Gtk.getObject Gtk.Label (Text.pack "label")
-            buttonMinus <- Gtk.getObject Gtk.Button (Text.pack "buttonMinus")
-            buttonPlus <- Gtk.getObject Gtk.Button (Text.pack "buttonPlus")
-            window <- Gtk.getObject Gtk.ApplicationWindow (Text.pack "window")
-
-            Gtk.onButtonClicked buttonMinus $ do
-              t <- Gtk.labelGetLabel label
-              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) - 1)))
-
-            Gtk.onButtonClicked buttonPlus $ do
-              t <- Gtk.labelGetLabel label
-              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) + 1)))
-
-            pure window
 
       builder <- Gtk.builderNewFromString (Text.pack string) (-1)
       window <- Gtk.buildWithBuilder buildFn builder
