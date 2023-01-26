@@ -7,12 +7,12 @@ thesis.pdf: PhdThesis theorems thesis.tex
 PhdThesis:
 	rm -rf PhdThesis
 	wget -O - 'https://users.dimi.uniud.it/~marco.comini/LaTeX/PhdThesis/PhdThesis.tbz' | tar -xjf -
-	$(MAKE) -C PhdThesis
+	$(MAKE) -C PhdThesis all
 
 theorems:
 	rm -rf theorems
 	wget -O - 'https://users.dimi.uniud.it/~marco.comini/LaTeX/Theorems/theorems.tbz' | tar -xjf -
-	$(MAKE) -C theorems
+	$(MAKE) -C theorems all
 
 .PHONY: clean
 clean:

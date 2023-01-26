@@ -19,6 +19,12 @@
 
 \usepackage{theorems}
 
+\usepackage[
+  hidelinks,
+  linktoc=all,
+  pdfpagelayout=TwoPageRight
+]{hyperref}
+
 \author{Matteo Morena}
 \supervisor{Prof.\ Marco Comini}
 \date{2021--2022}
@@ -59,9 +65,15 @@
 
   \maketitle
 
+  \cleardoublepage
+
+  \currentpdfbookmark{\abstractname}{abstract}
+
   \begin{abstract}
     % TODO
   \end{abstract}
+
+  \currentpdfbookmark{\acknowledgmentsname}{acknowledgments}
 
   \begin{acknowledgments}
     % TODO
@@ -69,7 +81,10 @@
 
   \frontmatter
 
+  \currentpdfbookmark{\contentsname}{contents}
+
   \tableofcontents
+  \addtocontents{toc}{\vspace{-5pt}}
 
   \mainmatter
 
@@ -688,8 +703,8 @@
 
   Haskell's standard library exposes many other higher-order functions and
   operators; these are all documented at
-  \lstinline@https://hackage.haskell.org/package/base@. Rather than describing
-  them all, I'll let the reader look up the documentation if necessary.
+  \url{https://hackage.haskell.org/package/base}. Rather than describing them
+  all, I'll let the reader look up the documentation if necessary.
 
   \section{Type classes}
 
@@ -1495,7 +1510,7 @@
 
   If type classes become record types, it follows that type class instances
   become record values. An \lstinline@Eq@ instance for the algebraic data type
-  \lstinline@Grade@ of section~\ref{section:udt} can be defined as:
+  \lstinline@Grade@ of \autoref{section:udt} can be defined as:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     gradeEqInstance :: Eq Grade
@@ -3160,9 +3175,8 @@
   \end{lstlisting}
 
   Expressions with the binary operators \lstinline@+=@, \lstinline@-=@,
-  \lstinline@*=@, \lstinline@/=@,
-  \lstinline@%=@ are type checked considering the shorthands detailed in table
-  \ref{table:assignmentoperators}.
+  \lstinline@*=@, \lstinline@/=@, \lstinline@%=@ are type checked considering
+  the shorthands detailed in \autoref{table:assignmentoperators}.
 
   The type resulting from function invocations is determined by looking up the
   callee's signature. If a call refers to an unbound identifier, or if the wrong
@@ -4094,7 +4108,7 @@
   \end{lstlisting}
 
   The other assignment operators are implemented according to the shorthands of
-  table \ref{table:assignmentoperators}. For example, \lstinline@+=@ is
+  \autoref{table:assignmentoperators}. For example, \lstinline@+=@ is
   implemented as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -4389,8 +4403,8 @@
   \section{The parser}
 
   Devin's parser is implemented with the help of the \lstinline@parsec@ parser
-  combinator library. Parser combinators have been described in section
-  \ref{section:parsercombinators}.
+  combinator library. Parser combinators have been described in
+  \autoref{section:parsercombinators}.
 
   As mentioned, the positions of leaf nodes are stored in the syntax tree. While
   the \lstinline@parsec@ library does provide functionality to query the current
@@ -4936,7 +4950,7 @@
 
   \section{The user interface}
 
-  As explained in section \ref{section:editorfeatures}, Devin's graphical user
+  As explained in \autoref{section:editorfeatures}, Devin's graphical user
   interface depends on the GTK+ library. For those unfamiliar, GTK+ is the
   standard GUI library used for Gnome applications; being cross-platform, GTK+
   can be used in other platforms beside the Gnome desktop environment. One
@@ -4991,8 +5005,8 @@
   The focus of this thesis is programming language implementation, not GUI
   development. Rather than explaining all code pertaining to Devin's UI, I'll
   give one example on how GTK+ may be used within Haskell. Devin's UI
-  implementation is listed in the appendix, starting at section
-  \ref{section:appmain}.
+  implementation is listed in the appendix, starting at
+  \autoref{section:appmain}.
 
   Let's consider developing a simple graphical counting application. It should
   display a number $n$ and provide two buttons: one to increment $n$, and one to
@@ -5165,15 +5179,15 @@
       Gtk.widgetShowAll window
   \end{lstlisting}
 
-  \backmatter
-
-  \conclusions
+  \chapter{Conclusions}
 
   % TODO
 
   \newpage
 
   \thispagestyle{empty}
+
+  \backmatter
 
   \appendix
 
@@ -5312,5 +5326,5 @@
     [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
     {../app/Devin/Highlight/Syntax.hs}
 
-  \printbibliography
+  \printbibliography[heading=bibintoc]
 \end{document}
