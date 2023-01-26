@@ -15,7 +15,6 @@
 \addbibresource{thesis.bib}
 
 \usepackage{tikz}
-\usetikzlibrary{positioning}
 \usetikzlibrary{shapes.geometric}
 
 \usepackage{theorems}
@@ -790,7 +789,8 @@
   This declaration gives default method declarations for both \lstinline@(/=)@
   and \lstinline@(==)@. Instances of this class should implement at least one of
   the two operators; if neither \lstinline@(==)@ nor \lstinline@(/=)@ are
-  provided, then both will loop. Primitive data types are instance of this class.
+  provided, then both will loop. Primitive data types are instance of this
+  class.
 
   Instances for the \lstinline@Eq@ are usually generated via
   \lstinline@deriving@ declarations as explained in earlier sections. Of course,
@@ -1803,6 +1803,10 @@
   the purposes of this thesis, I'll discuss the processing of programming
   languages only.
 
+  \newpage
+
+  \thispagestyle{empty}
+
   \chapter{The Devin programming language}
 
   In this thesis, I'll discuss the implementation of a simple imperative
@@ -2295,6 +2299,10 @@
   objective. As optional types are not a common feature and languages shape the
   way we think about solving problems, I decided to add this feature to be
   played around with.
+
+  \newpage
+
+  \thispagestyle{empty}
 
   \chapter{Implementing Devin}
 
@@ -4637,9 +4645,10 @@
   \end{lstlisting}
 
   Parsing binary expressions is more involved, as operator precedence has to be
-  accounted for. There are 5 levels of precedence: the operators \lstinline@and@,
-  \lstinline@or@ and \lstinline@xor@ have the lowest precedence, while
-  \lstinline@*@, \lstinline@/@, \lstinline@%@ have the highest.
+  accounted for. There are 5 levels of precedence: the operators
+  \lstinline@and@, \lstinline@or@ and \lstinline@xor@ have the lowest
+  precedence, while \lstinline@*@, \lstinline@/@,
+  \lstinline@%@ have the highest.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression :: Stream s m Char => ParserT s m Expression
@@ -5161,6 +5170,10 @@
   \conclusions
 
   % TODO
+
+  \newpage
+
+  \thispagestyle{empty}
 
   \appendix
 
