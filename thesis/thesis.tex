@@ -3816,14 +3816,16 @@
   \end{lstlisting}
 
   Evaluating arithmetic expressions on \lstinline@Int@s may lead to overflows.
-  The helper functions \lstinline@safeUnary@ and \lstinline@safeBinary@ wrap
-  Haskell's built-in operators, allowing for overflow detection. Both
-  \lstinline@toInteger@ and \lstinline@toIntegralSized@ are functions from the
-  \lstinline@base@ library. In the context of Devin's evaluator,
-  \lstinline@toInteger@ converts an \lstinline@Int64@ to an unbounded
-  \lstinline@Integer@; \lstinline@toIntegralSized@ is its inverse, as it
-  attempts to convert an \lstinline@Integer@ back to an \lstinline@Int64@. On
-  overflow, it yields \lstinline@Nothing@.
+  The higher-order helper functions \lstinline@safeUnary@ and
+  \lstinline@safeBinary@ are used to wrap Haskell's built-in operators, allowing
+  for overflow detection. Both \lstinline@toInteger@ and
+  \lstinline@toIntegralSized@ are functions from the \lstinline@base@ library.
+  In the context of Devin's evaluator, \lstinline@toInteger@ converts an
+  \lstinline@Int64@ to an unbounded \lstinline@Integer@; its inverse
+  \lstinline@toIntegralSized@ attempts to convert an \lstinline@Integer@ back to
+  an \lstinline@Int64@. If it is not possible to fit an \lstinline@Integer@ in
+  the 64 bits of an \lstinline@Int64@, \lstinline@toIntegralSized@ yields
+  \lstinline@Nothing@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     safeUnary op x = toIntegralSized (op (toInteger x))
@@ -3831,9 +3833,9 @@
     safeBinary op x y = toIntegralSized (toInteger x `op` toInteger y)
   \end{lstlisting}
 
-  Unary expressions are evaluated as follows:
-
   \newpage
+
+  Unary expressions are evaluated as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression UnaryExpression {unary, operand}
