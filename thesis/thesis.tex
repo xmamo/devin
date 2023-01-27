@@ -2321,13 +2321,14 @@
 
   \chapter{Implementing Devin}
 
-  Devin's implementation spans approximately 4500 lines of code. Knowledge about
-  programming in Haskell is required to understand this chapter.
-
-  Devin is entirely written in Haskell. Given the size of its implementation,
-  some details are omitted for brevity. In particular, import declarations and
-  \lstinline@LANGUAGE@ pragmas are left out for simplicity. Devin's full
-  implementation can be found in the appendix.
+  Devin's implementation spans approximately 4500 lines of code and is entirely
+  written in Haskell. Given the size of its implementation, some details are
+  omitted for brevity. In particular, import declarations and
+  \lstinline@LANGUAGE@ pragmas are left out for simplicity. Note that some of
+  the functionality of the package \lstinline@extra@ is used: the library
+  provides extra functions for the standard Haskell libraries, filling out
+  missing functionality. Devin's full implementation can be found in the
+  appendix.
 
   In terms of implementation complexity, both the type checker and the evaluator
   are somewhat simpler than the parser. The parser makes much greater use of
