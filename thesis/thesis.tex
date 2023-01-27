@@ -644,7 +644,7 @@
     sum xs = foldr (+) 0 xs
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     product :: (Foldable t, Num a) => t a -> a
@@ -1226,7 +1226,7 @@
       let x2 = (-b + sqrt d) / (2 * a)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       if isNaN x1 || isInfinite x1 || isNaN x2 || isInfinite x2 then do
@@ -1408,7 +1408,7 @@
       deriving (Show, Read)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Eq a => Eq (Triangle a) where
@@ -2423,7 +2423,7 @@
       } -> Expression
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       IntegerExpression :: {
@@ -2534,7 +2534,7 @@
       } -> statement
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       AssertStatement :: {
@@ -2650,7 +2650,7 @@
       } -> Error
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       -- Runtime errors:
@@ -2772,7 +2772,7 @@
          in (f x y, env'', errors1 ++ errors2)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Typer where
@@ -2897,7 +2897,7 @@
     checkExpression RationalExpression {} = pure Float
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression VarExpression {varName, interval} =
@@ -3142,7 +3142,7 @@
         rightT <- checkExpression right
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case (leftT, rightT) of
@@ -3267,7 +3267,7 @@
       pure False
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement expectedT DoWhileStatement {body, predicate} = do
@@ -3397,7 +3397,7 @@
         defineVarType name t
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       FunDefinition {funId, params, returnInfo, body} -> withNewScope $ do
@@ -3526,7 +3526,7 @@
       (Float x, Float y) -> pure (x == y)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       (Array rs1, Array rs2) -> do
@@ -3540,7 +3540,7 @@
           go n i = do
             x <- readRef (rs1 ! i)
             y <- readRef (rs2 ! i)
-            ifM (compareVals x y) (go n (i + 1)) (pure False)
+            compareVals x y &&^ go n (i + 1)
 
       (_, _) -> pure False
 
@@ -3949,7 +3949,7 @@
                 newRef (Array rs3)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
           (_, _) -> do
@@ -4010,7 +4010,7 @@
         leftV <- readRef leftR
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         rightR <- evalExpression right
@@ -4245,7 +4245,7 @@
         Bool False -> pure Nothing
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         _ -> do
@@ -4669,7 +4669,7 @@
     expression = expression1
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression1 :: Stream s m Char => ParserT s m Expression
@@ -4906,7 +4906,7 @@
       close <- s *> token ")"
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       returnInfo <- s *> optionMaybe (token "->") >>= \case
@@ -5006,7 +5006,7 @@
   development. Rather than explaining all code pertaining to Devin's UI, I'll
   give one example on how GTK+ may be used within Haskell. Devin's UI
   implementation is listed in the appendix, starting at
-  \autoref{section:appmain}.
+  \autoref{section:appmainhs}.
 
   Let's consider developing a simple graphical counting application. It should
   display a number $n$ and provide two buttons: one to increment $n$, and one to
@@ -5061,7 +5061,7 @@
       Gtk.containerAdd window box
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       Gtk.onButtonClicked buttonMinus $ do
@@ -5124,7 +5124,7 @@
             window <- Gtk.getObject Gtk.ApplicationWindow (Text.pack "window")
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
             Gtk.onButtonClicked buttonMinus $ do
@@ -5195,136 +5195,92 @@
 
   \section{\texttt{devin.cabal}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../devin.cabal}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../devin.cabal}
 
   \section{\texttt{src/Devin/Display.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Display.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Display.hs}
 
   \section{\texttt{src/Devin/Error.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Error.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Error.hs}
 
   \section{\texttt{src/Devin/Evaluator.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Evaluator.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Evaluator.hs}
 
   \section{\texttt{src/Devin/Evaluators.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Evaluators.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Evaluators.hs}
 
   \section{\texttt{src/Devin/Interval.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Interval.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Interval.hs}
 
   \section{\texttt{src/Devin/Parsec.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Parsec.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Parsec.hs}
 
   \section{\texttt{src/Devin/Parsers.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Parsers.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Parsers.hs}
 
   \section{\texttt{src/Devin/Syntax.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Syntax.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Syntax.hs}
 
   \section{\texttt{src/Devin/Type.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Type.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Type.hs}
 
   \section{\texttt{src/Devin/Typer.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Typer.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Typer.hs}
 
   \section{\texttt{src/Devin/Typers.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Typers.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Typers.hs}
 
   \section{\texttt{src/Devin/Utils.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../src/Devin/Utils.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../src/Devin/Utils.hs}
 
   \section{\texttt{test/Main.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../test/Main.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../test/Main.hs}
 
   \section{\texttt{test/Devin/EvaluatorsSpec.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../test/Devin/EvaluatorsSpec.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../test/Devin/EvaluatorsSpec.hs}
 
   \section{\texttt{test/Devin/ParsersSpec.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../test/Devin/ParsersSpec.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../test/Devin/ParsersSpec.hs}
 
   \section{\texttt{test/Devin/TypersSpec.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../test/Devin/TypersSpec.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../test/Devin/TypersSpec.hs}
 
   \section{\texttt{app/Main.hs}}
-  \label{section:appmain}
+  \label{section:appmainhs}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../app/Main.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../app/Main.hs}
 
   \section{\texttt{app/Devin/Highlight.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../app/Devin/Highlight.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../app/Devin/Highlight.hs}
 
   \section{\texttt{app/Devin/Tree.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../app/Devin/Tree.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../app/Devin/Tree.hs}
 
   \section{\texttt{app/Devin/Highlight/Braces.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../app/Devin/Highlight/Braces.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../app/Devin/Highlight/Braces.hs}
 
   \section{\texttt{app/Devin/Highlight/Syntax.hs}}
 
-  \lstinputlisting
-    [aboveskip=0pt,basicstyle=\ttfamily\footnotesize]
-    {../app/Devin/Highlight/Syntax.hs}
+  \lstinputlisting[basicstyle=\ttfamily\small]{../app/Devin/Highlight/Syntax.hs}
 
   \printbibliography[heading=bibintoc]
 \end{document}

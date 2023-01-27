@@ -267,7 +267,7 @@ onActivate application = do
 
     atomicWriteIORef parserThreadIdRef parserThread
 
-  -- Set up codeBuffer callback for "notify::cursor-position" signals.
+  -- Set up `codeBuffer` callback for "notify::cursor-position" signals.
   -- The callback takes care of highlighting matching braces.
 
   G.onObjectNotify codeBuffer (Just "cursor-position") $ \_ -> do
@@ -281,9 +281,9 @@ onActivate application = do
       pure ()
 
   -- The play button exhibits different behavior depending on context:
-  -- 1. Initially, its function is to start the evaluation process;
-  -- 2. Pressing it again will advance evaluation to the next debug statement.
-  -- initialPlayButtonCallback holds the action corresponding to (1).
+  --  1. Initially, its function is to start the evaluation process;
+  --  2. Pressing it again will advance evaluation to the next debug statement.
+  -- `initialPlayButtonCallback` holds the action corresponding to (1).
 
   let initialPlayButtonCallback = whenJustM (readIORef syntaxTreeRef) $ \devin -> do
         Gtk.widgetSetSensitive playButton False

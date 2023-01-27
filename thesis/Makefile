@@ -1,7 +1,7 @@
 .PHONY: all
 all: thesis.pdf
 
-thesis.pdf: PhdThesis theorems thesis.tex
+thesis.pdf: PhdThesis theorems thesis.tex thesis.bib
 	TEXINPUTS=:PhdThesis:theorems latexmk -pdf thesis.tex
 
 PhdThesis:

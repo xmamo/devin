@@ -1,5 +1,4 @@
 {-# LANGUAGE ApplicativeDo #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
@@ -25,12 +24,7 @@ import Data.Char
 import Data.Functor
 
 import Devin.Parsec hiding (token)
-
-#if __GLASGOW_HASKELL__ >= 902
 import Devin.Syntax
-#else
-import Devin.Syntax hiding (definition)
-#endif
 
 
 type ParserT s m a = ParsecT (Int, s) [Token] m a

@@ -1,14 +1,10 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
-
-#if __GLASGOW_HASKELL__ >= 902
 {-# LANGUAGE NoFieldSelectors #-}
-#endif
 
 module Devin.Error (Error (..)) where
 
