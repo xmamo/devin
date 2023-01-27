@@ -677,7 +677,7 @@ evalExpression expression = case expression of
   ParenthesizedExpression {inner} -> evalExpression inner
 
   where
-    safeUnary op x = toIntegralSized (toInteger (op x))
+    safeUnary op x = toIntegralSized (op (toInteger x))
     safeBinary op x y = toIntegralSized (toInteger x `op` toInteger y)
 
 
