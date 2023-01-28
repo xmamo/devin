@@ -2,7 +2,7 @@
 all: thesis.pdf
 
 thesis.pdf: PhdThesis theorems PhdThesis.cfg theorems.cfg thesis.bib thesis.tex
-	latexmk -interaction=nonstopmode -pdf -Werror thesis.tex
+	TEXINPUTS=:PhdThesis:theorems latexmk -interaction=nonstopmode -pdf -Werror thesis.tex
 
 PhdThesis:
 	rm -rf PhdThesis
