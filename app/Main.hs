@@ -159,7 +159,7 @@ onActivate application = do
 
   Gtk.onTextBufferChanged codeBuffer $ do
     -- The newly inserted code might be syntactically invalid. Preemptively
-    -- discard the old syntax tree (if any) and disable the "play" button.
+    -- discard the old syntax tree (if any) and disable the playButton.
     atomicWriteIORef syntaxTreeRef Nothing
     Gtk.widgetSetSensitive playButton False
 
@@ -181,11 +181,11 @@ onActivate application = do
         let messages = errorMessages parseError
 
         Gtk.postGUIASync $ do
-          -- Remove previous "error" highlighting, if any
+          -- Remove previous error highlighting, if any
           (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
           Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
-          -- Highlight as "error", starting from the parseError offset
+          -- Highlight as error, starting from the parseError offset
           startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
           Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
@@ -267,7 +267,7 @@ onActivate application = do
 
     atomicWriteIORef parserThreadIdRef parserThread
 
-  -- Set up `codeBuffer` callback for "notify::cursor-position" signals.
+  -- Set up codeBuffer callback for "notify::cursor-position" signals.
   -- The callback takes care of highlighting matching braces.
 
   G.onObjectNotify codeBuffer (Just "cursor-position") $ \_ -> do
@@ -283,7 +283,7 @@ onActivate application = do
   -- The play button exhibits different behavior depending on context:
   --  1. Initially, its function is to start the evaluation process;
   --  2. Pressing it again will advance evaluation to the next debug statement.
-  -- `initialPlayButtonCallback` holds the action corresponding to (1).
+  -- initialPlayButtonCallback holds the action corresponding to (1).
 
   let initialPlayButtonCallback = whenJustM (readIORef syntaxTreeRef) $ \devin -> do
         Gtk.widgetSetSensitive playButton False

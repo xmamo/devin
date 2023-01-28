@@ -1,8 +1,8 @@
 .PHONY: all
 all: thesis.pdf
 
-thesis.pdf: PhdThesis theorems thesis.tex thesis.bib
-	TEXINPUTS=:PhdThesis:theorems latexmk -pdf thesis.tex
+thesis.pdf: PhdThesis theorems PhdThesis.cfg theorems.cfg thesis.bib thesis.tex
+	latexmk -interaction=nonstopmode -pdf -Werror thesis.tex
 
 PhdThesis:
 	rm -rf PhdThesis
@@ -18,15 +18,6 @@ theorems:
 clean:
 	if [ -f PhdThesis/Makefile ]; then $(MAKE) -C PhdThesis clean; fi
 	if [ -f theorems/Makefile ]; then $(MAKE) -C theorems clean; fi
-	latexmk -C
+	latexmk -bibtex -C
 	rm -f *~
-	rm -f *.bbl
 	rm -f *.run.xml
-
-.PHONY: gnome-latex
-gnome-latex: PhdThesis theorems
-	TEXINPUTS=:PhdThesis:theorems gnome-latex thesis.tex
-
-.PHONY: latexila
-latexila: PhdThesis theorems
-	TEXINPUTS=:PhdThesis:theorems latexila thesis.tex
