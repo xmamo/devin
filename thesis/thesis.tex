@@ -5209,11 +5209,43 @@
 
   \chapter{Conclusions}
 
-  % TODO
+  In this thesis, I demonstrated how to develop an interpreter for a programming
+  language from scratch. I explained some of the theory which underlies
+  programming languages and gave an introduction to Haskell, which was used
+  implement Devin.
 
-  \newpage
+  As for Haskell, I demonstrated how type classes can be encoded as implicit
+  parameters; further, I hinted at some of the advantages of type classes with
+  respect to interfaces or abstract classes from object oriented languages. The
+  concept of type classes is quite powerful: languages such as Rust and Carbon
+  (Google's experimental successor to C++), employ abstractions which can in
+  many ways be compared to them. Scala, a language for the JVM, has implicit
+  parameters built-in; type classes thus emerge naturally. It would be
+  interesting to witness an imperative language which forgoes object orientation
+  completely, opting for a type class like mechanism instead. With the knowledge
+  of programming languages implementation at hand, this seems like a rather
+  interesting project to work on.
 
-  \thispagestyle{empty}
+  As for Devin, I implemented enough functionality in order to present good
+  starting point for serious programming language implementation: after all,
+  Devin only misses on a module system and a standard library. With the basic
+  theory in mind, features such as polymorphism and type classes could be added;
+  this, of course, would require more a complex type system and runtime
+  implementations.
+
+  One of the objectives I had for Devin's graphical user interface is to
+  exemplify how source code corresponds to syntax trees; with the GTK+ library,
+  I developed an interface which not only performs syntax highlighting, but also
+  visualizes this correspondence. Additionally, Devin's UI implements a
+  debugger; with the \lstinline@debug@ statement, execution can be suspended at
+  arbitrary locations, allowing for the program's state to be observed. I
+  demonstrated how a monadic mechanism can be used to represent pausable
+  computations; more complex solutions might be required in different
+  circumstances. Availability of practical material discussing this matter is
+  unfortunately sparse: in fact, implementing debugging functionality has been
+  one of the hardest parts of this whole project, alongside working around
+  \lstinline@gi-gtk@'s incomplete language binding and understanding how to
+  perform manual syntax highlighting on the \lstinline@GtkSourceView@ widget.
 
   \backmatter
 
