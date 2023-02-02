@@ -5247,6 +5247,23 @@
   \lstinline@gi-gtk@'s incomplete language binding and understanding how to
   perform manual syntax highlighting on the \lstinline@GtkSourceView@ widget.
 
+  Developing Devin has been insightful to a better understanding on the matter
+  of programming languages. Actual implementation made it clear which kinds of
+  problems arise and are required to be solved; using Haskell for such a
+  non-trivial project has taught me how to solve problems functionally, while
+  providing a new perspective on how abstraction can be achieved through a type
+  class like mechanism. While developing Devin, many ideas for new language
+  constructs arose: in particular, I think it is quite clever how Scala provides
+  and makes use of implicitly passed parameters. I researched which other
+  mechanisms besides monads could be used for achieving side-effects in a purely
+  functional way. One alternative is to use so-called \emph{algebraic effects};
+  this is subject of ongoing research, and languages such as Koka give a way of
+  experimenting with such features. With an unbounded amount of time at hand, it
+  would've been interesting to develop a purely functional language, with
+  implicit parameters and an effect system. Alas, this project has taken long
+  enough; all in all, I'm still very satisfied about what I learned from this
+  experience.
+
   \backmatter
 
   \appendix
