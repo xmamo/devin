@@ -2316,7 +2316,7 @@
   performing the actual summation. Double-precision floating-point format
   numbers as specified in IEEE 754 can't safely represent integers less than
   $-\left(2^{53} - 1\right)$ or greater than $2^{53} - 1$ without loss of
-  precision~\cite{max-safe-integer}; as such, I argue that a programming
+  precision~\cite{mdn-is-safe-integer}; as such, I argue that a programming
   language should make conversions between integers and floats explicit.
 
   This design decision is largely inspired by how Haskell deals with numbers.
