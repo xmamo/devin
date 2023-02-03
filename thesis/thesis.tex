@@ -5212,7 +5212,7 @@
   In this thesis, I demonstrated how to develop an interpreter for a programming
   language from scratch. I explained some of the theory which underlies
   programming languages and gave an introduction to Haskell, which was used
-  implement Devin.
+  to implement Devin.
 
   As for Haskell, I demonstrated how type classes can be encoded as implicit
   parameters; further, I hinted at some of the advantages of type classes with
@@ -5220,17 +5220,16 @@
   concept of type classes is quite powerful: languages such as Rust and Carbon
   (Google's experimental successor to C++), employ abstractions which can in
   many ways be compared to them. Scala, a language for the JVM, has implicit
-  parameters built-in; type classes thus emerge naturally. It would be
-  interesting to witness an imperative language which forgoes object orientation
-  completely, opting for a type class like mechanism instead. With the knowledge
-  of programming languages implementation at hand, this seems like a rather
-  interesting project to work on.
+  parameters built-in; type classes thus emerge
+  naturally~\cite{scala-type-classes}. It would be interesting to witness an
+  imperative language which forgoes object orientation completely, opting for a
+  type class like mechanism instead.
 
   As for Devin, I implemented enough functionality in order to present good
   starting point for serious programming language implementation: after all,
   Devin only misses on a module system and a standard library. With the basic
   theory in mind, features such as polymorphism and type classes could be added;
-  this, of course, would require more a complex type system and runtime
+  this, of course, would require more complex type system and runtime
   implementations.
 
   One of the objectives I had for Devin's graphical user interface is to
@@ -5253,16 +5252,16 @@
   non-trivial project has taught me how to solve problems functionally, while
   providing a new perspective on how abstraction can be achieved through a type
   class like mechanism. While developing Devin, many ideas for new language
-  constructs arose: in particular, I think it is quite clever how Scala provides
-  and makes use of implicitly passed parameters. I researched which other
-  mechanisms besides monads could be used for achieving side-effects in a purely
-  functional way. One alternative is to use so-called \emph{algebraic effects};
-  this is subject of ongoing research, and languages such as Koka~\cite{koka}
-  give a way of experimenting with such features. With an unbounded amount of
-  time at hand, it would've been interesting to develop a purely functional
-  language, with implicit parameters and an effect system. Alas, this project
-  has taken long enough; all in all, I'm still very satisfied about what I
-  learned from this experience.
+  constructs arose: in particular, the way in which Scala provides and makes use
+  of implicitly passed parameters seems to be of great power. I researched which
+  other techniques besides monads could be used for achieving side-effects in a
+  purely functional way. One possible alternative is to use so-called
+  \emph{algebraic effects}: this is subject of ongoing research, and languages
+  such as Koka~\cite{koka} give a way of experimenting with such features. With
+  an unbounded amount of time at hand, it would've been interesting to develop a
+  purely functional language, with implicit parameters and an effect system.
+  Alas, this project has taken long enough; still, I'm quite satisfied about
+  what I learned from this experience.
 
   \backmatter
 
