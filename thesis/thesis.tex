@@ -11,7 +11,7 @@
 \usepackage[final]{listings}
 \usepackage{multirow}
 
-\usepackage{biblatex}
+\usepackage[sorting=none,abbreviate=false]{biblatex}
 \addbibresource{thesis.bib}
 
 \usepackage{tikz}
@@ -19,11 +19,7 @@
 
 \usepackage{theorems}
 
-\usepackage[
-  hidelinks,
-  linktoc=all,
-  pdfpagelayout=TwoPageRight
-]{hyperref}
+\usepackage[hidelinks,pdfpagelayout=TwoPageRight]{hyperref}
 
 \author{Matteo Morena}
 \supervisor{Prof.\ Marco Comini}
@@ -123,10 +119,11 @@
   assume the reader is familiar with any imperative programming language like C,
   C++ or Java.
 
-  Haskell is a purely functional programming language. Programs are not encoded
-  as a series of steps and procedures abstracting over them; in particular,
-  there is no such thing as a statement. Instead, everything in Haskell is an
-  expression; functions are the building blocks which abstract over expressions.
+  Haskell~\autocite{haskell} is a purely functional programming language. Programs
+  are not encoded as a series of steps and procedures abstracting over them; in
+  particular, there is no such thing as a statement. Instead, everything in
+  Haskell is an expression; functions are the building blocks which abstract
+  over expressions.
 
   Functions operate on their arguments and compute some result; if a function
   gets called twice with the same arguments, it's guaranteed to yield the same
@@ -153,7 +150,7 @@
     pythagoras = \x y -> sqrt (x ^ 2  + y ^ 2)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   This declaration binds the name \lstinline@pythagoras@ to a function of two
   arguments which applies Pythagoras' theorem. The symbol \lstinline@\@ is
@@ -454,7 +451,7 @@
   \end{itemize}
 
   \section{User defined types, \texttt{Maybe} and \texttt{Either}}
-  \label{section:udt}
+  \label{section:user-defined-types}
 
   While lists and tuples are certainly useful, Haskell of course allows the
   definition of new data types. This form of abstraction improves upon the use
@@ -475,7 +472,7 @@
     complexIm (Complex _ b) = b
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   The data declaration on the first line introduces a new type,
   \lstinline@Complex@; a value of such a type can be constructed with the
@@ -947,11 +944,11 @@
   The definition for the \lstinline@Applicative@ class is listed below. Note
   that the official Haskell language report doesn't define the
   \lstinline@Applicative@ class; further, it doesn't define any relationship
-  between it and \lstinline@Monad@. Since \lstinline@base@ is the library which
-  is used to develop applications in practice, its definition is given for
-  completeness, as the \lstinline@Monad@ type class extends
-  \lstinline@Applicative@'s interface. The operator \lstinline@(<$>)@ is used as
-  an infix alias of \lstinline@fmap@.
+  between it and \lstinline@Monad@~\cite{haskell-functor-and-monad-classes}.
+  Since \lstinline@base@ is the library which is used to develop applications in
+  practice, its definition is given for completeness; the \lstinline@Monad@ type
+  class extends \lstinline@Applicative@'s interface. The operator
+  \lstinline@(<$>)@ is used as an infix alias of \lstinline@fmap@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     class Functor f => Applicative f where
@@ -1064,7 +1061,8 @@
       return x = pure x
   \end{lstlisting}
 
-  Monads are perhaps Haskell's greatest innovation; in the next section, I'll
+  Monads are perhaps Haskell's greatest
+  innovation~\cite{monads-for-functional-programming}; in the next section, I'll
   explain how the \lstinline@Monad@ type class turns out to be so useful.
 
   The same way every applicative is a functor, every monad is an applicative;
@@ -1535,7 +1533,7 @@
 
   If type classes become record types, it follows that type class instances
   become record values. An \lstinline@Eq@ instance for the algebraic data type
-  \lstinline@Grade@ of \autoref{section:udt} can be defined as:
+  \lstinline@Grade@ of \autoref{section:user-defined-types} can be defined as:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     gradeEqInstance :: Eq Grade
@@ -1551,7 +1549,7 @@
         g x y = not (f x y)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   Finally, many instances can be generated in terms of others:
 
@@ -1632,7 +1630,7 @@
     additive expression.
   \end{itemize}
 
-  \pagebreak
+  \newpage
 
   According to such rules, the string \lstinline@2*(3+4)@ is a valid arithmetic
   expression. By definition:
@@ -1720,21 +1718,21 @@
   \emph{syntax tree}.
 
   \section{Parser combinators}
-  \label{section:parsercombinators}
+  \label{section:parser-combinators}
 
   There are many ways to recognize some input and generate an associated syntax
   tree. There has been much academic research, and there are many readily
   available implementations of so-called \emph{parser generators}: tools which
   automatically generate code for parsing a language, given its grammar. These
   tools build upon well-known algorithms, like those available for such as LL or
-  LALR grammar classes, just to throw a few names around. These tools are very
-  performant; however, they're kind of magical.
+  LR~\cite{lr} grammar classes, just to throw a few names around. These tools
+  are very performant; however, they're kind of magical.
 
   In this section, we'll see how there's no fundamental need for any generators;
   although such tools are handy, it isn't too difficult to write a parser from
   scratch, using a technique called \emph{recursive descent parsing}. Among
   others, recursive descent parsers are used by the GCC compiler and the V8
-  JavaScript engines~\cite{nystrom}.
+  JavaScript engines~\cite{recursive-descent-parsing}.
 
   Recursive descent parsing is a method for constructing a parser using a
   collection of recursive functions. The simplest functions parse the atoms (or
@@ -2094,7 +2092,7 @@
     \end{tabular}
 
     \caption{Assignment operators}
-    \label{table:assignmentoperators}
+    \label{table:assignment-operators}
   \end{table}
 
   \newpage
@@ -2210,10 +2208,11 @@
 
   A peculiar feature of Devin is that of \emph{optional types}. With optional
   types, the semantic of the language doesn't depend on the static type
-  system~\cite{bracha_2004}. A notable example of an optionally typed language
-  is Python. With this feature, type annotations can be omitted from Devin
-  programs. Type checking is not performed on terms where type annotations are
-  missing. If no type annotations are provided, Devin becomes dynamically typed.
+  system~\cite{pluggable-type-systems}. A notable example of an optionally typed
+  language is Python. With this feature, type annotations can be omitted from
+  Devin programs. Type checking is not performed on terms where type annotations
+  are missing. If no type annotations are provided, Devin becomes dynamically
+  typed.
 
   \begin{lstlisting}[
     float=h,
@@ -2236,13 +2235,13 @@
   \end{lstlisting}
 
   \section{Editor features}
-  \label{section:editorfeatures}
+  \label{section:editor-features}
 
   Devin is bundled with a code editing UI built upon GTK+, a popular library for
   creating graphical user interfaces. GTK+ works on Windows, macOS and many
   UNIX-like platforms~\cite{gtk+}. Code editing is supported by GtkSourceView, a
   library that extends the GTK+ framework for text editing and support for
-  configurable syntax highlighting.
+  configurable syntax highlighting~\cite{gtksourceview}.
 
   Other than syntax highlighting, Devin's editor features error reporting: both
   syntactic and semantic errors are displayed according to their position within
@@ -2287,7 +2286,7 @@
     \caption{The debugger displaying the current state of the stack}
   \end{figure}
 
-  \pagebreak
+  \newpage
 
   Runtime errors are handled as well. When an error occurs, the offending code
   fragment is highlighted and a message dialog describing the problem is shown
@@ -2317,11 +2316,12 @@
   performing the actual summation. Double-precision floating-point format
   numbers as specified in IEEE 754 can't safely represent integers less than
   $-\left(2^{53} - 1\right)$ or greater than $2^{53} - 1$ without loss of
-  precision~\cite{mdn}; as such, I argue that a programming language should make
-  conversions between integers and floats explicit.
+  precision~\cite{max-safe-integer}; as such, I argue that a programming
+  language should make conversions between integers and floats explicit.
 
   This design decision is largely inspired by how Haskell deals with numbers.
-  Examples of other languages which lack implicit conversions are Go and Rust.
+  Examples of other languages which lack implicit conversions are
+  Go~\cite{go-numeric-types} and Rust~\cite{rust-conversion}.
 
   \subsection{Optional types}
 
@@ -2352,8 +2352,8 @@
   \lstinline@LANGUAGE@ pragmas are left out for simplicity. Note that some of
   the functionality of the package \lstinline@extra@ is used: the library
   provides extra functions for the standard Haskell libraries, filling out
-  missing functionality. Devin's full implementation can be found in the
-  appendix.
+  missing functionality~\cite{extra}. Devin's full implementation can be found
+  in the \hyperref[chapter:devin-source-code]{appendix}.
 
   In terms of implementation complexity, both the type checker and the evaluator
   are somewhat simpler than the parser. The parser makes much greater use of
@@ -2733,7 +2733,7 @@
       | Placeholder String
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   To compare types, the relation operator \lstinline@(<:)@ is provided:
 
@@ -3202,7 +3202,7 @@
 
   Expressions with the binary operators \lstinline@+=@, \lstinline@-=@,
   \lstinline@*=@, \lstinline@/=@, \lstinline@%=@ are type checked considering
-  the shorthands detailed in \autoref{table:assignmentoperators}.
+  the shorthands detailed in \autoref{table:assignment-operators}.
 
   The type resulting from function invocations is determined by looking up the
   callee's signature. If a call refers to an unbound identifier, or if the wrong
@@ -3916,7 +3916,7 @@
             raise (InvalidUnary unary operandT)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   The binary arithmetic operators \lstinline@-@, \lstinline@/@ and \lstinline@%@
   have similar implementations between themselves, with the exception that
@@ -4136,7 +4136,7 @@
   \end{lstlisting}
 
   The other assignment operators are implemented according to the shorthands of
-  \autoref{table:assignmentoperators}. For example, \lstinline@+=@ is
+  \autoref{table:assignment-operators}. For example, \lstinline@+=@ is
   implemented as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -4431,8 +4431,8 @@
   \section{The parser}
 
   Devin's parser is implemented with the help of the \lstinline@parsec@ parser
-  combinator library. Parser combinators have been described in
-  \autoref{section:parsercombinators}.
+  combinator library~\cite{parsec}. Parser combinators have been described in
+  \autoref{section:parser-combinators}.
 
   As mentioned, the positions of leaf nodes are stored in the syntax tree. While
   the \lstinline@parsec@ library does provide functionality to query the current
@@ -4815,7 +4815,7 @@
           pure (IfElseStatement ifKeyword predicate trueBranch elseKeyword falseBranch)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   While statements are parsed as a \lstinline@while@ keyword, followed by an
   expression, followed by a statement. Do-while statements are parsed in a
@@ -4978,7 +4978,7 @@
 
   \section{The user interface}
 
-  As explained in \autoref{section:editorfeatures}, Devin's graphical user
+  As explained in \autoref{section:editor-features}, Devin's graphical user
   interface depends on the GTK+ library. For those unfamiliar, GTK+ is the
   standard GUI library used for Gnome applications; being cross-platform, GTK+
   can be used in other platforms beside the Gnome desktop environment. One
@@ -4987,9 +4987,9 @@
 
   GTK+ is a library written in C and meant to be consumed in C. Given it's
   popularity, many language bindings exist. Devin's implementation utilizes the
-  bindings provided by the package \lstinline@gi-gtk@. This package is mostly a
-  thin wrapper on top GTK+; as a consequence, windows and widgets are to be
-  constructed imperatively rather than declaratively.
+  bindings provided by the package \lstinline@gi-gtk@~\cite{gi-gtk}. This
+  package is mostly a thin wrapper on top GTK+; as a consequence, windows and
+  widgets are to be constructed imperatively rather than declaratively.
 
   Devin's UI implementation is somewhat complex, requiring more than 1100 lines
   of code. Many considerations were made while programming the UI; describing
@@ -5034,7 +5034,7 @@
   development. Rather than explaining all code pertaining to Devin's UI, I'll
   give one example on how GTK+ may be used within Haskell. Devin's UI
   implementation is listed in the appendix, starting at
-  \autoref{section:appmainhs}.
+  \autoref{section:app-main-hs}.
 
   Let's consider developing a simple graphical counting application. It should
   display a number $n$ and provide two buttons: one to increment $n$, and one to
@@ -5257,18 +5257,19 @@
   and makes use of implicitly passed parameters. I researched which other
   mechanisms besides monads could be used for achieving side-effects in a purely
   functional way. One alternative is to use so-called \emph{algebraic effects};
-  this is subject of ongoing research, and languages such as Koka give a way of
-  experimenting with such features. With an unbounded amount of time at hand, it
-  would've been interesting to develop a purely functional language, with
-  implicit parameters and an effect system. Alas, this project has taken long
-  enough; all in all, I'm still very satisfied about what I learned from this
-  experience.
+  this is subject of ongoing research, and languages such as Koka~\cite{koka}
+  give a way of experimenting with such features. With an unbounded amount of
+  time at hand, it would've been interesting to develop a purely functional
+  language, with implicit parameters and an effect system. Alas, this project
+  has taken long enough; all in all, I'm still very satisfied about what I
+  learned from this experience.
 
   \backmatter
 
   \appendix
 
   \chapter{Devin source code}
+  \label{chapter:devin-source-code}
 
   \section{\texttt{devin.cabal}}
 
@@ -5339,7 +5340,7 @@
   \lstinputlisting[basicstyle=\ttfamily\small]{../test/Devin/TypersSpec.hs}
 
   \section{\texttt{app/Main.hs}}
-  \label{section:appmainhs}
+  \label{section:app-main-hs}
 
   \lstinputlisting[basicstyle=\ttfamily\small]{../app/Main.hs}
 
