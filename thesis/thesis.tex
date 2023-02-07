@@ -98,7 +98,12 @@
   \currentpdfbookmark{\acknowledgmentsname}{acknowledgments}
 
   \begin{acknowledgments}
-    % TODO
+    I would like to thank my supervisor, professor Marco Comini, for some of the
+    insightful conversations we had, and helping to develop parts of the
+    software discussed in this thesis.
+
+    Also thanks Matteo Poggi and Alberto Pastorutti for having read parts of my
+    thesis, for providing feedback, and for emotional support.
   \end{acknowledgments}
 
   \frontmatter
@@ -630,13 +635,13 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     foldList :: (a -> b -> b) -> b -> [a] -> b
     foldList _ z [] = z
-    foldList f z (x : xs) = f x (foldr f z xs)
+    foldList f z (x : xs) = f x (foldList f z xs)
 
     listSum :: Num a => [a] -> a
-    listSum xs = foldr (\x acc -> x + acc) 0 xs
+    listSum xs = foldList (\x acc -> x + acc) 0 xs
 
     listProduct :: Num a => [a] -> a
-    listProduct xs = foldr (\x acc -> x * acc) 1 xs
+    listProduct xs = foldList (\x acc -> x * acc) 1 xs
   \end{lstlisting}
 
   Optionally, given that \lstinline@(+)@ and \lstinline@(*)@ already denote the
@@ -645,10 +650,10 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listSum :: Num a => [a] -> a
-    listSum xs = foldr (+) 0 xs
+    listSum xs = foldList (+) 0 xs
 
     listProduct :: Num a => [a] -> a
-    listProduct xs = foldr (*) 1 xs
+    listProduct xs = foldList (*) 1 xs
   \end{lstlisting}
 
   Lists are not the only kind of objects which can be folded over. For example,
