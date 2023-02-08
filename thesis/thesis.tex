@@ -696,8 +696,8 @@
     doubleList xs = map (\x -> 2 * x) xs
   \end{lstlisting}
 
-  Which, using the section \lstinline@(2 *)@, can be more succinctly be
-  expressed as:
+  The section \lstinline@(2 *)@, equivalent to the partial application
+  \lstinline@((*) 2)@, can be used for brevity:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     doubleList :: Num a => [a] -> [a]
