@@ -91,8 +91,8 @@ highlightStatement tags buffer = \case
     highlightInterval (keywordTag tags) buffer assertKeyword
     highlightExpression tags buffer predicate
 
-  DebugStatement {debugKeyword} ->
-    highlightInterval (keywordTag tags) buffer debugKeyword
+  BreakpointStatement {breakpointKeyword} ->
+    highlightInterval (keywordTag tags) buffer breakpointKeyword
 
   BlockStatement {statements} ->
     for_ statements (highlightStatement tags buffer)

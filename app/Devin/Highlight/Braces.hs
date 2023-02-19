@@ -49,7 +49,7 @@ highlightStatementBraces ::
   Tags -> a -> Gtk.TextIter -> Statement -> m Bool
 highlightStatementBraces tag buffer insertIter = \case
   ReturnStatement {result = Nothing} -> pure False
-  DebugStatement {} -> pure False
+  BreakpointStatement {} -> pure False
 
   ExpressionStatement {value} ->
     highlightExpressionBraces tag buffer insertIter value

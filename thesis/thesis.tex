@@ -1390,7 +1390,7 @@
   Entities from modules can also be imported in an unqualified manner, by
   omitting the \lstinline@qualified@ keyword and \lstinline@as@ clause. In the
   following, \lstinline@nub@ can be used without qualification:
-  
+
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import Data.List
 
@@ -2227,14 +2227,14 @@
 
   Once a valid program has been written, it can be run by clicking the
   $\blacktriangleright$ button. The state of execution can be observed with
-  debug statements; these signal the evaluator to pause execution and display
-  the current \emph{runtime stack}---the data structure which maps variables and
-  function arguments to their values. Each time a function gets called, a new
-  \emph{frame} is pushed onto the stack; it contains associations between the
-  parameter names and the passed values. Variable definitions within the called
-  function add new associations to the newly pushed frame. When the called
-  function returns, the topmost frame is popped off the stack and execution
-  continues normally.
+  breakpoint statements; these signal the evaluator to pause execution and
+  display the current \emph{runtime stack}---the data structure which maps
+  variables and function arguments to their values. Each time a function gets
+  called, a new \emph{frame} is pushed onto the stack; it contains associations
+  between the parameter names and the passed values. Variable definitions within
+  the called function add new associations to the newly pushed frame. When the
+  called function returns, the topmost frame is popped off the stack and
+  execution continues normally.
 
   Devin has been designed with simplicity of implementation in mind. In
   particular, Devin's call stack exhibits two properties:
@@ -2466,7 +2466,7 @@
 
   Any expression followed by a semicolon becomes a statement. The type
   \lstinline@Statement@ represents these, along with if, while, do-while,
-  return, assert, debug and block statements.
+  return, assert, breakpoint and block statements.
 
   In any point in which a statement may occur, a variable or function definition
   can be placed instead. The data constructor \lstinline@DefinitionStatement@
@@ -2523,8 +2523,8 @@
         semicolon :: Token
       } -> Statement
 
-      DebugStatement :: {
-        debugKeyword :: Token,
+      BreakpointStatement :: {
+        breakpointKeyword :: Token,
         semicolon :: Token
       } -> Statement
 
@@ -3250,10 +3250,10 @@
       pure False
   \end{lstlisting}
 
-  For debug statements, nothing needs to be done.
+  For breakpoint statements, nothing needs to be done.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkStatement _ DebugStatement {} = pure False
+    checkStatement _ BreakpointStatement {} = pure False
   \end{lstlisting}
 
   Finally, blocks are type checked by recursively checking all statements they
@@ -3415,16 +3415,16 @@
 
   An \lstinline@Evaluator@ represents a computation which updates a
   \lstinline@State@, possibly producing some side-effect. To allow execution to
-  be interrupted by debug statements, the algebraic data type \lstinline@Result@
-  is provided. It has three constructors:
+  be interrupted by breakpoint statements, the algebraic data type
+  \lstinline@Result@ is provided. It has three constructors:
 
   \begin{itemize}
     \item \lstinline@Done@, if the last statement has been executed. This data
     constructor stores the result of the computation.
 
-    \item \lstinline@Debug@, if a debug statement has been reached. The debug
-    statement, along with the next step to execute, is stored by this
-    constructor.
+    \item \lstinline@Breakpoint@, if a breakpoint statement has been reached.
+    The breakpoint statement, along with the next step to execute, is stored by
+    this constructor.
 
     \item \lstinline@Error@, if an error occurred at runtime.
   \end{itemize}
@@ -3432,7 +3432,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Result a
       = Done a
-      | Debug Statement (Evaluator a)
+      | Breakpoint Statement (Evaluator a)
       | Error Error
       deriving Functor
   \end{lstlisting}
@@ -3525,7 +3525,7 @@
 
       case result of
         Done x -> pure (Right x, state')
-        Debug _ mx -> runEvaluator mx state'
+        Breakpoint _ mx -> runEvaluator mx state'
         Error error -> pure (Left error, state')
   \end{lstlisting}
 
@@ -3545,7 +3545,7 @@
 
         case result of
           Done x -> runEvaluatorStep (f x <$> my) state'
-          Debug statement mx -> pure (Debug statement (liftA2 f mx my), state')
+          Breakpoint statement mx -> pure (Breakpoint statement (liftA2 f mx my), state')
           Error error -> pure (Error error, state')
 
     instance Monad Evaluator where
@@ -3555,7 +3555,7 @@
 
         case result of
           Done x -> runEvaluatorStep (f x) state'
-          Debug statement mx -> pure (Debug statement (f =<< mx), state')
+          Breakpoint statement mx -> pure (Breakpoint statement (f =<< mx), state')
           Error error -> pure (Error error, state')
   \end{lstlisting}
 
@@ -3655,15 +3655,17 @@
         popFrame = Evaluator (\state -> pure (Done (), tail state))
   \end{lstlisting}
 
-  Finally, the functions \lstinline@debug@ and \lstinline@raise@ are provided
-  for convenience.
+  Finally, the functions \lstinline@breakpoint@ and \lstinline@raise@ are
+  provided for convenience.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    debug :: Statement -> Evaluator ()
-    debug statement = Evaluator (\state -> pure (Debug statement (pure ()), state))
+    breakpoint :: Statement -> Evaluator ()
+    breakpoint statement = Evaluator $ \state ->
+      pure (Breakpoint statement (pure ()), state)
 
     raise :: Error -> Evaluator a
-    raise error = Evaluator (\state -> pure (Error error, state))
+    raise error = Evaluator $ \state ->
+      pure (Error error, state)
   \end{lstlisting}
 
   \subsection{Evaluating expressions}
@@ -4238,11 +4240,11 @@
           raise (InvalidType predicate Type.Bool t)
   \end{lstlisting}
 
-  Debug statements are handled trivially.
+  Breakpoint statements are handled trivially.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression DebugStatement {} = do
-      debug statement
+    evalExpression BreakpointStatement {} = do
+      breakpoint statement
       pure Nothing
   \end{lstlisting}
 
@@ -4642,7 +4644,7 @@
         doWhileStatement,
         returnStatement,
         assertStatement,
-        debugStatement,
+        breakpointStatement,
         expressionStatement,
         blockStatement
       ]
@@ -4721,14 +4723,15 @@
       pure (AssertStatement assertKeyword predicate semicolon)
   \end{lstlisting}
 
-  Debug statements are just a \lstinline@debug@ keyword followed by a semicolon.
+  Breakpoint statements are just a \lstinline@breakpoint@ keyword followed by a
+  semicolon.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    debugStatement :: Stream s m Char => ParserT s m Statement
-    debugStatement = do
-      debugKeyword <- keyword "debug"
+    breakpointStatement :: Stream s m Char => ParserT s m Statement
+    breakpointStatement = do
+    breakpointKeyword <- keyword "breakpoint"
       semicolon <- s *> token ";"
-      pure (DebugStatement debugKeyword semicolon)
+      pure (BreakpointStatement breakpointKeyword semicolon)
   \end{lstlisting}
 
   Finally, block statements are parsed as an open brace, followed by zero or
@@ -5081,8 +5084,8 @@
   exemplify how source code corresponds to syntax trees; with the GTK+ library,
   I developed an interface which not only performs syntax highlighting, but also
   visualizes this correspondence. Additionally, Devin's UI implements a
-  debugger; with the \lstinline@debug@ statement, execution can be suspended at
-  arbitrary locations, allowing for the program's state to be observed. I
+  debugger; with the \lstinline@breakpont@ statement, execution can be suspended
+  at arbitrary locations, allowing for the program's state to be observed. I
   demonstrated how a monadic mechanism can be used to represent pausable
   computations; more complex solutions might be required in different
   circumstances. Availability of practical material discussing this matter is

@@ -124,7 +124,7 @@ checkStatement expectedT statement = case statement of
     unless (t <: Bool) (report (InvalidType predicate Bool t))
     pure False
 
-  DebugStatement {} -> pure False
+  BreakpointStatement {} -> pure False
 
   BlockStatement {statements} -> withNewScope $ do
     for_ statements $ \case

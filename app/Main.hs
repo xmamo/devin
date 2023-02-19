@@ -282,7 +282,7 @@ onActivate application = do
 
   -- The play button exhibits different behavior depending on context:
   --  1. Initially, its function is to start the evaluation process;
-  --  2. Pressing it again will advance evaluation to the next debug statement.
+  --  2. Pressing it again will advance evaluation to the next breakpoint.
   -- initialPlayButtonCallback holds the action corresponding to (1).
 
   let initialPlayButtonCallback = whenJustM (readIORef syntaxTreeRef) $ \devin -> do
@@ -310,7 +310,7 @@ onActivate application = do
         case result of
           Done _ -> Gtk.postGUIASync cleanup
 
-          Debug statement evaluator' -> do
+          Breakpoint statement evaluator' -> do
             atomicWriteIORef playButtonClickCallbackVar $ do
               Gtk.postGUIASync (Gtk.widgetSetSensitive playButton False)
 

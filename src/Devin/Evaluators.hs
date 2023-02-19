@@ -145,8 +145,8 @@ evalStatement statement = case statement of
         t <- getType v
         raise (InvalidType predicate Type.Bool t)
 
-  DebugStatement {} -> do
-    debug statement
+  BreakpointStatement {} -> do
+    breakpoint statement
     pure Nothing
 
   BlockStatement {statements} -> withNewFrame 1 $ do

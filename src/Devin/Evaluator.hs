@@ -28,7 +28,7 @@ module Devin.Evaluator (
   defineVar,
   lookupVar,
   withNewFrame,
-  debug,
+  breakpoint,
   raise
 ) where
 
@@ -53,7 +53,7 @@ newtype Evaluator a = Evaluator (State -> IO (Result a, State))
 
 data Result a
   = Done a
-  | Debug Statement (Evaluator a)
+  | Breakpoint Statement (Evaluator a)
   | Error Error
   deriving Functor
 
@@ -97,7 +97,7 @@ instance Applicative Evaluator where
 
     case result of
       Done x -> runEvaluatorStep (f x <$> my) state'
-      Debug statement mx -> pure (Debug statement (liftA2 f mx my), state')
+      Breakpoint statement mx -> pure (Breakpoint statement (liftA2 f mx my), state')
       Error error -> pure (Error error, state')
 
 
@@ -108,7 +108,7 @@ instance Monad Evaluator where
 
     case result of
       Done x -> runEvaluatorStep (f x) state'
-      Debug statement mx -> pure (Debug statement (f =<< mx), state')
+      Breakpoint statement mx -> pure (Breakpoint statement (f =<< mx), state')
       Error error -> pure (Error error, state')
 
 
@@ -134,7 +134,7 @@ runEvaluator mx state = do
 
   case result of
     Done x -> pure (Right x, state')
-    Debug _ mx -> runEvaluator mx state'
+    Breakpoint _ mx -> runEvaluator mx state'
     Error error -> pure (Left error, state')
 
 
@@ -260,9 +260,11 @@ withNewFrame offset mx = do
     popFrame = Evaluator (\state -> pure (Done (), tail state))
 
 
-debug :: Statement -> Evaluator ()
-debug statement = Evaluator (\state -> pure (Debug statement (pure ()), state))
+breakpoint :: Statement -> Evaluator ()
+breakpoint statement = Evaluator $ \state ->
+  pure (Breakpoint statement (pure ()), state)
 
 
 raise :: Error -> Evaluator a
-raise error = Evaluator (\state -> pure (Error error, state))
+raise error = Evaluator $ \state ->
+  pure (Error error, state)

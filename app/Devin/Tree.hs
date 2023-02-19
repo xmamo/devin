@@ -138,9 +138,9 @@ statementTree = \case
       tokenTree ";" semicolon
     ]
 
-  DebugStatement {debugKeyword, semicolon} ->
-    Tree.Node ("DebugStatement", "") [
-      tokenTree "debug" debugKeyword,
+  BreakpointStatement {breakpointKeyword, semicolon} ->
+    Tree.Node ("BreakpointStatement", "") [
+      tokenTree "breakpoint" breakpointKeyword,
       tokenTree ";" semicolon
     ]
 
