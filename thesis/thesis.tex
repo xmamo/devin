@@ -154,6 +154,8 @@
     pythagoras = \x y -> sqrt (x ^ 2  + y ^ 2)
   \end{lstlisting}
 
+  \pagebreak
+
   This declaration binds the name \lstinline@pythagoras@ to a function of two
   arguments which applies Pythagoras' theorem. The symbol \lstinline@\@ is
   pronounced \emph{lambda}, as the notation recalls the one used in lambda
@@ -218,7 +220,9 @@
   Yet another alternative to define the factorial function is to employ tail
   recursion:
 
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+  \pagebreak
+
+  \begin{lstlistinfg}[gobble=4,basicstyle=\ttfamily\small]
     factorial' :: Integral a => a -> a
     factorial' n = go 1 n
       where
@@ -339,6 +343,8 @@
   represents strings as lists of characters. Lists are composed by zero or more
   elements of the same type; for example, a list of the numbers \lstinline@4@,
   \lstinline@5@ and \lstinline@6@ can be defined as follows:
+
+  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     list456 :: [Int]
@@ -473,6 +479,8 @@
   expression \lstinline@Complex a b@ constructs a new value of type
   \lstinline@Complex@.
 
+  \pagebreak
+
   The deriving declaration \lstinline@deriving (Eq, Show)@ instructs the
   compiler to generate three functions:
   \lstinline@(==), (/=) :: Complex -> Complex -> Bool@ to test for equality
@@ -515,15 +523,9 @@
   below; for simplicity, deriving clauses are omitted.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    data Maybe a
-      = Nothing
-      | Just a
-    \end{lstlisting}
+    data Maybe a = Nothing | Just a
 
-    \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    data Either a b
-      = Left a
-      | Right b
+    data Either a b = Left a | Right b
   \end{lstlisting}
 
   Both \lstinline@Maybe@ and \lstinline@Either@ are called \emph{type
@@ -538,6 +540,8 @@
   value of type \lstinline@a@ (represented as \lstinline@Just a@).
   \lstinline@Either@ represents values of two possibilities; a value of type
   \lstinline@Either a b@ is either \lstinline@Left a@ or \lstinline@Right b@.
+
+  % \pagebreak
 
   Both algebraic data types are commonly used for error reporting. For simple
   cases, where functions may not yield any meaningful value, \lstinline@Maybe@
@@ -735,6 +739,8 @@
 
   One of the most trivial instances of the \lstinline@Functor@ type class can be
   defined for \lstinline@Maybe@:
+
+  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Functor Maybe where
@@ -990,8 +996,10 @@
   \lstinline@(+) x y@. While the implementation for \lstinline@sum2Maybes'@ is
   somewhat more complex than \lstinline@sum2Maybes@---using two higher order
   functions instead of one---it is syntactically more general than the
-  \lstinline@liftA2@ approach. In fact, using \lstinline@(<$>)@ and
-  \lstinline@(<*>)@, functions of any arity can be lifted and applied:
+  \lstinline@liftA2@ approach.
+
+  Using \lstinline@(<$>)@ and \lstinline@(<*>)@, functions of any arity can be
+  lifted and applied:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     sum3Maybes :: Num a => Maybe a -> Maybe a -> Maybe a -> Maybe a
@@ -1057,6 +1065,8 @@
     liftM2 f mx my = mx >>= \x -> my >>= \y -> return (f x y)
   \end{lstlisting}
 
+  \newpage
+
   \section{Behind the syntax of function types}
 
   As mentioned, the definition \lstinline@pythagoras x y = sqrt (x ^ 2 + y ^ 2)@
@@ -1101,10 +1111,6 @@
   \lstinline@Functor@, \lstinline@Applicative@ and \lstinline@Monad@ instances
   for \lstinline@(->) r@.
 
-  Understanding that all Haskell functions have arity 1 should make it clear
-  that passing less than the appropriate amount of arguments to invocations
-  implies partial application.
-
   \section{Basic input and output}
 
   Let's implement a very simple program which performs the following task:
@@ -1116,6 +1122,7 @@
     \item Read a number $n$ from standard input;
 
     \item Compare the given number $n$ to $0$:
+
     \begin{itemize}[noitemsep]
       \item If $n < 0$, print \lstinline@n < 0@;
       \item If $n > 0$, print \lstinline@n > 0@;
@@ -1138,13 +1145,12 @@
                 int n = scanner.nextInt();
 
                 // Computation 3
-                if (n < 0) {
+                if (n < 0)
                     System.out.println("n < 0");
-                } else if (n > 0) {
+                else if (n > 0)
                     System.out.println("n > 0");
-                } else {
+                else
                     System.out.println("n = 0");
-                }
             }
         }
     }
@@ -1241,8 +1247,8 @@
 
   Note that \lstinline@readLn :: Read a => IO a@ is polymorphic and may read
   values of any type from standard input. While the preceding examples compile
-  without problems, it may sometimes be necessary to add type annotations when
-  the desired output type of \lstinline@readLn@ can't be inferred:
+  without problems, it may be necessary to add type annotations when the type of
+  \lstinline@readLn@ can't be inferred:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     main :: IO ()
@@ -1304,7 +1310,11 @@
       accRef <- newSTRef 1
       go accRef n
       readSTRef accRef
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       where
         go _ 0 = pure ()
 
@@ -1323,13 +1333,14 @@
   Haskell programs; most of the time, a functional-style implementation
   suffices. There are real world scenarios in which mutation is essential to
   achieve good performance, such as when implementing an algorithm which makes
-  use of dynamic programming. Consider function to compute the Levenshtein
-  distance between two strings; that is, the minimum number of single-character
-  edits (insertions, deletions or substitutions) required to change one string
-  into the other: without going into too much detail, the complexity of a
-  na\"ive recursive implementation is exponential! It is exactly in cases like
-  these that using well-known iterative algotithms which employ mutation is
-  beneficial.
+  use of dynamic programming.
+
+  Consider function to compute the Levenshtein distance between two strings;
+  that is, the minimum number of single-character edits (insertions, deletions
+  or substitutions) required to change one string into the other: without going
+  into too much detail, the complexity of a na\"ive recursive implementation is
+  exponential! It is exactly in cases like these that using well-known iterative
+  algotithms which employ mutation is beneficial.
 
   \section{Importing and creating modules}
 
@@ -1352,7 +1363,10 @@
   module from the \lstinline@base@ package: this module exports additional
   functions to be used on lists besides the ones provided by
   \lstinline@Prelude@; one of these is \lstinline@nub :: Eq a => [a] -> [a]@,
-  which removes duplicate elements from a list:
+  which removes duplicate elements from a list. This function can be used with a
+  qualified import as follows:
+
+  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import qualified Data.List
@@ -1367,10 +1381,9 @@
   \end{lstlisting}
 
   The import declaration \lstinline@import qualified Data.List@ imports the
-  entities exported by the \lstinline@Data.List@ module; these can only be used
-  in a qualified manner. The function \lstinline@words@ from the
-  \lstinline@Prelude@ splits a string on white space; its dual,
-  \lstinline@unwords@, joins a list of strings with separating spaces.
+  entities exported by the \lstinline@Data.List@ module. The function
+  \lstinline@words@ from the \lstinline@Prelude@ splits a string on white space;
+  its dual, \lstinline@unwords@, joins a list of strings with separating spaces.
 
   Imported modules may be assigned an alias using the \lstinline@as@ clause:
 
@@ -1417,7 +1430,11 @@
 
     data Triangle a = Triangle {x1, y1, x2, y2, x3, y3 :: a}
       deriving (Show, Read)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Eq a => Eq (Triangle a) where
       (==) :: Triangle a -> Triangle a -> Bool
       Triangle x11 y11 x12 y12 x13 y13 == Triangle x21 y21 x22 y22 x23 y23 =
@@ -1532,6 +1549,8 @@
 
         g x y = not (f x y)
   \end{lstlisting}
+
+  \newpage
 
   Finally, many instances can be generated in terms of others:
 
@@ -1709,7 +1728,7 @@
   For our purposes, the distinction between abstract and concrete syntax trees
   isn't necessary: for this reason, from now on we'll just use the term
   \emph{syntax tree}.
-  
+
   In general, syntax trees not only represent the structure of a programming
   languages, but also the structure of markup or other kinds of languages. For
   the purposes of this thesis, I'll discuss the processing of programming
@@ -1791,7 +1810,7 @@
     next application of $P$ itself. This combinator succeeds with the
     accumulated results of all successful runs.
   \end{itemize}
-  
+
   \newpage
 
   \section{Tree traversal}
@@ -1834,9 +1853,9 @@
     would be rather concrete, as each node would need to be associated with a
     position in the parser's input string.
   \end{itemize}
-  
+
   \newpage
-  
+
   \thispagestyle{empty}
 
   \chapter{The Devin programming language}
