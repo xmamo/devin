@@ -14,8 +14,7 @@
 \usepackage[sorting=none,abbreviate=false]{biblatex}
 \addbibresource{thesis.bib}
 
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric}
+\usepackage{forest}
 
 \usepackage{theorems}
 
@@ -1579,7 +1578,7 @@
   Consider the process of parsing arithmetic expressions. Given a sequence of
   characters as input, syntactically invalid strings like \lstinline@1+@ and
   \lstinline@3//4@ have to be rejected, while valid strings like
-  \lstinline@2*(3+4)@ have to be accepted.
+  \lstinline@2+3*(4+5)@ have to be accepted.
 
   The set of all possible inputs which a parser may accept is called the
   \emph{language} accepted by that parser. The set of rules which dictate which
@@ -1603,7 +1602,7 @@
     \emph{term};
 
     \item \lstinline[mathescape]@$x$*$y$@ and \lstinline[mathescape]@$x$/$y$@
-    are \emph{multiplicative expressions} if $y$ is a term and $x$ is a either
+    are \emph{multiplicative expressions} if $y$ is a term and $x$ is either a
     term or a multiplicative expression;
 
     \item \lstinline[mathescape]@$x$+$y$@ and \lstinline[mathescape]@$x$-$y$@
@@ -1612,90 +1611,109 @@
     additive expression.
   \end{itemize}
 
-  According to such rules, the string \lstinline@2*(3+4)@ is a valid arithmetic
-  expression. By definition:
-
-  \begin{itemize}
-    \item \lstinline@2@, \lstinline@3@, \lstinline@4@ are literal expressions;
-
-    \item \lstinline@3+4@ is an additive expression;
-
-    \item \lstinline@(3+4)@ is a parenthesized expression;
-
-    \item \lstinline@2*(3+4)@ is a multiplicative expression.
-  \end{itemize}
+  According to such rules, \lstinline@2@, \lstinline@3@, \lstinline@4@ and
+  \lstinline@5@ are literal expressions, \lstinline@4+5@ is an additive
+  expression, \lstinline@(4+5)@ is a parenthesized expression,
+  \lstinline@3*(4+5)@ is a multiplicative expression, and \lstinline@2+3*(4+5)@
+  is an additive expression.
 
   Once a grammar is specified, a parser for the language in question can be
   defined. Crucially, the output of the parser has to be a structure which is
   easy to manipulate in the following phases. For most implementations, the
   output data structure is a tree.
 
-  \section{Syntax tree}
+  \section{Syntax trees}
 
   The syntactic structure of a string accepted by a parser is represented by a a
   \emph{syntax tree}. In literature, two categories are usually defined:
   \emph{concrete} and \emph{abstract} syntax trees.
 
-  A syntax tree that retains all information necessary to identically
-  reconstruct the original input it is called a \emph{concrete} syntax tree.
-  Such a tree can be further processed by either adding or discarding some
-  information; also, nodes can be rearranged. When there's not a one-to-one
-  correspondence between the parsed input and the produced tree, the syntax tree
-  is said to be \emph{abstract}.
-
-  Consider the language of arithmetic expressions: there are at least two
-  possible syntax trees for the input string \lstinline@2+3*(4+5)@, depending on
-  how much information is to be retained. In both cases, the semantic meaning is
-  the same: for instance, details about parenthesization can be discarded if the
-  resulting syntax tree still represents the same order of operations.
+  Consider the expression \lstinline@2+3*(4+5)@ in the language of arithmetic
+  expressions as defined in the previous section. A concrete syntax tree
+  typically indicates which grammatical rules were used while parsing to match a
+  given substring.
 
   \begin{figure}[h]
     \centering
 
-    \usetikzlibrary {shapes.misc}
+    \begin{forest}
+      for tree={draw}
+      [{expression},ellipse,font=\itshape
+        [{additive},ellipse,font=\itshape,calign=child,calign child=2
+          [{term},ellipse,font=\itshape,tier=t3
+            [{literal},ellipse,font=\itshape,tier=t4
+              [{2},circle,font=\ttfamily,tier=t5]]]
+          [{+},ellipse,font=\ttfamily,tier=t3]
+          [{multiplicative},ellipse,font=\itshape,tier=t3,calign=child,calign child=2
+            [{term},ellipse,font=\itshape,tier=t4
+              [{literal},ellipse,font=\itshape,tier=t5
+                [{3},circle,font=\ttfamily,tier=t6]]]
+            [{*},circle,font=\ttfamily,tier=t4]
+            [{term},ellipse,font=\itshape,tier=t4
+              [{parenthesized},ellipse,font=\itshape,tier=t5,calign=child,calign child=2
+                [{(},circle,font=\ttfamily,tier=t6]
+                [{expression},ellipse,font=\itshape,tier=t6
+                  [{additive},ellipse,font=\itshape,calign=child,calign child=2
+                    [{term},ellipse,font=\itshape,tier=t8
+                      [{literal},ellipse,font=\itshape,tier=t9
+                        [{4},circle,font=\ttfamily,tier=t10]]]
+                    [{+},ellipse,font=\ttfamily,tier=t8]
+                    [{term},ellipse,font=\itshape,tier=t8
+                      [{literal},ellipse,font=\itshape,tier=t9
+                        [{5},circle,font=\ttfamily,tier=t10]]]]]
+                [{)},circle,font=\ttfamily,tier=t6]]]]]]
+    \end{forest}
 
-    \begin{tabular}{cc}
-      \begin{tikzpicture}[
-        semithick,
-        level distance=14mm,
-        every node/.style={circle,draw,font=\ttfamily}
-      ]
-        \node {+}
-          child {node {2}}
-          child {node {*}
-            child {node {3}}
-            child {node {+}
-              child {node {4}}
-              child {node {5}}
-            }
-          };
-      \end{tikzpicture} &
-
-      \begin{tikzpicture}[
-        semithick,
-        level distance=14mm,
-        every node/.style={circle,draw,font=\ttfamily}
-      ]
-        \node {+}
-          child {node {2}}
-          child {node {*}
-            child {node {3}}
-            child {node[ellipse] {( )}
-              child {node {+}
-                child {node {4}}
-                child {node {5}}
-              }
-            }
-          };
-      \end{tikzpicture}
-    \end{tabular}
-
-    \caption{Two semantically equivalent syntax trees for \texttt{2+3*(4+5)}}
+    \caption{Concrete syntax tree for \texttt{2+3*(4+5)}}
   \end{figure}
 
-  For our purposes, the distinction between abstract and concrete syntax tree
-  isn't necessary: for this reason, from now on I'll just use the term
+  To ease workflow, concrete syntax trees are usually manipulated by removing
+  redundant or unnecessary information. There are at least two possible abstract
+  syntax trees for the string \lstinline@2+3*(4+5)@, depending on how much
+  information is to be retained. In both cases, the semantic meaning is the
+  same: the tree still represents the same order of operations.
+
+  \begin{figure}[h]
+    \centering
+
+    \begin{tabular}{cc}
+      \begin{forest}
+        for tree={draw,font=\ttfamily}
+        [{+},ellipse
+          [{2},circle,tier=t2]
+          [{*},circle,tier=t2
+            [{3},circle,tier=t3]
+            [{( )},ellipse,tier=t3
+              [{+},ellipse
+                [{4},circle,tier=t5]
+                [{5},circle,tier=t5]]]]]
+      \end{forest} &
+
+      \begin{forest}
+        for tree={draw,font=\ttfamily}
+        [{+},ellipse
+          [{2},circle,tier=t2]
+          [{*},circle,tier=t2
+            [{3},circle,tier=t3]
+            [{+},ellipse,tier=t3
+              [{4},circle,tier=t4]
+              [{5},circle,tier=t4]]]]
+      \end{forest}
+    \end{tabular}
+
+    \caption{
+      Two semantically equivalent abstract syntax trees for \texttt{2+3*(4+5)}
+    }
+  \end{figure}
+
+  For our purposes, the distinction between abstract and concrete syntax trees
+  isn't necessary: for this reason, from now on we'll just use the term
   \emph{syntax tree}.
+  
+  In general, syntax trees not only represent the structure of a programming
+  languages, but also the structure of markup or other kinds of languages. For
+  the purposes of this thesis, I'll discuss the processing of programming
+  languages only.
 
   \section{Parser combinators}
   \label{section:parser-combinators}
@@ -1704,9 +1722,8 @@
   tree. There has been much academic research, and there are many readily
   available implementations of so-called \emph{parser generators}: tools which
   automatically generate code for parsing a language, given its grammar. These
-  tools build upon well-known algorithms, like those available for such as LL or
-  LR~\cite{lr} grammar classes, just to throw a few names around. These tools
-  are very performant; however, they're kind of magical.
+  tools build upon well-known algorithms, like those available for LL or
+  LR~\cite{lr} grammar classes, just to throw a few names around.
 
   In this section, we'll see how there's no fundamental need for any generators;
   although such tools are handy, it isn't too difficult to write a parser from
@@ -1774,6 +1791,8 @@
     next application of $P$ itself. This combinator succeeds with the
     accumulated results of all successful runs.
   \end{itemize}
+  
+  \newpage
 
   \section{Tree traversal}
 
@@ -1815,11 +1834,10 @@
     would be rather concrete, as each node would need to be associated with a
     position in the parser's input string.
   \end{itemize}
-
-  In general, syntax trees not only represent the structure of a programming
-  languages, but also the structure of markup or other kinds of languages. For
-  the purposes of this thesis, I'll discuss the processing of programming
-  languages only.
+  
+  \newpage
+  
+  \thispagestyle{empty}
 
   \chapter{The Devin programming language}
 
