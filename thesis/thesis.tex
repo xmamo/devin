@@ -222,7 +222,7 @@
 
   \pagebreak
 
-  \begin{lstlistinfg}[gobble=4,basicstyle=\ttfamily\small]
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     factorial' :: Integral a => a -> a
     factorial' n = go 1 n
       where
@@ -1858,7 +1858,7 @@
 
   \thispagestyle{empty}
 
-  \chapter{The Devin programming language}
+  \chapter{The Devin language and UI}
 
   In this thesis, I'll discuss the implementation of a simple imperative
   programming language which I decided to call Devin. The name Devin is an
@@ -1896,7 +1896,7 @@
     \item \lstinline@Float@, for double-precision floating-point numbers like
     \lstinline@0.0@ and \lstinline@3.14@. The presence of the fractional part
     distinguishes integers from floats. Contrary to C, exponential notation like
-    \lstinline@1E100@ is disallowed;
+    \lstinline@1E100@ is not supported;
 
     \item \lstinline[mathescape]@[$T$]@, for arrays like
     \lstinline@[1, 1, 2, 3, 5, 8, 13, 21, 34, 55]@.
@@ -1907,11 +1907,11 @@
   procedure has side-effects only, it marked as returning \lstinline@Unit@.
 
   With unit types, there's no need to distinguish between functions which return
-  a value and procedures which do not: all which can be called always returns a
-  value. One of the advantages of unit types is the uniform treatment
-  assignments to calls. While unit types are traditionally used in functional
-  programming languages, some recent imperative languages like Kotlin and Rust
-  incorporate this feature as well.
+  a value and procedures which do not: all callables always returns a value. One
+  of the advantages of unit types is the uniform treatment assignments to calls.
+  While unit types are traditionally used in functional programming languages,
+  some recent imperative languages like Kotlin and Rust incorporate this feature
+  as well.
 
   \subsection{Built-in operators}
 
@@ -1963,8 +1963,8 @@
   multiplication and division. For integers (but not floats), there's the modulo
   operation.
 
-  Binary arithmetic operations require both operands to be of the same type:
-  there are no implicit type conversions.
+  Binary arithmetic operations require both operands to be of the same numeric
+  type: there are no implicit type conversions.
 
   Division (operator \lstinline@/@) behaves differently depending on the types
   of the operands. In any case, the result of arithmetic operations has the same
@@ -2053,15 +2053,15 @@
 
       \multirow{2}{*}{Equality} &
       \lstinline[mathescape]@$x$ == $y$@ &
-      $x \equiv y$ \\
+      $x = y$ \\
 
       &
       \lstinline[mathescape]@$x$ != $y$@ &
-      $x \not\equiv y$ \\
+      $x \neq y$ \\
       \hline
     \end{tabular}
 
-    \caption{Equality and comparison operators}
+    \caption{Relational operators}
   \end{table}
 
   Variables and array elements can be assigned to with the \lstinline@=@
@@ -2108,7 +2108,7 @@
     \label{table:assignment-operators}
   \end{table}
 
-  \section{Working with arrays}
+  \subsection{Working with arrays}
 
   Arrays support the following operations:
 
@@ -2136,7 +2136,7 @@
 
   Variables can be defined using statements of the form
   \lstinline[mathescape]@var $x$ = $y$@, where $x$ is an identifier and $y$ is
-  an expression. The type of of the new variable $x$ is inferred from $y$.
+  an expression. The type of the new variable $x$ is inferred from $y$.
   Variables can be defined at any point, whether globally or as function locals.
   Their visibility extends from the point of their definition onward.
 
@@ -2170,26 +2170,27 @@
 
   \subsection{Branching and looping mechanisms}
 
-  The following two looping constructs are supported:
+  The following two standard constructs are supported:
 
   \begin{itemize}
     \item \emph{While loops} in the form \lstinline[mathescape]@while $p$ $s$@.
-    This construct runs the statement $s$ as long as the expression $p$ is true;
+    This construct evaluates $p$; if \lstinline@true@, $s$ is run. This repeats
+    until $p$ evaluates to \lstinline@false@.
 
     \item \emph{Do-while loops} in the form
-    \lstinline[mathescape]@do $s$ while $p$@. This construct runs $s$ once;
-    then, it re-runs $s$ as long as $p$ is true.
+    \lstinline[mathescape]@do $s$ while $p$@. This construct runs $s$; this
+    repeat unless a subsequent evaluation of $p$ yields \lstinline@false@.
   \end{itemize}
 
   Conditional code execution is supported through statements of the form
   \lstinline[mathescape]@if $p$ $s_1$@ and
   \lstinline[mathescape]@if $p$ $s_1$ else $s_2$@, where $p$ is a boolean
-  predicate and $s_1$ and $s_2$ are statements.
+  expression and $s_1$ and $s_2$ are statements.
 
   \subsection{Assertions}
 
   Devin provides a mechanism for asserting that predicates evaluate to
-  \lstinline@true@ at runtime; if they are not, an error is generated, causing
+  \lstinline@true@ at runtime; if they do not, an error is generated, causing
   program termination. Assertions can be used to check internal assumptions or
   to guard against violation of function contracts, among other things.
 
@@ -2197,14 +2198,13 @@
   statement of a function calculating the factorial of \lstinline@n@, as the
   result not defined if $\text{\lstinline@n@} < 0$.
 
-  \subsection{Procedure definition and application}
+  \subsection{Function definition and application}
 
-  Procedures can be defined either globally or within other procedures. They
-  obey to the same scoping rules as variables. The entry point for Devin
-  programs is a global procedure named \lstinline@main@; it must take no
-  arguments.
+  Functions can be defined either globally or within other functions. They obey
+  to the same scoping rules as variables. The entry point for Devin programs is
+  a global functions named \lstinline@main@; it must take no arguments.
 
-  The syntax for calling procedures is the same as in C:
+  The syntax for calling functions is the same as in C:
   \lstinline[mathescape]@$f$()@ calls $f$ with zero arguments,
   \lstinline[mathescape]@$g$($x$)@ calls $g$ with a single argument,
   \lstinline[mathescape]@$h$($x$, $y$)@ calls $h$ with two arguments, and so on.
@@ -2220,8 +2220,7 @@
   system~\cite{pluggable-type-systems}. A notable example of an optionally typed
   language is Python. With this feature, type annotations can be omitted from
   Devin programs. Type checking is not performed on terms where type annotations
-  are missing. If no type annotations are provided, Devin becomes dynamically
-  typed.
+  are missing.
 
   \begin{lstlisting}[
     float=h,
@@ -2311,8 +2310,8 @@
   \subsection{Operations between numeric types}
 
   Addition, subtraction, multiplication, division and modulo are supported only
-  if both operands are of the same type. For instance, it isn't legal to sum a
-  floating-point number to an integer. While this restriction might seem
+  if both operands are of the same numeric type. For instance, it isn't legal to
+  sum a floating-point number to an integer. While this restriction might seem
   unconventional at first, there is a very specific reason for it.
 
   In Devin, both integers and floating-point numbers occupy 64 bits. Summing two
