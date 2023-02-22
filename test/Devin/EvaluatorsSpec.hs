@@ -193,6 +193,30 @@ spec = do
         \    }\n\
         \}"
 
+    it "should succeed on program 13" $
+      executionShouldSucceed
+        "var a = -1;\n\
+        \var b = -2;\n\
+        \\n\
+        \def f(a: Int) -> Unit {\n\
+        \    assert b == -2;\n\
+        \\n\
+        \    if (a < 100)\n\
+        \        g(a + 1);\n\
+        \}\n\
+        \\n\
+        \def g(b: Int) -> Unit {\n\
+        \    assert a == -1;\n\
+        \\n\
+        \    if (b < 100)\n\
+        \        f(b + 1);\n\
+        \}\n\
+        \\n\
+        \def main() -> Unit {\n\
+        \    f(0);\n\
+        \    g(0);\n\
+        \}"
+
 
 executionShouldSucceed :: String -> Expectation
 executionShouldSucceed source = case runParser Parsers.devin [] "" (0, source) of
