@@ -24,7 +24,7 @@ import Data.Char
 import Data.Functor
 
 import Devin.Parsec hiding (token)
-import Devin.Syntax
+import Devin.Syntax hiding (definition)
 
 
 type ParserT s m a = ParsecT (Int, s) [Token] m a
