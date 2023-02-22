@@ -73,9 +73,9 @@ defineType :: String -> Type -> Typer Type
 defineType name t = Typer $ \case
   [] -> (t, [Scope [(name, t)] [] []], [])
 
-  scope : parents ->
+  scope : scopes ->
     let types' = (name, t) : types scope
-     in (t, scope {types = types'} : parents, [])
+     in (t, scope {types = types'} : scopes, [])
 
 
 lookupType :: String -> Typer (Maybe (Type, Int))
@@ -83,18 +83,18 @@ lookupType name = Typer (\env -> (go 0 env, env, []))
   where
     go _ [] = Nothing
 
-    go depth (Scope {types} : parents) = case lookup name types of
+    go depth (Scope {types} : scopes) = case lookup name types of
       Just t -> Just (t, depth)
-      Nothing -> go (depth + 1) parents
+      Nothing -> go (depth + 1) scopes
 
 
 defineFunSignature :: String -> ([Type], Type) -> Typer ()
 defineFunSignature name signature = Typer $ \case
   [] -> ((), [Scope [] [(name, signature)] []], [])
 
-  scope : parents ->
+  scope : scopes ->
     let funs' = (name, signature) : funs scope
-     in ((), scope {funs = funs'} : parents, [])
+     in ((), scope {funs = funs'} : scopes, [])
 
 
 lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
@@ -102,18 +102,18 @@ lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
   where
     go _ [] = Nothing
 
-    go depth (Scope {funs} : parents) = case lookup name funs of
+    go depth (Scope {funs} : scopes) = case lookup name funs of
       Just signature -> Just (signature, depth)
-      Nothing -> go (depth + 1) parents
+      Nothing -> go (depth + 1) scopes
 
 
 defineVarType :: String -> Type -> Typer ()
 defineVarType name t = Typer $ \case
   [] -> ((), [Scope [] [] [(name, t)]], [])
 
-  scope : parents ->
+  scope : scopes ->
     let vars' = (name, t) : vars scope
-     in ((), scope {vars = vars'} : parents, [])
+     in ((), scope {vars = vars'} : scopes, [])
 
 
 lookupVarType :: String -> Typer (Maybe (Type, Int))
@@ -121,9 +121,9 @@ lookupVarType name = Typer (\env -> (go 0 env, env, []))
   where
     go _ [] = Nothing
 
-    go depth (Scope {vars} : parents) = case lookup name vars of
+    go depth (Scope {vars} : scopes) = case lookup name vars of
       Just t -> Just (t, depth)
-      Nothing -> go (depth + 1) parents
+      Nothing -> go (depth + 1) scopes
 
 
 withNewScope :: Typer a -> Typer a

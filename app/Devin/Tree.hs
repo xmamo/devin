@@ -270,15 +270,15 @@ stateForest :: MonadIO m => State -> m (Tree.Forest (Text, Text))
 stateForest = \case
   [] -> pure []
 
-  Frame {vars = []} : parents -> stateForest parents
+  Frame {vars = []} : frames -> stateForest frames
 
-  Frame {vars} : parents -> do
+  Frame {vars} : frames -> do
     subforest <- for vars $ \(name, r) -> do
       v <- readRef r
       s <- displayVal v
       pure (Tree.Node (Text.pack name, Text.pack s) [])
 
-    forest <- stateForest parents
+    forest <- stateForest frames
     pure (Tree.Node ("Frame", "") subforest : forest)
 
 

@@ -2804,18 +2804,18 @@
     defineType name t = Typer $ \case
       [] -> (t, [Scope [(name, t)] [] []], [])
 
-      scope : parents ->
+      scope : scopes ->
         let types' = (name, t) : types scope
-         in (t, scope {types = types'} : parents, [])
+         in (t, scope {types = types'} : scopes, [])
 
     lookupType :: String -> Typer (Maybe (Type, Int))
     lookupType name = Typer (\env -> (go 0 env, env, []))
       where
         go _ [] = Nothing
 
-        go depth (Scope {types} : parents) = case lookup name types of
+        go depth (Scope {types} : scopes) = case lookup name types of
           Just t -> Just (t, depth)
-          Nothing -> go (depth + 1) parents
+          Nothing -> go (depth + 1) scopes
   \end{lstlisting}
 
   The functions \lstinline@defineFunSignature@ and
@@ -2829,18 +2829,18 @@
     defineFunSignature name signature = Typer $ \case
       [] -> ((), [Scope [] [(name, signature)] []], [])
 
-      scope : parents ->
+      scope : scopes ->
         let funs' = (name, signature) : funs scope
-         in ((), scope {funs = funs'} : parents, [])
+         in ((), scope {funs = funs'} : scopes, [])
 
     lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
     lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
       where
         go _ [] = Nothing
 
-        go depth (Scope {funs} : parents) = case lookup name funs of
+        go depth (Scope {funs} : scopes) = case lookup name funs of
           Just signature -> Just (signature, depth)
-          Nothing -> go (depth + 1) parents
+          Nothing -> go (depth + 1) scopes
   \end{lstlisting}
 
   Finally, variables can be defined and looked up with \lstinline@defineVarType@
@@ -2851,18 +2851,18 @@
     defineVarType name t = Typer $ \case
       [] -> ((), [Scope [] [] [(name, t)]], [])
 
-      scope : parents ->
+      scope : scopes ->
         let vars' = (name, t) : vars scope
-         in ((), scope {vars = vars'} : parents, [])
+         in ((), scope {vars = vars'} : scopes, [])
 
     lookupVarType :: String -> Typer (Maybe (Type, Int))
     lookupVarType name = Typer (\env -> (go 0 env, env, []))
       where
         go _ [] = Nothing
 
-        go depth (Scope {vars} : parents) = case lookup name vars of
+        go depth (Scope {vars} : scopes) = case lookup name vars of
           Just t -> Just (t, depth)
-          Nothing -> go (depth + 1) parents
+          Nothing -> go (depth + 1) scopes
   \end{lstlisting}
 
   Functions to remove previously defined associations could be implemented;
@@ -3650,35 +3650,35 @@
     defineFun name fun = Evaluator $ \case
       [] -> pure (Done (), [Frame 0 [(name, fun)] []])
 
-      frame : parents -> do
+      frame : frames -> do
         let funs' = (name, fun) : funs frame
-        pure (Done (), frame {funs = funs'} : parents)
+        pure (Done (), frame {funs = funs'} : frames)
 
     lookupFun :: String -> Evaluator (Maybe (Function, Int))
     lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
       where
         go _ [] = Nothing
 
-        go depth (Frame {offset, funs} : parents) = case lookup name funs of
+        go depth (Frame {offset, funs} : frames) = case lookup name funs of
           Just fun -> Just (fun, depth)
-          Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
+          Nothing -> go (depth + max 1 offset) (drop (offset - 1) frames)
 
     defineVar :: String -> Reference -> Evaluator ()
     defineVar name r = Evaluator $ \case
       [] -> pure (Done (), [Frame 0 [] [(name, r)]])
 
-      frame : parents -> do
+      frame : frames -> do
         let vars' = (name, r) : vars frame
-        pure (Done (), frame {vars = vars'} : parents)
+        pure (Done (), frame {vars = vars'} : frames)
 
     lookupVar :: String -> Evaluator (Maybe (Reference, Int))
     lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
       where
         go _ [] = Nothing
 
-        go depth (Frame {offset, vars} : parents) = case lookup name vars of
+        go depth (Frame {offset, vars} : frames) = case lookup name vars of
           Just ref -> Just (ref, depth)
-          Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
+          Nothing -> go (depth + max 1 offset) (drop (offset - 1) frames)
   \end{lstlisting}
 
   The function \lstinline@withNewFrame@ runs another \lstinline@Evaluator@ on

@@ -215,9 +215,9 @@ defineFun :: String -> Function -> Evaluator ()
 defineFun name fun = Evaluator $ \case
   [] -> pure (Done (), [Frame 0 [(name, fun)] []])
 
-  frame : parents -> do
+  frame : frames -> do
     let funs' = (name, fun) : funs frame
-    pure (Done (), frame {funs = funs'} : parents)
+    pure (Done (), frame {funs = funs'} : frames)
 
 
 lookupFun :: String -> Evaluator (Maybe (Function, Int))
@@ -225,18 +225,18 @@ lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
   where
     go _ [] = Nothing
 
-    go depth (Frame {offset, funs} : parents) = case lookup name funs of
+    go depth (Frame {offset, funs} : frames) = case lookup name funs of
       Just fun -> Just (fun, depth)
-      Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
+      Nothing -> go (depth + max 1 offset) (drop (offset - 1) frames)
 
 
 defineVar :: String -> Reference -> Evaluator ()
 defineVar name r = Evaluator $ \case
   [] -> pure (Done (), [Frame 0 [] [(name, r)]])
 
-  frame : parents -> do
+  frame : frames -> do
     let vars' = (name, r) : vars frame
-    pure (Done (), frame {vars = vars'} : parents)
+    pure (Done (), frame {vars = vars'} : frames)
 
 
 lookupVar :: String -> Evaluator (Maybe (Reference, Int))
@@ -244,9 +244,9 @@ lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
   where
     go _ [] = Nothing
 
-    go depth (Frame {offset, vars} : parents) = case lookup name vars of
+    go depth (Frame {offset, vars} : frames) = case lookup name vars of
       Just ref -> Just (ref, depth)
-      Nothing -> go (depth + max offset 1) (drop (offset - 1) parents)
+      Nothing -> go (depth + max 1 offset) (drop (offset - 1) frames)
 
 
 withNewFrame :: Int -> Evaluator a -> Evaluator a
