@@ -2390,7 +2390,14 @@
     data Token = Token {interval :: (Int, Int)}
   \end{lstlisting}
 
+  \newpage
+
   \subsection{Representing expressions}
+
+  Literals, numbers and variables are the simplest kinds of expressions, as they
+  are atomic. More complex expressions can be built from simpler ones: for
+  example, a binary expression is constructed by two sub-expressions and a
+  binary operator.
 
   Devin supports 4 unary operators: \lstinline@+@, \lstinline@-@,
   \lstinline@not@, \lstinline@len@. Unary operators are represented by the
@@ -2436,11 +2443,6 @@
       | ModuloAssignOperator {interval :: (Int, Int)}
   \end{lstlisting}
 
-  Literals, numbers and variables are the simplest kinds of expressions, as they
-  are atomic. More complex expressions can be built from simpler ones: for
-  example, a binary expression is constructed by two sub-expressions and a
-  binary operator.
-
   Expressions are described by a single algebraic data type:
   \lstinline@Expression@. Opening and closing parentheses are stored in the
   syntax tree. As a convention, parentheses are always identified by the
@@ -2453,7 +2455,11 @@
         varName :: String,
         interval :: (Int, Int)
       } -> Expression
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       IntegerExpression :: {
         integer :: Integer,
         interval :: (Int, Int)
@@ -2503,6 +2509,8 @@
         close :: Token
       } -> Expression
   \end{lstlisting}
+
+  \newpage
 
   \subsection{Representing statements}
 
@@ -2558,7 +2566,11 @@
         result :: Maybe Expression,
         semicolon :: Token
       } -> statement
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       AssertStatement :: {
         assertKeyword :: Token,
         predicate :: Expression,
@@ -2616,13 +2628,15 @@
       } -> Definition
   \end{lstlisting}
 
+  \newpage
+
   \section{Representing semantic errors}
 
-  Both the evaluator and the type checker require some data type to represent
-  errors. Runtime errors, like division by zero, are raised by the evaluator.
-  Static analysis errors, like a missing return statement, are reported by the
-  type checker. As some errors are common to both phases, a single algebraic
-  data type is used:
+  Both the evaluator and the type checker benefit from having some data type to
+  represent errors. Runtime errors, like division by zero, are raised by the
+  evaluator. Static analysis errors, like a missing return statement, are
+  reported by the type checker. As some errors are common to both phases, a
+  single algebraic data type is used:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Error where
@@ -2668,7 +2682,11 @@
       MissingReturnStatement :: {
         funId :: SymbolId
       } -> Error
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       -- Runtime errors:
 
       IntegerOverflow :: {
@@ -2697,10 +2715,10 @@
 
   \section{The type checker}
 
-  At high level, type checking is performed by a set of functions that operate
-  on an \emph{environment}, a data structure which associates identifiers to
-  types. The environment is used to assert that function calls and variable
-  usages are valid within their context.
+  The process of type checking is performed by a set of functions operating on
+  an \emph{environment}, a data structure which associates identifiers to types.
+  The environment is used to assert that function calls and variable usages are
+  valid within their context.
 
   The module \lstinline@Devin.Type@ provides the structures necessary to
   represent types. The data constructors \lstinline@Unit@, \lstinline@Bool@,
@@ -2722,6 +2740,8 @@
       | Array Type
       | Placeholder String
   \end{lstlisting}
+
+  \pagebreak
 
   To compare types, the relation operator \lstinline@(<:)@ is provided:
 
@@ -2784,7 +2804,11 @@
         let (x, env', errors1) = runTyper mx env
             (y, env'', errors2) = runTyper my env'
          in (f x y, env'', errors1 ++ errors2)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Typer where
       (>>=) :: Typer a -> (a -> Typer b) -> Typer b
       mx >>= f = Typer $ \env ->
@@ -2794,10 +2818,11 @@
   \end{lstlisting}
 
   Next, some utility functions are defined. The function \lstinline@defineType@
-  binds a name to a \lstinline@Type@ (the binding is added to the current
-  environment). Its dual, \lstinline@lookupType@, looks up to which type a name
-  is bound. \lstinline@lookupType@ searches the current environment first; if no
-  bindings are found, the parent environment is scanned next.
+  binds a type name (such as \lstinline@"Unit"@) to a \lstinline@Type@ (such as
+  \lstinline@Unit@); the binding is added to the current environment. Its dual,
+  \lstinline@lookupType@, looks up to which type a name is bound.
+  \lstinline@lookupType@ searches the current environment; if no bindings are
+  found, the parent environment is scanned next.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     defineType :: String -> Type -> Typer Type
@@ -2842,6 +2867,8 @@
           Just signature -> Just (signature, depth)
           Nothing -> go (depth + 1) scopes
   \end{lstlisting}
+
+  \newpage
 
   Finally, variables can be defined and looked up with \lstinline@defineVarType@
   and \lstinline@lookupVarType@.
@@ -2903,7 +2930,11 @@
     checkExpression IntegerExpression {} = pure Int
 
     checkExpression RationalExpression {} = pure Float
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression VarExpression {varName, interval} =
       lookupVarType varName >>= \case
         Just (t, _) -> pure t
@@ -3079,7 +3110,11 @@
       | MultiplyOperator {} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case (leftT, rightT) of
           (Unknown, _) -> pure Unknown
           (_, Unknown) -> pure Unknown
@@ -3140,7 +3175,11 @@
       | AndOperator {} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case (leftT, rightT) of
           (Unknown, _) -> pure Unknown
           (_, Unknown) -> pure Unknown
@@ -3150,13 +3189,7 @@
 
   Assignments with \lstinline@=@ are checked by verifying that both the left and
   right operands are of the same type. Interestingly, it is not checked whether
-  the left-hand side is a variable. As an example, an expression like
-  \lstinline@1 = 2@ is considered valid as it would not fail at runtime. The
-  reason for a particular behavior is the implementation of the evaluator, which
-  for simplicity considers everything to be assignable. The type checker
-  could've been programmed to reject such behavior even if it is well defined at
-  runtime; however, it could be argued that it is the job of a linter to check
-  for such expressions.
+  the left-hand side is a variable.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression {left, binary, right}
@@ -3225,10 +3258,11 @@
       pure False
   \end{lstlisting}
 
-  If-else statements are type checked by asserting that the predicate is a
-  boolean and recursively checking both possible execution paths. If both
-  branches return control, then the if-else statement surely returns control as
-  well.
+  If-else statements are type checked by ensuring that the predicate is a
+  boolean expression and recursively type checking both possible execution
+  paths. We follow a conservative approach and verify if both branches return
+  control; in such case, the whole if-else statement surely must return control
+  as well.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement expectedT IfElseStatement {predicate, trueBranch, falseBranch} = do
@@ -3239,8 +3273,9 @@
       pure (trueBranchDoesReturn && falseBranchDoesReturn)
   \end{lstlisting}
 
-  For if statements without \lstinline@else@ it can't be deduced whether control
-  is returned, as the value of the predicate is only known at runtime.
+  For if statements without \lstinline@else@ we follow the same conservative
+  approach; since control isn't guaranteed to be returned to the callee,
+  \lstinline@False@ is returned.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkStatement expectedT IfStatement {predicate, trueBranch} = do
@@ -3267,7 +3302,7 @@
       pure doesReturn
   \end{lstlisting}
 
-  Return statements are checked by asserting that the returned value has the
+  Return statements are checked by ensuring that the returned value has the
   correct type. If the return value is omitted, it is assumed that
   \lstinline@unit@ is returned instead.
 
@@ -3298,8 +3333,8 @@
     checkStatement _ BreakpointStatement {} = pure False
   \end{lstlisting}
 
-  Finally, blocks are type checked by recursively checking all statements they
-  contain. It is deduced that a block returns control if at least one of it
+  Finally, blocks are type checked by recursively type checking all statements
+  they contain. It is deduced that a block returns control if at least one of it
   statements does.
 
   Devin's syntactical scoping rules have to be considered: declarations in a
@@ -3375,16 +3410,39 @@
         pure (Array t)
   \end{lstlisting}
 
-  Variable definitions and function bodies are type checked as follows:
+  The function \lstinline@checkDefinition2 :: Definition -> Typer ()@ type
+  checks variable and function definitions, adding a new binding of the symbol's
+  name to the environment.
+
+  For variable definitions, implementation is trivial:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkDefinition2 :: Definition -> Typer ()
-    checkDefinition2 = \case
-      VarDefinition {varId = SymbolId {name}, value} -> do
-        t <- checkExpression value
-        defineVarType name t
+    checkDefinition2 VarDefinition {varId = SymbolId {name}, value} = do
+      t <- checkExpression value
+      defineVarType name t
+  \end{lstlisting}
 
-      FunDefinition {funId, params, returnInfo, body} -> withNewScope $ do
+  To type check function definitions, a new scope is introduced; this way,
+  bindings for parameter names are local to the function which introduced them.
+
+  \newpage
+
+  For each function definition, type checking is done in three steps:
+
+  \begin{enumerate}
+    \item Parameter names to are bound their type;
+
+    \item The return type is determined from the function signature. If no
+    return type was provided, \lstinline@Unknown@ is assumed;
+
+    \item The body of the function is type checked. If the return type isn't
+    \lstinline@Unit@ or \lstinline@Unknown@, it is further verified that
+    execution paths return a value.
+  \end{enumerate}
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkDefinition2 FunDefinition {funId, params, returnInfo, body} =
+      withNewScope $ do
         for_ params $ \(_, SymbolId {name}, typeInfo) -> case typeInfo of
           Just (_, paramTypeId) -> do
             paramT <- getType paramTypeId
@@ -5126,7 +5184,7 @@
   exemplify how source code corresponds to syntax trees; with the GTK+ library,
   I developed an interface which not only performs syntax highlighting, but also
   visualizes this correspondence. Additionally, Devin's UI implements a
-  debugger; with the \lstinline@breakpont@ statement, execution can be suspended
+  debugger; with the breakpont statement, execution can be suspended
   at arbitrary locations, allowing for the program's state to be observed. I
   demonstrated how a monadic mechanism can be used to represent pausable
   computations; more complex solutions might be required in different
