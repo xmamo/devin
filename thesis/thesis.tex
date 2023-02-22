@@ -1,23 +1,30 @@
 \documentclass[UdineBachThesis,american,11pt]{PhdThesis}
 
+% Base packages
 \usepackage{babel}
 \usepackage[final]{graphicx}
 
+% AMS packages
 \usepackage{amsmath}
 \usepackage{amssymb}
 
+% Companion packages
 \usepackage{csquotes}
 \usepackage{enumitem}
 \usepackage[final]{listings}
 \usepackage{multirow}
 
+% The BibLaTeX package
 \usepackage[sorting=none,abbreviate=false]{biblatex}
 \addbibresource{thesis.bib}
 
+% Other packages
 \usepackage{forest}
 
+% The theorems package by prof. Marco Comini
 \usepackage{theorems}
 
+% The hyperref package. Has to be loaded last!
 \usepackage[hidelinks,pdfpagelayout=TwoPageRight]{hyperref}
 
 \author{Matteo Morena}
@@ -2360,8 +2367,7 @@
   In terms of implementation complexity, both the type checker and the evaluator
   are somewhat simpler than the parser. The parser makes much greater use of
   higher order functions and uses multi-parameter type classes, causing some
-  syntactical noise on function signatures. Experienced Haskellers should have
-  no problems reading the parser's implementation; in any case, I'll describe
+  syntactical noise on function signatures; for this reason, I'll describe
   parsing last.
 
   \section{The syntax tree}
@@ -2388,7 +2394,7 @@
 
   Devin supports 4 unary operators: \lstinline@+@, \lstinline@-@,
   \lstinline@not@, \lstinline@len@. Unary operators are represented by the
-  algebraic data type \lstinline@UnaryOperator@, which is defined as follows:\
+  algebraic data type \lstinline@UnaryOperator@, which is defined as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data UnaryOperator
