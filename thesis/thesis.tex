@@ -1,7 +1,7 @@
 \documentclass[UdineBachThesis,american,11pt]{PhdThesis}
 
 % Base packages
-\usepackage{babel}
+\usepackage[main=american,greek]{babel}
 \usepackage[final]{graphicx}
 
 % AMS packages
@@ -20,7 +20,6 @@
 
 % Other packages
 \usepackage{forest}
-\usepackage{textgreek}
 
 % The theorems package by prof. Marco Comini
 \usepackage{theorems}
@@ -44,7 +43,7 @@
 \setlength{\parskip}{0.4em plus 1pt minus 1pt}
 
 \setlist{
-  topsep=0pt,
+  topsep=0pt plus 1pt minus 1pt,
   partopsep=0pt,
   parsep=\parskip,
   itemsep=0pt
@@ -548,8 +547,6 @@
   value of type \lstinline@a@ (represented as \lstinline@Just a@).
   \lstinline@Either@ represents values of two possibilities; a value of type
   \lstinline@Either a b@ is either \lstinline@Left a@ or \lstinline@Right b@.
-
-  % \pagebreak
 
   Both algebraic data types are commonly used for error reporting. For simple
   cases, where functions may not yield any meaningful value, \lstinline@Maybe@
@@ -1888,7 +1885,7 @@
   Devin is an imperative programming language with lexical variable scoping and
   support for recursive function definitions. Syntactically, it's similar to any
   C descendant; among others, it supports variable definition and assignment,
-  while loops, do-while loops and branching.
+  while loops, do-while loops and brancing with if and if-else statements.
 
   \subsection{Data types}
 
@@ -1923,8 +1920,8 @@
 
   \subsection{Built-in operators}
 
-  Booleans support the usual operations of negation, conjunction, disjunction
-  and exclusive disjunction.
+  Booleans support the usual operations of negation, conjunction and
+  disjunction. Additionaly, an operator for exclusive disjunction is provided.
 
   Like many languages, boolean binary operators are evaluated lazily: the right
   operand is only evaluated if the left operand doesn't already determine the
@@ -2116,6 +2113,8 @@
     \label{table:assignment-operators}
   \end{table}
 
+  \newpage
+
   \subsection{Working with arrays}
 
   Arrays support the following operations:
@@ -2265,9 +2264,11 @@
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{4.png}
+    \includegraphics[width=0.9\textwidth]{4.png}
     \caption{Semantic error reporting and highlighting}
   \end{figure}
+
+  \pagebreak
 
   Once a valid program has been written, it can be run by clicking the
   $\blacktriangleright$ button. The state of execution can be observed with
@@ -2288,28 +2289,32 @@
     nested scopes with the same mechanism as function calls. The debugger skips
     visualization of empty frames, as they occur somewhat frequently.
 
-    \item Execution always starts with a non-empty stack containing a single
-    frame. This frame binds the names \lstinline@true@ to the truth value,
-    \lstinline@false@ to \lstinline@not true@, \lstinline@unit@ to the unit
-    value. In practice, this means that \lstinline@true@, \lstinline@false@ and
+    \item Program execution always starts with a non-empty stack containing a
+    single frame. This frame associates the name \lstinline@true@ to the truth
+    value, \lstinline@false@ to \lstinline@not true@, and \lstinline@unit@ to
+    the unit value.
+
+    In practice, this means that \lstinline@true@, \lstinline@false@ and
     \lstinline@unit@ are not special keywords or constants; instead, they are
     ordinary variables. This is a deliberate design decision.
   \end{itemize}
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{5.png}
+    \includegraphics[width=0.9\textwidth]{5.png}
     \caption{The debugger displaying the current state of the stack}
   \end{figure}
 
+  \pagebreak
+
   Runtime errors are handled as well. When an error occurs, the offending code
-  fragment is highlighted and a message dialog describing the problem is shown
-  to the user. Runtime errors include, but are not limited to, index out of
-  bounds errors, division by zero, assertion violations.
+  fragment is highlighted and a descriptive message dialog is shown to the user.
+  Runtime errors include, but are not limited to, index out of bounds errors,
+  division by zero, assertion violations.
 
   \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{6.png}
+    \includegraphics[width=0.9\textwidth]{6.png}
     \caption{Runtime error reporting and highlighting}
   \end{figure}
 
@@ -2353,6 +2358,10 @@
   objective. As optional types are not a common feature and languages shape the
   way we think about solving problems, I decided to add this feature to be
   played around with.
+
+  \newpage
+
+  \thispagestyle{empty}
 
   \chapter{Implementing Devin}
 
@@ -2807,7 +2816,7 @@
          in (f x y, env'', errors1 ++ errors2)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Typer where
@@ -3615,6 +3624,8 @@
       newRef v'
   \end{lstlisting}
 
+  \newpage
+
   As for the \lstinline@Evaluator@, two functions are provided:
   \lstinline@runEvaluatorStep@ and \lstinline@runEvaluator@. The former runs a
   single step of computation, while the latter runs all remaining steps.
@@ -4110,7 +4121,7 @@
         rightV <- readRef rightR
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case (leftV, rightV) of
@@ -4411,7 +4422,7 @@
         defineFun name (UserDefined definition)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalDefinition2 :: Definition -> Evaluator ()
@@ -4528,7 +4539,7 @@
       pure (f (start, end))
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   Numbers with decimals are parsed similarly with respect to integers. The dot,
   parsed with \lstinline@char '.'@, does not get used directly to compute the
@@ -4623,9 +4634,8 @@
   general-purpose identifiers~\cite{identifier-syntax}, albeit with some minor
   variations applied to their recommendations. Simplifying, identifiers start
   with a letter and continue with either letters or numbers; the more general
-  Unicode definition allows identifiers like
-  \texttt{\textpi\textupsilon\texttheta\textalpha\textgamma\'o\textrho\textalpha\textsigma}
-  to be accepted as well.
+  Unicode definition allows identifiers like \texttt{\ensuregreek{πυθαγόρας}} to
+  be accepted as well.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     identifier :: Stream s m Char => ParserT s m String
@@ -4716,7 +4726,7 @@
       pure (\left right -> BinaryExpression left binary right)
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression3 :: Stream s m Char => ParserT s m Expression
@@ -5119,6 +5129,8 @@
   of the container with \lstinline@Gtk.widgetSetMarginStart@,
   \lstinline@Gtk.widgetSetMarginEnd@, \lstinline@Gtk.widgetSetMarginTop@,
   \lstinline@Gtk.widgetSetMarginBottom@.
+
+  \newpage
 
   The main window is created with \lstinline@Gtk.applicationWindowNew@. Its
   title is set to the empty string and it is configured not to be resizable.
