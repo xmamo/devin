@@ -20,6 +20,7 @@
 
 % Other packages
 \usepackage{forest}
+\usepackage{textgreek}
 
 % The theorems package by prof. Marco Comini
 \usepackage{theorems}
@@ -4465,11 +4466,13 @@
     type Parser s a = Parsec (Int, s) [Token] a
   \end{lstlisting}
 
+  \newpage
+
   \subsection{Parsing expressions}
 
   Let's start by examining how an integer is parsed. Syntactically, an integer
-  is made up of one or more digits 0--9; it is optionally preceded by a sign
-  \lstinline@+@ or \lstinline@-@.
+  is made up of one or more digits in the range $0$--$9$; it is optionally
+  preceded by a sign (\lstinline@+@ or \lstinline@-@).
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     integerExpression :: Stream s m Char => ParserT s m Expression
@@ -4480,7 +4483,7 @@
       pure (IntegerExpression (sign * magnitude))
   \end{lstlisting}
 
-  The do block first parses the sign, then the digits. It computes the
+  The do expression first parses the sign, then the digits. It computes the
   magnitude, which multiplied by the sign gives the value of the integer.
 
   \lstinline@char '+'@ tries to parse \lstinline@+@; if it succeeds, the its
@@ -4490,26 +4493,29 @@
   \lstinline@-@ is parsed, the sign is assumed to be positive.
 
   The combinator \lstinline@(<|>)@ implements choice. The parser
-  \lstinline[mathescape]@$p$ <|> $q$@ first applies $p$. If it succeeds, the
-  value of $p$ is returned. If $p$ fails without consuming any input, parser $q$
+  \lstinline[mathescape]@$p$ <|> $q$@ first applies $p$; if it succeeds, the
+  value of $p$ is returned; if $p$ fails without consuming any input, parser $q$
   is tried. Thus, \lstinline@(char '+' $> 1) <|> (char '-' $> -1) <|> pure 1@
-  tries to parse \lstinline@+@ (in which case the sign is $+1$), then
-  \lstinline@-@ (sign $-1$); if neither character could be parsed,
-  \lstinline@pure 1@ does nothing and yields $+1$.
+  tries to parse a \lstinline@+@ (in which case the sign is $+1$), then
+  \lstinline@-@ (in which case the sign is $-1$); if neither character could be
+  parsed, \lstinline@pure 1@ does nothing and yields $+1$.
 
   Digits are parsed with \lstinline@satisfy isDigit@. The parser
   \lstinline[mathescape]@satisfy $p$@ succeeds for any character for which the
   predicate $p$ is true and returns the parsed character. The combinator
   \lstinline[mathescape]@many1 $p$@ applies a parser $p$ one or more times.
+  Thus, \lstinline@many1 (satisfy isDigit)@ parses the longest sequence of one
+  or more digits.
 
   The constructor \lstinline@IntegerExpression@ has two fields, the second of
-  which is a \lstinline@(Int, Int)@: it marks the start and end offset where the
-  integer was parsed. The \lstinline@syntax@ combinator gets the position before
-  and after the do block as a tuple; this value is given to the partially
-  applied \lstinline@IntegerExpression@. \lstinline@try@ makes
-  \lstinline@integerExpression@ atomic, in the sense that it either succeeds or
-  fails without consuming any input. \lstinline@flip label "number"@ gives a
-  description to be used for error reporting.
+  which is an \lstinline@(Int, Int)@; this field marks the start and end offsets
+  of where the integer was parsed. The \lstinline@syntax@ combinator, used in
+  the previous listing, gets the positions before and after the do expression;
+  this tuple is given to the partially applied \lstinline@IntegerExpression@.
+  \lstinline@try@ makes \lstinline@integerExpression@ atomic, in the sense that
+  it either succeeds or fails without consuming any input.
+  \lstinline@flip label "number"@ gives a description to be used for error
+  reporting.
 
   The helper function \lstinline@syntax@ is implemented as follows:
 
@@ -4521,6 +4527,8 @@
       end <- getOffset
       pure (f (start, end))
   \end{lstlisting}
+
+  \pagebreak
 
   Numbers with decimals are parsed similarly with respect to integers. The dot,
   parsed with \lstinline@char '.'@, does not get used directly to compute the
@@ -4580,6 +4588,8 @@
     s = skipMany (skipMany1 (space <?> "") <|> void (comment <?> ""))
   \end{lstlisting}
 
+  \newpage
+
   The function \lstinline@string@ is provided by \lstinline@parsec@; it parses a
   sequence of characters, consuming characters even if the whole string couldn't
   be matched: \lstinline@try@ has to be used to disable this odd behavior.
@@ -4613,8 +4623,9 @@
   general-purpose identifiers~\cite{identifier-syntax}, albeit with some minor
   variations applied to their recommendations. Simplifying, identifiers start
   with a letter and continue with either letters or numbers; the more general
-  Unicode definition allows characters like \lstinline[literate={è}{\`e}{1}]@è@
-  or \lstinline[literate={ß}{\ss}{1}]@ß@ to be accepted as well.
+  Unicode definition allows identifiers like
+  \texttt{\textpi\textupsilon\texttheta\textalpha\textgamma\'o\textrho\textalpha\textsigma}
+  to be accepted as well.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     identifier :: Stream s m Char => ParserT s m String
@@ -4638,6 +4649,8 @@
         isContinue DecimalNumber = True
         isContinue category = isStart category
   \end{lstlisting}
+
+  \newpage
 
   Keywords are handled by parsing an identifier and checking that it is equal to
   some string.
@@ -4673,11 +4686,9 @@
       pure (UnaryExpression unary operand)
   \end{lstlisting}
 
-  Parsing binary expressions is more involved, as operator precedence has to be
-  accounted for. There are 5 levels of precedence: the operators
-  \lstinline@and@, \lstinline@or@ and \lstinline@xor@ have the lowest
-  precedence, while \lstinline@*@, \lstinline@/@,
-  \lstinline@%@ have the highest.
+  Parsing binary expressions is somewhat more involved, as operator precedence
+  has to be accounted for. Each level of precedence is handled by a different
+  parsing function.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression :: Stream s m Char => ParserT s m Expression
@@ -4703,7 +4714,11 @@
         ]
 
       pure (\left right -> BinaryExpression left binary right)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression3 :: Stream s m Char => ParserT s m Expression
     expression3 = chainl1 expression4 $ do
       binary <- try $ between s s $ syntax $ choice
@@ -4746,7 +4761,7 @@
   For simplicity, \lstinline@expression6@ is not listed here. This function
   handles parenthesized expressions, function calls, variables and array access
   expressions. Interested readers may read the complete implementation in the
-  appendix.
+  \hyperref[chapter:devin-source-code]{appendix}.
 
   \subsection{Parsing statements}
 
@@ -4847,7 +4862,7 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     breakpointStatement :: Stream s m Char => ParserT s m Statement
     breakpointStatement = do
-    breakpointKeyword <- keyword "breakpoint"
+      breakpointKeyword <- keyword "breakpoint"
       semicolon <- s *> token ";"
       pure (BreakpointStatement breakpointKeyword semicolon)
   \end{lstlisting}
@@ -4863,6 +4878,12 @@
       close <- token "}"
       pure (BlockStatement open statements close)
   \end{lstlisting}
+
+  Note that the operator \lstinline@(<*)@ chains two parsers, discarding the
+  result of the second. Thus, the combinators \lstinline@(*>)@ and
+  \lstinline@(<*)@ serve a similar purpose: sequencing two parsers and
+  discarding the result of one of the two operands. As a mnemonic, the angle
+  bracket points to the parser whose result has to be kept.
 
   \subsection{Parsing variable and function definitions}
 
@@ -4924,9 +4945,7 @@
       pure (FunDefinition defKeyword funId open params commas close returnInfo body)
   \end{lstlisting}
 
-  Parameters are parsed by the \lstinline@param@ function. This function
-  accounts for the fact that each parameter may be preceded by a \lstinline@ref@
-  keyword.
+  Parameters are parsed by the \lstinline@param@ helper function.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     param = do
@@ -4936,7 +4955,11 @@
             token <- keyword "ref"
             paramId <- s *> symbolId
             pure (Just token, paramId),
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
           do
             paramId <- symbolId
             pure (Nothing, paramId)
@@ -4967,10 +4990,9 @@
   package is mostly a thin wrapper on top GTK+; as a consequence, windows and
   widgets are to be constructed imperatively rather than declaratively.
 
-  Devin's UI implementation is somewhat complex, requiring more than 1100 lines
-  of code. Many considerations were made while programming the UI; describing
-  them all would require a thesis on its own. To be short, I'll highlight two
-  of them:
+  Devin's UI implementation is complex, requiring more than 1100 lines of code.
+  Many considerations were made while developing the UI; to be short, I'll
+  highlight two of them:
 
   \begin{itemize}
     \item Source code editing features are provided on top of the GtkSourceView
@@ -4985,8 +5007,7 @@
     implicitly defining Devin's parser, and the one providing syntax
     highlighting. One could say that allowing for minor potential discrepancies
     between the two which few would notice is good enough. Or, one could be
-    pedantic and say that there should be only one source of truth. Readers can
-    guess that I chose the second option.
+    pedantic and accept only one source of truth. I chose the second option.
 
     This consideration gives rise to the first problem: using part of
     GtkSourceView's features, while performing syntax highlighting based on the
@@ -5037,7 +5058,11 @@
       G.onApplicationActivate application (onActivate application)
       status <- G.applicationRun application Nothing
       when (status /= 0) (exitWith (ExitFailure (fromIntegral status)))
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
     onActivate application = do
       label <- Gtk.labelNew (Just (Text.pack "0"))
@@ -5098,8 +5123,7 @@
   The main window is created with \lstinline@Gtk.applicationWindowNew@. Its
   title is set to the empty string and it is configured not to be resizable.
   Finally, event handlers for button clicks are registered with
-  \lstinline@Gtk.onButtonClicked@. After all is done, the application window is
-  displayed to the user with \lstinline@Gtk.widgetShowAll@.
+  \lstinline@Gtk.onButtonClicked@.
 
   As can be seen, using GTK+ within Haskell is not too difficult, even if
   imperative-style programming is required. In most circumstances, code working
@@ -5115,22 +5139,6 @@
 
     onActivate' :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
     onActivate' application = do
-      let buildFn = do
-            label <- Gtk.getObject Gtk.Label (Text.pack "label")
-            buttonMinus <- Gtk.getObject Gtk.Button (Text.pack "buttonMinus")
-            buttonPlus <- Gtk.getObject Gtk.Button (Text.pack "buttonPlus")
-            window <- Gtk.getObject Gtk.ApplicationWindow (Text.pack "window")
-
-            Gtk.onButtonClicked buttonMinus $ do
-              t <- Gtk.labelGetLabel label
-              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) - 1)))
-
-            Gtk.onButtonClicked buttonPlus $ do
-              t <- Gtk.labelGetLabel label
-              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) + 1)))
-
-            pure window
-
       let string =
             "<interface>\n\
             \  <object class=\"GtkApplicationWindow\" id=\"window\">\n\
@@ -5166,6 +5174,26 @@
             \    </child>\n\
             \  </object>\n\
             \</interface>\0"
+  \end{lstlisting}
+
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+      let buildFn = do
+            label <- Gtk.getObject Gtk.Label (Text.pack "label")
+            buttonMinus <- Gtk.getObject Gtk.Button (Text.pack "buttonMinus")
+            buttonPlus <- Gtk.getObject Gtk.Button (Text.pack "buttonPlus")
+            window <- Gtk.getObject Gtk.ApplicationWindow (Text.pack "window")
+
+            Gtk.onButtonClicked buttonMinus $ do
+              t <- Gtk.labelGetLabel label
+              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) - 1)))
+
+            Gtk.onButtonClicked buttonPlus $ do
+              t <- Gtk.labelGetLabel label
+              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) + 1)))
+
+            pure window
 
       builder <- Gtk.builderNewFromString (Text.pack string) (-1)
       window <- Gtk.buildWithBuilder buildFn builder
