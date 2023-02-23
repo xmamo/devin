@@ -295,12 +295,12 @@ checkExpression expression = case expression of
       (Int, Int) -> pure Int
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | EqualOperator {} <- binary -> do
+  BinaryExpression {left, binary = EqualOperator {}, right} -> do
     checkExpression left
     checkExpression right
     pure Bool
 
-  BinaryExpression {left, binary, right} | NotEqualOperator {} <- binary -> do
+  BinaryExpression {left, binary = NotEqualOperator {}, right} -> do
     checkExpression left
     checkExpression right
     pure Bool

@@ -62,7 +62,7 @@ type State = [Frame]
 
 
 data Frame = Frame {
-  offset :: Int,  -- Access link / static link
+  offset :: Int,  -- Static link
   funs :: [(String, Function)],
   vars :: [(String, Reference)]
 }

@@ -215,21 +215,23 @@ evalExpression expression = case expression of
       Just (UserDefined FunDefinition {params, body}, depth) ->
         withNewFrame (depth + 1) (go 0 params argRs)
         where
-          -- Pass by value
+          -- Pass argument by value:
           go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do
             argR' <- cloneRef argR
             defineVar name argR'
             go (n + 1) params argRs
 
-          -- Pass by reference
+          -- Pass argument by reference:
           go n ((Just _, SymbolId {name}, _) : params) (argR : argRs) = do
             defineVar name argR
             go (n + 1) params argRs
 
+          -- If argument count is correct:
           go _ [] [] = evalStatement body >>= \case
             Just r -> cloneRef r
             Nothing -> newRef Unit
 
+          -- If argument count is incorrect:
           go n params argRs = do
             let expected = n + length params
             let actual = n + length argRs

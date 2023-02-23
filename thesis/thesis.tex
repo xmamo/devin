@@ -1911,7 +1911,7 @@
 
   In addition to the items above, Devin has a \emph{unit type} named
   \lstinline@Unit@; it is inhabited by one value only: \lstinline@unit@. When a
-  procedure has side-effects only, it marked as returning \lstinline@Unit@.
+  function has side-effects only, it marked as returning \lstinline@Unit@.
 
   With unit types, there's no need to distinguish between functions which return
   a value and procedures which do not: all callables always returns a value. One
@@ -2217,7 +2217,7 @@
   \lstinline[mathescape]@$h$($x$, $y$)@ calls $h$ with two arguments, and so on.
 
   The evaluation strategy of Devin is eager; arguments are evaluated from left
-  to right. By default, procedure arguments are passed by value; with the
+  to right. By default, function arguments are passed by value; with the
   \lstinline@ref@ keyword, they can be passed by reference instead.
 
   \subsection{Optional types}
@@ -2717,7 +2717,7 @@
 
   The process of type checking is performed by a set of functions operating on
   an \emph{environment}, a data structure which associates identifiers to types.
-  The environment is used to assert that function calls and variable usages are
+  The environment is used to verify if function calls and variable usages are
   valid within their context.
 
   The module \lstinline@Devin.Type@ provides the structures necessary to
@@ -2998,7 +2998,7 @@
   \end{lstlisting}
 
   Unary arithmetic expressions with the operators \lstinline@+@ and
-  \lstinline@-@ are type checked by asserting that the operand is of a numeric
+  \lstinline@-@ are type checked by ensuring that the operand is of a numeric
   type. If it is, the result of evaluating the whole expression has the same
   type of the operand.
 
@@ -3154,17 +3154,15 @@
   during evaluation.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression BinaryExpression {left, binary, right}
-      | EqualOperator {} <- binary = do
-        checkExpression left
-        checkExpression right
-        pure Bool
+    BinaryExpression {left, binary = EqualOperator {}, right} -> do
+      checkExpression left
+      checkExpression right
+      pure Bool
 
-    checkExpression BinaryExpression {left, binary, right}
-      | NotEqualOperator {} <- binary = do
-        checkExpression left
-        checkExpression right
-        pure Bool
+    BinaryExpression {left, binary = NotEqualOperator {}, right} -> do
+      checkExpression left
+      checkExpression right
+      pure Bool
   \end{lstlisting}
 
   The operators \lstinline@and@, \lstinline@or@ and \lstinline@xor@ are all
@@ -3177,7 +3175,7 @@
         rightT <- checkExpression right
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case (leftT, rightT) of
@@ -3239,7 +3237,7 @@
   return statements, \lstinline@checkStatement@ verifies that the returned value
   is of the given type.
 
-  Inside procedures, return statements may signal control to be returned the
+  Inside functions, return statements may signal control to be returned the
   callee. The function \lstinline@checkStatement@ wraps a \lstinline@Bool@ which
   is \lstinline@True@ if control is guaranteed to be returned to the callee and
   \lstinline@False@ otherwise.
@@ -3465,15 +3463,14 @@
 
   \section{The evaluator}
 
-  The data types and functions in the module \lstinline@Devin.Evaluator@
-  implement the evaluator interface. Mirroring type checking, evaluation
-  operates on a linked list of \emph{frames}; each frame holds bindings between
-  function names and their definitions, and between variable names and their
-  value stored in memory.
+  The data types and functions in \lstinline@Devin.Evaluator@ implement the
+  evaluator interface. Evaluation operates on a linked list of \emph{frames};
+  each frame holds bindings between function names and their definitions, and
+  between variable names and their value stored in memory.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Frame = Frame {
-      offset :: Int,  -- Access link / static link
+      offset :: Int,  -- Static link
       funs :: [(String, Function)],
       vars :: [(String, Reference)]
     }
@@ -3484,8 +3481,10 @@
       deriving Functor
   \end{lstlisting}
 
-  A \lstinline@Function@ represents a bound procedure. It can either be a Devin
-  built-in with ad-hoc semantics, or user-defined.
+  \newpage
+
+  A \lstinline@Function@ is either be a Devin built-in with ad-hoc semantics, or
+  a user-defined function.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Function
@@ -3498,9 +3497,9 @@
   bound to a cell which holds the actual value. This way, multiple identifiers
   can refer to the same value.
 
-  In Devin, cells are implemented by the \lstinline@Reference@ data type; it
-  wraps Haskell's \lstinline@IORef@, which provides mutable references in the
-  \lstinline@IO@ monad.
+  In Devin's evaluator, cells are implemented by the \lstinline@Reference@ data
+  type; it wraps Haskell's \lstinline@IORef@, which provides mutable references
+  in the \lstinline@IO@ monad.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data Value
@@ -3549,7 +3548,11 @@
 
     readRef :: MonadIO m => Reference -> m Value
     readRef (Reference ref) = liftIO (readIORef ref)
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     writeRef :: MonadIO m => Reference -> Value -> m ()
     writeRef (Reference ref) v = liftIO (writeIORef ref v)
   \end{lstlisting}
@@ -3587,8 +3590,8 @@
       compareVals v1 v2
   \end{lstlisting}
 
-  Since a \lstinline@Value@ can be an array containing references, it may be
-  useful to clone it, copying the values contained in its cells. The functions
+  A \lstinline@Value@ can be an array containing references; thus, to implement
+  pass by value, the ability to clone values is needed. The functions
   \lstinline@cloneVal@ and \lstinline@cloneRef@ are implemented to provide such
   functionality.
 
@@ -3673,7 +3676,7 @@
         pure (Done x, state)
   \end{lstlisting}
 
-  Procedures and variables can be defined and looked up with the
+  Functions and variables can be defined and looked up with the
   \lstinline@defineFun@, \lstinline@lookupFun@, \lstinline@defineVar@ and
   \lstinline@lookupVar@ functions. On lookup, the stack of frames is searched
   for the requested binding from top to bottom.
@@ -3687,8 +3690,8 @@
 
   \begin{itemize}
     \item When $\text{\lstinline@offset@} = 1$, the previous frame coincides
-    with the lexical parent: only the current needs to be skipped to reach its
-    parent.
+    with the lexical parent: only the current frame needs to be skipped to reach
+    its parent.
 
     \item When $\text{\lstinline@offset@} > 1$, the previous frame doesn't
     coincide with the lexical parent: more than one frame needs to be skipped to
@@ -3699,9 +3702,12 @@
     clear that \lstinline@g@'s body doesn't have access to the variables defined
     inside \lstinline@f@. At the same time, from the perspective of the runtime
     stack, \lstinline@g@'s frame succeeds \lstinline@f@'s frame. It is in cases
-    like these that the \lstinline@offset@ helps to recover the actual lexical
-    parent.
+    like these that the \lstinline@offset@ field is used to recover the actual
+    lexical parent.
   \end{itemize}
+
+  The functions \lstinline@defineFun@, \lstinline@lookupFun@,
+  \lstinline@defineVar@ and \lstinline@lookupVar@ are defined as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     defineFun :: String -> Function -> Evaluator ()
@@ -3728,7 +3734,11 @@
       frame : frames -> do
         let vars' = (name, r) : vars frame
         pure (Done (), frame {vars = vars'} : frames)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     lookupVar :: String -> Evaluator (Maybe (Reference, Int))
     lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
       where
@@ -3772,23 +3782,28 @@
 
   The module \lstinline@Devin.Evaluators@ implements functions to evaluate
   expressions, statements and definitions.
-  \lstinline@evalExpression :: Expression -> Evaluator Reference@ executes an
-  expression and returns the cell containing the evaluated value.
+  \lstinline@evalExpression :: Expression -> Evaluator Reference@ evaluates an
+  expression and returns the cell containing the resulting value.
 
   Evaluating integer and floating-point literals is trivial: all that needs to
   be done is to allocate a new cell containing the value of the literal. For
   integers, an exception is raised if the literal is out of the 64-bit range.
-  Variable literals get looked up in the running state.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression expression @ IntegerExpression {integer} =
+    evalExpression expression | IntegerExpression {integer} <- expression =
       case toIntegralSized integer of
         Just x -> newRef (Int x)
         Nothing -> raise (IntegerOverflow expression)
 
     evalExpression RationalExpression {rational} =
       newRef (Float (fromRat rational))
+  \end{lstlisting}
 
+  \pagebreak
+
+  Variable literals get simply looked up in the running state:
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression VarExpression {varName, interval} =
       lookupVar varName >>= \case
         Just (r, _) -> pure r
@@ -3861,7 +3876,10 @@
     safeBinary op x y = toIntegralSized (toInteger x `op` toInteger y)
   \end{lstlisting}
 
-  Unary expressions are evaluated as follows:
+  In the case of unary arithmetic expressions, the operand gets evaluated
+  recursively. If the operator is \lstinline@-@, the result gets negated; if the
+  operator is \lstinline@+@, nothing else needs to be done. Again, exceptions
+  are raised if subexpressions evaluate to the wrong type.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression UnaryExpression {unary, operand}
@@ -3891,12 +3909,22 @@
           _ -> do
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
+  \end{lstlisting}
 
+  Expressions with \lstinline@not@ or \lstinline@len@ are handled similarly to
+  expressions with the unary \lstinline@-@ operator: the operand gets evaluated
+  recursively, then some function is applied if its type is correct.
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression UnaryExpression {unary, operand}
       | NotOperator {} <- unary = do
         operandR <- evalExpression operand
         operandV <- readRef operandR
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case operandV of
           Bool x -> newRef (Bool (not x))
 
@@ -3917,10 +3945,11 @@
             raise (InvalidUnary unary operandT)
   \end{lstlisting}
 
-  The binary arithmetic operators \lstinline@-@, \lstinline@/@ and \lstinline@%@
-  have similar implementations between themselves, with the exception that
-  \lstinline@%@ supports only \lstinline@Int@s, and that both \lstinline@/@ and
-  \lstinline@%@ raise an exception if the dividend is 0.
+  The implementations of the binary arithmetic operators \lstinline@-@,
+  \lstinline@/@ and \lstinline@%@ are similar to each other, with the exception
+  that the operator \lstinline@%@ supports only operands of type
+  \lstinline@Int@, and that both \lstinline@/@ and \lstinline@%@ require the
+  dividend not to be 0.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression expression @ BinaryExpression {left, binary, right}
@@ -3944,9 +3973,26 @@
             raise (InvalidBinary binary leftT rightT)
   \end{lstlisting}
 
-  The operators \lstinline@+@ and \lstinline@*@ are overloaded and are meant to
-  work with both arrays and numbers. Array concatenation and repetition require
-  cells to be cloned.
+  The binary operators \lstinline@+@ and \lstinline@*@ are overloaded and are
+  meant to work with both arrays and numbers. For simplicity, only the
+  implementation of \lstinline@+@ is explained.
+
+  First, both the left and right operands of \lstinline@+@ are evaluated. If
+  they are of the same numeric type, addition is performed. Otherwise, if both
+  operands are are arrays:
+
+  \begin{enumerate}
+    \item The array lengths $n_1$ and $n_2$ are used to compute the length $n_3$
+    of the new array which will contain the elements of the first array
+    concatenated with the second;
+
+    \item A new array of length $n_3 = n_1 + n_2$ is created; it is an error if
+    $n_3$ can't be converted to an \lstinline@Int@ without overflow;
+
+    \item Elements of indices $0$ through $n_1 - 1$ of the new array are set to
+    clones of the elements of the first array; elements of indices $n_1$ through
+    $n_3 - 1$ are set to clones of the elements of the second array.
+  \end{enumerate}
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression expression @ BinaryExpression {left, binary, right}
@@ -3979,48 +4025,6 @@
             leftT <- getType leftV
             rightT <- getType rightV
             raise (InvalidBinary binary leftT rightT)
-
-    evalExpression expression @ BinaryExpression {left, binary, right}
-      | MultiplyOperator {} <- binary = do
-        leftR <- evalExpression left
-        leftV <- readRef leftR
-
-        rightR <- evalExpression right
-        rightV <- readRef rightR
-
-        case (leftV, rightV) of
-          (Int x, Int y) | Just z <- safeBinary (*) x y -> newRef (Int z)
-          (Int _, Int _) -> raise (IntegerOverflow expression)
-
-          (Float x, Float y) -> newRef (Float (x * y))
-
-          (Int x, Array _) | x <= 0 -> newRef (Array Vector.empty)
-          (Array _, Int y) | y <= 0 -> newRef (Array Vector.empty)
-
-          (Int x, Array rs) -> do
-            let n = Vector.length rs
-
-            case safeBinary (*) x n of
-              Nothing -> raise (IntegerOverflow expression)
-
-              Just n' -> do
-                rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
-                newRef (Array rs')
-
-          (Array rs, Int y) -> do
-            let n = Vector.length rs
-
-            case safeBinary (*) n y of
-              Nothing -> raise (IntegerOverflow expression)
-
-              Just n' -> do
-                rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
-                newRef (Array rs')
-
-          (_, _) -> do
-            leftT <- getType leftV
-            rightT <- getType rightV
-            raise (InvalidBinary binary leftT rightT)
   \end{lstlisting}
 
   The operators \lstinline@<@, \lstinline@<=@, \lstinline@>@, \lstinline@>=@
@@ -4038,7 +4042,11 @@
         case (leftV, rightV) of
           (Int x, Int y) -> newRef (Bool (x < y))
           (Float x, Float y) -> newRef (Bool (x < y))
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
           (_, _) -> do
             leftT <- getType leftV
             rightT <- getType rightV
@@ -4099,7 +4107,11 @@
 
         rightR <- evalExpression right
         rightV <- readRef rightR
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         case (leftV, rightV) of
           (Bool x, Bool y) -> newRef (Bool (x /= y))
 
@@ -4109,8 +4121,9 @@
             raise (InvalidBinary binary leftT rightT)
   \end{lstlisting}
 
-  Plain assignments with \lstinline@=@ are evaluated by updating the value
-  contained in the cell given by the left operand.
+  Plain assignments with the operator \lstinline@=@ are evaluated by updating
+  the cell given by the left operand to the value obtained from the right
+  operand.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression BinaryExpression {left, binary, right}
@@ -4125,12 +4138,12 @@
   \end{lstlisting}
 
   The other assignment operators are implemented according to the shorthands of
-  \autoref{table:assignment-operators}. For example, \lstinline@+=@ is
+  \autoref{table:assignment-operators}. For example, \lstinline@/=@ is
   implemented as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression BinaryExpression {left, binary, right}
-      | AddAssignOperator {} <- binary = do
+    evalExpression expression @ BinaryExpression {left, binary, right}
+      | DivideAssignOperator {} <- binary = do
         leftR <- evalExpression left
         leftV <- readRef leftR
 
@@ -4138,10 +4151,11 @@
         rightV <- readRef rightR
 
         case (leftV, rightV) of
-          (Int x, Int y) | Just z <- safeBinary (+) x y -> writeRef' leftR (Int z)
+          (Int _, Int 0) -> raise (DivisionByZero expression)
+          (Int x, Int y) | Just z <- safeBinary div x y -> writeRef' leftR (Int z)
           (Int _, Int _) -> raise (IntegerOverflow expression)
 
-          (Float x, Float y) -> writeRef' leftR (Float (x + y))
+          (Float x, Float y) -> writeRef' leftR (Float (x / y))
 
           (_, _) -> do
             leftT <- getType leftV
@@ -4155,79 +4169,88 @@
   wrong type, or if too many or to few arguments are passed, an exception is
   raised. The built-in functions \lstinline@toFloat@ and \lstinline@toInt@
   convert an \lstinline@Int@ to a \lstinline@Float@ and round a
-  \lstinline@Float@ to an \lstinline@Int@ respectively. User-defined function
+  \lstinline@Float@ to an \lstinline@Int@ respectively; user-defined function
   calls are evaluated by updating Devin's state with bindings to parameter names
-  and then executing the callee's body. If an argument is passed by value, a
-  copy of its cell is bound; otherwise, no copy is performed.
+  and then executing the callee's body. If a given argument is passed by value,
+  a copy of its cell is bound; otherwise, no copy is performed.
 
   When a user-defined function's body is evaluated, a new frame is pushed by
-  calling \lstinline@withNewFrame (depth + 1)@. The lexical nesting of the
-  callee with respect to the caller is given by \lstinline@depth@.
+  calling \lstinline@withNewFrame (depth + 1)@, where \lstinline@depth@ is the
+  nesting level of the callee with respect to the caller. Recall that
+  \lstinline@withNewFrame :: Int -> Evaluator a -> Evaluator a@ runs another
+  evaluator on a modified state where a frame is added temporarily.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression expression |
-      CallExpression {funId = SymbolId {name, interval}, args} <- expression = do
-        argRs <- for args evalExpression
+    evalExpression expression @ CallExpression {funId, args} = do
+      let SymbolId {name, interval} = funId
 
-        lookupFun name >>= \case
-          Just (UserDefined FunDefinition {params, body}, depth) ->
-            withNewFrame (depth + 1) (go 0 params argRs)
-            where
-              -- Pass by value
-              go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do
-                argR' <- cloneRef argR
-                defineVar name argR'
-                go (n + 1) params argRs
+      argRs <- for args evalExpression
 
-              -- Pass by reference
-              go n ((Just _, SymbolId {name}, _) : params) (argR : argRs) = do
-                defineVar name argR
-                go (n + 1) params argRs
+      lookupFun name >>= \case
+        Just (UserDefined FunDefinition {params, body}, depth) ->
+          withNewFrame (depth + 1) (go 0 params argRs)
+          where
+            -- Pass argument by value:
+            go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do
+              argR' <- cloneRef argR
+              defineVar name argR'
+              go (n + 1) params argRs
 
-              go _ [] [] = evalStatement body >>= \case
-                Just r -> cloneRef r
-                Nothing -> newRef Unit
+            -- Pass argument by reference:
+            go n ((Just _, SymbolId {name}, _) : params) (argR : argRs) = do
+              defineVar name argR
+              go (n + 1) params argRs
 
-              go n params argRs = do
-                let expected = n + length params
-                let actual = n + length argRs
-                raise (InvalidArgCount expression expected actual)
+            -- If argument count is correct:
+            go _ [] [] = evalStatement body >>= \case
+              Just r -> cloneRef r
+              Nothing -> newRef Unit
 
-          Just (BuiltinToInt, depth) -> withNewFrame (depth + 1) $ case argRs of
-            [argR] -> do
-              argV <- readRef argR
+            -- If argument count is incorrect:
+            go n params argRs = do
+              let expected = n + length params
+              let actual = n + length argRs
+              raise (InvalidArgCount expression expected actual)
 
-              case argV of
-                Float x -> newRef (Int (round x))
+        Just (BuiltinToInt, depth) -> withNewFrame (depth + 1) $ case argRs of
+          [argR] -> do
+            argV <- readRef argR
 
-                _ -> do
-                  argT <- getType argV
-                  raise (InvalidType (head args) Type.Float argT)
+            case argV of
+              Float x -> newRef (Int (round x))
 
-            _ -> raise (InvalidArgCount expression 1 (length argRs))
+              _ -> do
+                argT <- getType argV
+                raise (InvalidType (head args) Type.Float argT)
 
-          Just (BuiltinToFloat, depth) -> withNewFrame (depth + 1) $ case argRs of
-            [argR] -> do
-              argV <- readRef argR
+          _ -> raise (InvalidArgCount expression 1 (length argRs))
+  \end{lstlisting}
 
-              case argV of
-                Int x -> newRef (Float (fromIntegral x))
+  \newpage
 
-                _ -> do
-                  argT <- getType argV
-                  raise (InvalidType (head args) Type.Int argT)
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+        Just (BuiltinToFloat, depth) -> withNewFrame (depth + 1) $ case argRs of
+          [argR] -> do
+            argV <- readRef argR
 
-            _ -> raise (InvalidArgCount expression 1 (length argRs))
+            case argV of
+              Int x -> newRef (Float (fromIntegral x))
 
-          _ -> raise (UnknownFun name interval)
+              _ -> do
+                argT <- getType argV
+                raise (InvalidType (head args) Type.Int argT)
+
+          _ -> raise (InvalidArgCount expression 1 (length argRs))
+
+        _ -> raise (UnknownFun name interval)
   \end{lstlisting}
 
   \subsection{Evaluating statements}
 
   The function
   \lstinline@evalStatement :: Statement -> Evaluator (Maybe Reference)@
-  evaluates statements. Evaluation returns \lstinline@Just@ on statements
-  containing a \lstinline@return@, else \lstinline@Nothing@.
+  evaluates statements. Evaluation yields \lstinline@Just@ on statements
+  returning control, else \lstinline@Nothing@.
 
   The following two base cases are trivial (\lstinline@evalDefinitions@'s
   implementation is discussed in the next section):
@@ -4242,11 +4265,10 @@
       pure Nothing
   \end{lstlisting}
 
-  If-else statements are processed by evaluating their predicate; based on the
-  value, the relevant branch is executed. A branch can either be a block of
-  statements or a single statement. As discussed previously, a declaration can
-  be inserted wherever a statement can be placed; as such, a new frame is pushed
-  to evaluate branches.
+  If-else statements are processed by evaluating their predicate; based on its
+  value, the relevant branch is executed. As discussed previously, a declaration
+  can be inserted wherever a statement can be placed; as such, a new frame is
+  pushed to evaluate branches.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression IfStatement {predicate, trueBranch} = do
@@ -4264,7 +4286,11 @@
     evalExpression IfElseStatement {predicate, trueBranch, falseBranch} = do
       r <- evalExpression predicate
       v <- readRef r
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       case v of
         Bool True -> withNewFrame 1 (evalStatement trueBranch)
         Bool False -> withNewFrame 1 (evalStatement falseBranch)
@@ -4275,8 +4301,8 @@
   \end{lstlisting}
 
   For while statements, the predicate is evaluated. If true, the body is
-  executed. To allow the body to be executed multiple times, the while statement
-  itself is evaluated again.
+  executed and then the while statement itself is evaluated again. Do-while
+  statements are of course implemented similarly to while statements.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression statement @ WhileStatement {predicate, body} = do
@@ -4293,25 +4319,11 @@
         _ -> do
           t <- getType v
           raise (InvalidType predicate Type.Bool t)
-
-    evalExpression statement @ DoWhileStatement {body, predicate} =
-      withNewFrame 1 (evalStatement body) >>= \case
-        Just r -> pure (Just r)
-
-        Nothing -> do
-          r <- evalExpression predicate
-          v <- readRef r
-
-          case v of
-            Bool False -> pure Nothing
-            Bool True -> evalStatement statement
-
-            _ -> do
-              t <- getType v
-              raise (InvalidType predicate Type.Bool t)
   \end{lstlisting}
 
-  Return statements are evaluated as follows:
+  Return statements are handled by evaluating the expression representing what
+  to return; if no such expression is present, the statement is assumed to
+  return \lstinline@unit@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression ReturnStatement {result = Just result} = do
@@ -4323,8 +4335,9 @@
       pure (Just r)
   \end{lstlisting}
 
-  Assertions evaluate their predicate. If it is not of type \lstinline@Bool@,
-  or if it is \lstinline@false@, an exception describing the error is raised.
+  For assertions, the predicate is evaluated. If it is not of type
+  \lstinline@Bool@, or if it is \lstinline@false@, an exception describing the
+  error is raised.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression statement @ AssertStatement {predicate} = do
@@ -4340,7 +4353,7 @@
           raise (InvalidType predicate Type.Bool t)
   \end{lstlisting}
 
-  Breakpoint statements are handled trivially.
+  Breakpoint statements are handled trivially:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression BreakpointStatement {} = do
@@ -4348,10 +4361,10 @@
       pure Nothing
   \end{lstlisting}
 
-  Blocks are processed in two steps. First, all function definitions are bound;
-  then, all other statements and/or definitions are evaluated. With
-  \lstinline@firstJustM@, execution stops at the first return statement, as
-  only return statements produce a \lstinline@Just@.
+  Blocks are processed in two steps. First, the current frame is populated with
+  all function definitions; then, all other statements and/or definitions are
+  evaluated. With \lstinline@firstJustM@, execution stops at the first return
+  statement, as only return statements produce a \lstinline@Just@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression BlockStatement {statements} = withNewFrame 1 $ do
@@ -4371,16 +4384,17 @@
 
   \subsection{Evaluating variable and function definitions}
 
-  As mentioned previously, the evaluator is independent from the type checker.
-  One consequence of this separation is that the environment computed by type
-  checking can't be reused during execution: the evaluator has to keep track of
-  its own bindings in the state. While this leads to some code duplication (the
-  environment is handled in a similar way in both cases), the implementation is
-  so trivial that there's little benefit in refactoring.
+  In Devin's implementation, the evaluator is independent from the type checker;
+  one consequence of this separation is that the environment computed by type
+  checking can't be reused during execution. In other words, the evaluator has
+  to keep track of the current function and variable bindings in its own state.
+  This leads to some code duplication, as bindings are handled in a similar way
+  in both cases; however, implementation is so trivial that there's little
+  benefit in refactoring.
 
   As with type checking, evaluation is performed in two passes. In the first
-  pass, procedure definitions are bound to the current environment; in the
-  second pass, variable definitions~are evaluated.
+  pass, function definitions are bound to the current frame; in the second,
+  variable definitions are evaluated.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalDefinitions :: [Definition] -> Evaluator ()
@@ -4394,7 +4408,11 @@
 
       FunDefinition {funId = SymbolId {name}} ->
         defineFun name (UserDefined definition)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalDefinition2 :: Definition -> Evaluator ()
     evalDefinition2 = \case
       VarDefinition {varId = SymbolId {name}, value} -> do
