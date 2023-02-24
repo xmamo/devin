@@ -267,24 +267,47 @@ tokenTree label Token {} = Tree.Node ("Token", Text.pack label) []
 
 
 stateForest :: MonadIO m => State -> m (Tree.Forest (Text, Text))
-stateForest frames = snd <$> go frames
-  where
-    go [] = pure (0, [])
+stateForest = \case
+  [] -> pure []
 
-    go (Frame {vars = []} : frames) = do
-      (skipped, forest) <- go frames
-      pure (skipped + 1, forest)
+  Frame {label = Nothing, vars = [], funs = []} : frames -> stateForest frames
 
-    go (Frame {poffset, vars} : frames) = do
-      let f subforest (name, r) = do
-            v <- readRef r
-            s <- displayVal v
-            pure (Tree.Node (Text.pack name, Text.pack s) [] : subforest)
+  Frame {label, poffset, funs, vars} : frames -> do
+    let offset = virtualOffset poffset frames
+    let poffsetTree = Tree.Node (".poffset", Text.pack (show offset)) []
+    let funsForest = foldl f [] funs
+    varsForest <- foldlM g [] vars
+    let frameForest = poffsetTree : funsForest ++ varsForest
+    forest <- stateForest frames
 
-      subforest <- foldlM f [] vars
-      (skipped, forest) <- go frames
-      let label = (Text.pack ("Frame (poffset = " ++ shows (poffset - skipped) ")"), "")
-      pure (skipped, Tree.Node label subforest : forest)
+    case label of
+      Nothing ->
+        pure (Tree.Node ("Frame", "") frameForest : forest)
+
+      Just label ->
+        pure (Tree.Node (Text.pack ("Frame " ++ label), "") frameForest : forest)
+
+    where
+      virtualOffset = go 0
+
+      go result offset _ | offset <= 0 = result
+
+      go result _ [] = result
+
+      go result offset (Frame {label = Nothing, vars = [], funs = []} : frames) =
+        go result (offset - 1) frames
+
+      go result offset (_ : frames) =
+        go (result + 1) (offset - 1) frames
+
+      f funsForest (name, _) =
+        Tree.Node (Text.pack name, "—") [] : funsForest
+
+      g varsForest (name, r) = do
+        v <- readRef r
+        s <- displayVal v
+        pure (Tree.Node (Text.pack name, Text.pack s) [] : varsForest)
+
 
 
 displayVal :: MonadIO m => Value -> m String

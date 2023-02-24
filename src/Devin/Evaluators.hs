@@ -32,7 +32,7 @@ evalDevin Devin {definitions} = do
   for_ definitions evalDefinition1
   for_ definitions evalDefinition2
   Just (UserDefined FunDefinition {params = [], body}, depth) <- lookupFun "main"
-  withNewFrame (depth + 1) (evalStatement body)
+  withNewFrame (Just "main") (depth + 1) (evalStatement body)
   pure ()
 
 
@@ -75,7 +75,7 @@ evalStatement statement = case statement of
     v <- readRef r
 
     case v of
-      Bool True -> withNewFrame 1 (evalStatement trueBranch)
+      Bool True -> withNewFrame Nothing 1 (evalStatement trueBranch)
       Bool False -> pure Nothing
 
       _ -> do
@@ -87,8 +87,8 @@ evalStatement statement = case statement of
     v <- readRef r
 
     case v of
-      Bool True -> withNewFrame 1 (evalStatement trueBranch)
-      Bool False -> withNewFrame 1 (evalStatement falseBranch)
+      Bool True -> withNewFrame Nothing 1 (evalStatement trueBranch)
+      Bool False -> withNewFrame Nothing 1 (evalStatement falseBranch)
 
       _ -> do
         t <- getType v
@@ -101,7 +101,7 @@ evalStatement statement = case statement of
     case v of
       Bool False -> pure Nothing
 
-      Bool True -> withNewFrame 1 (evalStatement body) >>= \case
+      Bool True -> withNewFrame Nothing 1 (evalStatement body) >>= \case
         Just r -> pure (Just r)
         Nothing -> evalStatement statement
 
@@ -110,7 +110,7 @@ evalStatement statement = case statement of
         raise (InvalidType predicate Type.Bool t)
 
   DoWhileStatement {body, predicate} ->
-    withNewFrame 1 (evalStatement body) >>= \case
+    withNewFrame Nothing 1 (evalStatement body) >>= \case
       Just r -> pure (Just r)
 
       Nothing -> do
@@ -149,7 +149,7 @@ evalStatement statement = case statement of
     breakpoint statement
     pure Nothing
 
-  BlockStatement {statements} -> withNewFrame 1 $ do
+  BlockStatement {statements} -> withNewFrame Nothing 1 $ do
     for_ statements $ \case
       DefinitionStatement {definition} -> evalDefinition1 definition
       _ -> pure ()
@@ -213,7 +213,7 @@ evalExpression expression = case expression of
 
     lookupFun name >>= \case
       Just (UserDefined FunDefinition {params, body}, depth) ->
-        withNewFrame (depth + 1) (go 0 params argRs)
+        withNewFrame (Just name) (depth + 1) (go 0 params argRs)
         where
           -- Pass argument by value:
           go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do
@@ -237,31 +237,33 @@ evalExpression expression = case expression of
             let actual = n + length argRs
             raise (InvalidArgCount expression expected actual)
 
-      Just (BuiltinToInt, depth) -> withNewFrame (depth + 1) $ case argRs of
-        [argR] -> do
-          argV <- readRef argR
+      Just (BuiltinToInt, depth) ->
+        withNewFrame (Just name) (depth + 1) $ case argRs of
+          [argR] -> do
+            argV <- readRef argR
 
-          case argV of
-            Float x -> newRef (Int (round x))
+            case argV of
+              Float x -> newRef (Int (round x))
 
-            _ -> do
-              argT <- getType argV
-              raise (InvalidType (head args) Type.Float argT)
+              _ -> do
+                argT <- getType argV
+                raise (InvalidType (head args) Type.Float argT)
 
-        _ -> raise (InvalidArgCount expression 1 (length argRs))
+          _ -> raise (InvalidArgCount expression 1 (length argRs))
 
-      Just (BuiltinToFloat, depth) -> withNewFrame (depth + 1) $ case argRs of
-        [argR] -> do
-          argV <- readRef argR
+      Just (BuiltinToFloat, depth) ->
+        withNewFrame (Just name) (depth + 1) $ case argRs of
+          [argR] -> do
+            argV <- readRef argR
 
-          case argV of
-            Int x -> newRef (Float (fromIntegral x))
+            case argV of
+              Int x -> newRef (Float (fromIntegral x))
 
-            _ -> do
-              argT <- getType argV
-              raise (InvalidType (head args) Type.Int argT)
+              _ -> do
+                argT <- getType argV
+                raise (InvalidType (head args) Type.Int argT)
 
-        _ -> raise (InvalidArgCount expression 1 (length argRs))
+          _ -> raise (InvalidArgCount expression 1 (length argRs))
 
       _ -> raise (UnknownFun name interval)
 

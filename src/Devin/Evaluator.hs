@@ -62,6 +62,7 @@ type State = [Frame]
 
 
 data Frame = Frame {
+  label :: Maybe String,
   poffset :: Int,  -- Static link
   funs :: [(String, Function)],
   vars :: [(String, Reference)]
@@ -143,9 +144,9 @@ makePredefinedState = liftIO $ do
   trueR <- newRef (Bool True)
   falseR <- newRef (Bool False)
   unitR <- newRef Unit
-  let funs = [("toInt", BuiltinToInt), ("toFloat", BuiltinToFloat)]
+  let funs = [("toFloat", BuiltinToFloat), ("toInt", BuiltinToInt)]
   let vars = [("false", falseR), ("true", trueR), ("unit", unitR)]
-  pure [Frame 0 funs vars]
+  pure [Frame Nothing 0 funs vars]
 
 
 cloneVal :: MonadIO m => Value -> m Value
@@ -213,7 +214,7 @@ compareRefs r1 r2 = do
 
 defineFun :: String -> Function -> Evaluator ()
 defineFun name fun = Evaluator $ \case
-  [] -> pure (Done (), [Frame 0 [(name, fun)] []])
+  [] -> pure (Done (), [Frame Nothing 0 [(name, fun)] []])
 
   frame : frames -> do
     let funs' = (name, fun) : funs frame
@@ -232,7 +233,7 @@ lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
 
 defineVar :: String -> Reference -> Evaluator ()
 defineVar name r = Evaluator $ \case
-  [] -> pure (Done (), [Frame 0 [] [(name, r)]])
+  [] -> pure (Done (), [Frame Nothing 0 [] [(name, r)]])
 
   frame : frames -> do
     let vars' = (name, r) : vars frame
@@ -249,15 +250,18 @@ lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
       Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
 
 
-withNewFrame :: Int -> Evaluator a -> Evaluator a
-withNewFrame offset mx = do
+withNewFrame :: Maybe String -> Int -> Evaluator a -> Evaluator a
+withNewFrame functionId poffset mx = do
   pushFrame
   x <- mx
   popFrame
   pure x
   where
-    pushFrame = Evaluator (\state -> pure (Done (), Frame offset [] [] : state))
-    popFrame = Evaluator (\state -> pure (Done (), tail state))
+    pushFrame = Evaluator $ \state ->
+      pure (Done (), Frame functionId poffset [] [] : state)
+
+    popFrame = Evaluator $ \state ->
+      pure (Done (), tail state)
 
 
 breakpoint :: Statement -> Evaluator ()
