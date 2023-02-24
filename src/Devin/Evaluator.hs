@@ -251,14 +251,15 @@ lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
 
 
 withNewFrame :: Maybe String -> Int -> Evaluator a -> Evaluator a
-withNewFrame functionId poffset mx = do
+withNewFrame label poffset mx = do
   pushFrame
   x <- mx
   popFrame
   pure x
+
   where
     pushFrame = Evaluator $ \state ->
-      pure (Done (), Frame functionId poffset [] [] : state)
+      pure (Done (), Frame label poffset [] [] : state)
 
     popFrame = Evaluator $ \state ->
       pure (Done (), tail state)
