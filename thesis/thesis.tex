@@ -88,7 +88,7 @@
     Building programming languages is not a trivial task. Multiple concepts,
     such as type theory, syntax and formal grammars, automata, deductive systems
     and semantics have to be understood. Nevertheless, implementing programming
-    languages is a rewarding process; it is thus my objective to provide an
+    languages is a rewarding process; it is my objective to provide an
     introduction to anybody interested in such topic.
 
     Many resources explain the theory behind programming languages; it is my
@@ -160,6 +160,8 @@
     pythagoras = \x y -> sqrt (x ^ 2  + y ^ 2)
   \end{lstlisting}
 
+  \pagebreak
+
   This declaration binds the name \lstinline@pythagoras@ to a function of two
   arguments which applies Pythagoras' theorem. The symbol \lstinline@\@ is
   pronounced \emph{lambda}, as the notation recalls the one used in lambda
@@ -223,6 +225,8 @@
 
   Yet another alternative to define the factorial function is to employ tail
   recursion:
+
+  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     factorial' :: Integral a => a -> a
@@ -419,8 +423,11 @@
 
   As mentioned, Haskell strings are just lists of characters. For example, the
   word \lstinline@Hello@ is represented by the literal \lstinline@"Hello"@,
-  which desugars to the list \lstinline@['H', 'e', 'l', 'l', 'o']@. The standard
-  library exports the following type alias:
+  which desugars to the list \lstinline@['H', 'e', 'l', 'l', 'o']@.
+
+  \pagebreak
+
+  The standard library exports the following type alias:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type String = [Char]
@@ -479,6 +486,8 @@
   words, if \lstinline@a@ and \lstinline@b@ are of type \lstinline@Double@, the
   expression \lstinline@Complex a b@ constructs a new value of type
   \lstinline@Complex@.
+
+  \pagebreak
 
   The deriving declaration \lstinline@deriving (Eq, Show)@ instructs the
   compiler to generate three functions:
@@ -544,6 +553,8 @@
   \lstinline@Either@ represents values of two possibilities; a value of type
   \lstinline@Either a b@ is either \lstinline@Left a@ or \lstinline@Right b@.
 
+  \pagebreak
+
   Both algebraic data types are commonly used for error reporting. For simple
   cases, where functions may not yield any meaningful value, \lstinline@Maybe@
   is used; thinking in terms of C or Java, this resembles the possibility of a
@@ -597,6 +608,8 @@
   Let's consider two functions: one which calculates the sum every element of a
   list, and one calculates the product of every element of a list. Such
   functions could be defined as:
+
+  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     listSum :: Num a => [a] -> a
@@ -664,6 +677,8 @@
     product xs = foldr (*) 1 xs
   \end{lstlisting}
 
+  \pagebreak
+
   Besides \lstinline@foldr@, another commonly used higher-order function
   provided by the standard library is \lstinline@map@. Given a list,
   \lstinline@map@ returns a new list obtained by applying a given input function
@@ -727,6 +742,8 @@
 
   As a first example, the interface for objects which can be mapped over, called
   \emph{functors} in category theory, can be described as follows:
+
+  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     class Functor f where
@@ -916,6 +933,8 @@
   implementing a type class instance satisfies its laws without thinking about
   them.
 
+  \newpage
+
   \section{The \texttt{Functor}, \texttt{Applicative} and \texttt{Monad} type
   classes}
 
@@ -981,6 +1000,8 @@
     sum2Maybes :: Num a => Maybe a -> Maybe a -> Maybe a
     sum2Maybes mx my = liftA2 (+) mx my
   \end{lstlisting}
+
+  \newpage
 
   As an alternative to \lstinline@liftA2@, \lstinline@(<$>)@ and the
   \emph{sequential application operator} \lstinline@(<*>)@ can be used to obtain
@@ -1050,6 +1071,8 @@
       return x = pure x
   \end{lstlisting}
 
+  \newpage
+
   Monads are perhaps Haskell's greatest
   innovation~\cite{monads-for-functional-programming}; in the next section, I'll
   explain how the \lstinline@Monad@ type class turns out to be so useful.
@@ -1109,6 +1132,8 @@
   \lstinline@Functor@, \lstinline@Applicative@ and \lstinline@Monad@ instances
   for \lstinline@(->) r@.
 
+  \newpage
+
   \section{Basic input and output}
 
   Let's implement a very simple program which performs the following task:
@@ -1166,7 +1191,11 @@
 
     computation2 :: IO Integer
     computation2 = readLn
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     computation3 :: Integer -> IO ()
     computation3 n = case compare n 0 of
       LT -> putStrLn "n < 0"
@@ -1228,7 +1257,11 @@
       let d = b ^ 2 - 4 * a * c
       let x1 = (-b - sqrt d) / (2 * a)
       let x2 = (-b + sqrt d) / (2 * a)
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       if isNaN x1 || isInfinite x1 || isNaN x2 || isInfinite x2 then do
         putStrLn ""
         putStrLn "No solutions!"
@@ -1413,7 +1446,11 @@
   triangles defined on the Euclidean plane:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    module Triangle2D (Triangle (..), perimeter, area) where
+    module Triangle2D (
+      Triangle (..),
+      perimeter,
+      area
+    ) where
 
     import Data.List
 
@@ -1793,6 +1830,8 @@
     accumulated results of all successful runs.
   \end{itemize}
 
+  \newpage
+
   \section{Tree traversal}
 
   The grammar of a language only describes its \emph{syntax}: on its own, it
@@ -1833,6 +1872,10 @@
     a hightlighter needs to be rather concrete, as each node has to be
     associated with a position in the input string.
   \end{itemize}
+
+  \newpage
+
+  \thispagestyle{empty}
 
   \chapter{The Devin language and UI}
 
@@ -1934,6 +1977,8 @@
 
     \caption{Boolean operators}
   \end{table}
+
+  \pagebreak
 
   Integers and floating-point numbers support addition, subtraction,
   multiplication and division. For integers (but not floats), there's also a
@@ -2083,6 +2128,8 @@
     \caption{Assignment operators}
     \label{table:assignment-operators}
   \end{table}
+
+  \newpage
 
   \subsection{Working with arrays}
 
@@ -2239,6 +2286,8 @@
     \caption{Semantic error reporting and highlighting}
   \end{figure}
 
+  \pagebreak
+
   Once a valid program has been written, it can be run by clicking the
   $\blacktriangleright$ button. The state of execution can be observed with
   breakpoint statements; these signal the evaluator to pause execution and
@@ -2275,6 +2324,8 @@
     \caption{The debugger displaying the current state of the stack}
     \label{figure:debugger}
   \end{figure}
+
+  \pagebreak
 
   Runtime errors are handled as well. When an error occurs, the offending code
   fragment is highlighted and a descriptive message dialog is shown to the user.
@@ -2324,6 +2375,10 @@
   think about solving problems, I decided to add this feature to be played
   around with.
 
+  \newpage
+
+  \thispagestyle{empty}
+
   \chapter{Implementing Devin}
 
   Devin's implementation spans approximately 4500 lines of code and is entirely
@@ -2357,11 +2412,11 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     data SymbolId = SymbolId {name :: String, interval :: (Int, Int)}
-      deriving (Eq, Show, Read)
 
     data Token = Token {interval :: (Int, Int)}
-      deriving (Eq, Show, Read)
   \end{lstlisting}
+
+  \newpage
 
   \subsection{Representing expressions}
 
@@ -2380,7 +2435,6 @@
       | MinusOperator {interval :: (Int, Int)}
       | NotOperator {interval :: (Int, Int)}
       | LenOperator {interval :: (Int, Int)}
-      deriving (Eq, Show, Read)
   \end{lstlisting}
 
   The 20 binary operators \lstinline@+@, \lstinline@-@, \lstinline@*@,
@@ -2413,7 +2467,6 @@
       | MultiplyAssignOperator {interval :: (Int, Int)}
       | DivideAssignOperator {interval :: (Int, Int)}
       | ModuloAssignOperator {interval :: (Int, Int)}
-      deriving (Eq, Show, Read)
   \end{lstlisting}
 
   Expressions are described by a single algebraic data type:
@@ -2428,7 +2481,11 @@
         varName :: String,
         interval :: (Int, Int)
       } -> Expression
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       IntegerExpression :: {
         integer :: Integer,
         interval :: (Int, Int)
@@ -2477,8 +2534,6 @@
         inner :: Expression,
         close :: Token
       } -> Expression
-
-      deriving (Eq, Show, Read)
   \end{lstlisting}
 
   \subsection{Representing statements}
@@ -2535,7 +2590,11 @@
         result :: Maybe Expression,
         semicolon :: Token
       } -> Statement
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       AssertStatement :: {
         assertKeyword :: Token,
         predicate :: Expression,
@@ -2552,8 +2611,6 @@
         statements :: [Statement],
         close :: Token
       } -> Statement
-
-      deriving (Eq, Show, Read)
   \end{lstlisting}
 
   \subsection{Representing variable and function definitions}
@@ -2568,7 +2625,6 @@
     data TypeId
       = PlainTypeId {name :: String, interval :: (Int, Int)}
       | ArrayTypeId {open :: Token, innerTypeId :: TypeId, close :: Token}
-      deriving (Eq, Show, Read)
   \end{lstlisting}
 
   Variables and functions definitions are given by \lstinline@VarDefinition@ and
@@ -2594,8 +2650,6 @@
         returnInfo :: Maybe (Token, TypeId),
         body :: Statement
       } -> Definition
-
-      deriving (Eq, Show, Read)
   \end{lstlisting}
 
   \section{Representing semantic errors}
@@ -2650,7 +2704,11 @@
       MissingReturnStatement :: {
         funId :: SymbolId
       } -> Error
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       -- Runtime errors:
 
       IntegerOverflow :: {
@@ -2675,8 +2733,6 @@
       AssertionFailed :: {
         statement :: Statement
       } -> Error
-
-      deriving (Show, Read)
   \end{lstlisting}
 
   \section{The type checker}
@@ -2705,8 +2761,9 @@
       | Float
       | Array Type
       | Placeholder String
-      deriving (Show, Read)
   \end{lstlisting}
+
+  \pagebreak
 
   To compare types, the relation operator \lstinline@(<:)@ is provided:
 
@@ -2740,7 +2797,7 @@
       types :: [(String, Type)],
       funs :: [(String, ([Type], Type))],
       vars :: [(String, Type)]
-    } deriving (Show, Read)
+    }
 
     type Environment = [Scope]
 
@@ -2769,7 +2826,11 @@
         let (x, env', errors1) = runTyper mx env
             (y, env'', errors2) = runTyper my env'
          in (f x y, env'', errors1 ++ errors2)
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance Monad Typer where
       (>>=) :: Typer a -> (a -> Typer b) -> Typer b
       mx >>= f = Typer $ \env ->
@@ -2792,14 +2853,14 @@
 
       scope : scopes ->
         let types' = (name, t) : types scope
-         in (t, scope {types = types'} : scopes, [])
+         in (t, scope{types = types'} : scopes, [])
 
     lookupType :: String -> Typer (Maybe (Type, Int))
     lookupType name = Typer (\env -> (go 0 env, env, []))
       where
         go _ [] = Nothing
 
-        go depth (Scope {types} : scopes) = case lookup name types of
+        go depth (Scope{types} : scopes) = case lookup name types of
           Just t -> Just (t, depth)
           Nothing -> go (depth + 1) scopes
   \end{lstlisting}
@@ -2817,17 +2878,19 @@
 
       scope : scopes ->
         let funs' = (name, signature) : funs scope
-         in ((), scope {funs = funs'} : scopes, [])
+         in ((), scope{funs = funs'} : scopes, [])
 
     lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
     lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
       where
         go _ [] = Nothing
 
-        go depth (Scope {funs} : scopes) = case lookup name funs of
+        go depth (Scope{funs} : scopes) = case lookup name funs of
           Just signature -> Just (signature, depth)
           Nothing -> go (depth + 1) scopes
   \end{lstlisting}
+
+  \newpage
 
   Finally, variables can be defined and looked up with \lstinline@defineVarType@
   and \lstinline@lookupVarType@.
@@ -2839,14 +2902,14 @@
 
       scope : scopes ->
         let vars' = (name, t) : vars scope
-         in ((), scope {vars = vars'} : scopes, [])
+         in ((), scope{vars = vars'} : scopes, [])
 
     lookupVarType :: String -> Typer (Maybe (Type, Int))
     lookupVarType name = Typer (\env -> (go 0 env, env, []))
       where
         go _ [] = Nothing
 
-        go depth (Scope {vars} : scopes) = case lookup name vars of
+        go depth (Scope{vars} : scopes) = case lookup name vars of
           Just t -> Just (t, depth)
           Nothing -> go (depth + 1) scopes
   \end{lstlisting}
@@ -2886,11 +2949,15 @@
   an error is reported.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression IntegerExpression {} = pure Int
+    checkExpression IntegerExpression{} = pure Int
 
-    checkExpression RationalExpression {} = pure Float
+    checkExpression RationalExpression{} = pure Float
+  \end{lstlisting}
 
-    checkExpression VarExpression {varName, interval} =
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression VarExpression{varName, interval} =
       lookupVarType varName >>= \case
         Just (t, _) -> pure t
 
@@ -2917,9 +2984,9 @@
   different types, then $T$ can't be inferred.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression ArrayExpression {elems = []} = pure (Array Unknown)
+    checkExpression ArrayExpression{elems = []} = pure (Array Unknown)
 
-    checkExpression ArrayExpression {elems = elem : elems} = do
+    checkExpression ArrayExpression{elems = elem : elems} = do
       t <- checkExpression elem
       go elems t
 
@@ -2941,7 +3008,7 @@
   Access to array elements is checked as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression AccessExpression {array, index} = do
+    checkExpression AccessExpression{array, index} = do
       arrayT <- checkExpression array
       indexT <- checkExpression index
 
@@ -2961,8 +3028,8 @@
   type of the operand.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression UnaryExpression {unary, operand}
-      | PlusOperator {} <- unary = do
+    checkExpression UnaryExpression{unary, operand}
+      | PlusOperator{} <- unary = do
         operandT <- checkExpression operand
 
         case operandT of
@@ -2971,8 +3038,8 @@
           Float -> pure Float
           _ -> report' (InvalidUnary unary operandT)
 
-    checkExpression UnaryExpression {unary, operand}
-      | MinusOperator {} <- unary = do
+    checkExpression UnaryExpression{unary, operand}
+      | MinusOperator{} <- unary = do
         operandT <- checkExpression operand
 
         case operandT of
@@ -2986,8 +3053,8 @@
   the operand is \lstinline@Bool@:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression UnaryExpression {unary, operand}
-      | NotOperator {} <- unary = do
+    checkExpression UnaryExpression{unary, operand}
+      | NotOperator{} <- unary = do
         operandT <- checkExpression operand
 
         case operandT of
@@ -3000,8 +3067,8 @@
   operand is an array. The resulting type is an \lstinline@Int@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression UnaryExpression {unary, operand}
-      | LenOperator {} <- unary = do
+    checkExpression UnaryExpression{unary, operand}
+      | LenOperator{} <- unary = do
         operandT <- checkExpression operand
 
         case operandT of
@@ -3009,6 +3076,8 @@
           Array _ -> pure Int
           _ -> report' (InvalidUnary unary operandT)
   \end{lstlisting}
+
+  \newpage
 
   As can be seen, there is a certain degree of code repetition within
   \lstinline@checkExpression@. While \emph{DRY} (Don't Repeat Yourself) is
@@ -3027,8 +3096,8 @@
   operands.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression BinaryExpression {left, binary, right}
-      | DivideOperator {} <- binary = do
+    checkExpression BinaryExpression{left, binary, right}
+      | DivideOperator{} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
 
@@ -3052,8 +3121,8 @@
   possibilities have to be considered during type checking.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression BinaryExpression {left, binary, right}
-      | AddOperator {} <- binary = do
+    checkExpression BinaryExpression{left, binary, right}
+      | AddOperator{} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
 
@@ -3064,9 +3133,13 @@
           (Float, Float) -> pure Float
           (Array t1, Array t2) | Just t <- merge t1 t2 -> pure (Array t)
           (_, _) -> report' (InvalidBinary binary leftT rightT)
+  \end{lstlisting}
 
-    checkExpression BinaryExpression {left, binary, right}
-      | MultiplyOperator {} <- binary = do
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkExpression BinaryExpression{left, binary, right}
+      | MultiplyOperator{} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
 
@@ -3087,8 +3160,8 @@
   exactly same way for all four comparison operators:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression BinaryExpression {left, binary, right}
-      | LessOperator {} <- binary = do
+    checkExpression BinaryExpression{left, binary, right}
+      | LessOperator{} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
 
@@ -3110,12 +3183,12 @@
   runtime errors during evaluation.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression BinaryExpression {left, binary = EqualOperator {}, right} = do
+    checkExpression BinaryExpression{left, binary = EqualOperator{}, right} = do
       checkExpression left
       checkExpression right
       pure Bool
 
-    checkExpression BinaryExpression {left, binary = NotEqualOperator {}, right} = do
+    checkExpression BinaryExpression{left, binary = NotEqualOperator{}, right} = do
       checkExpression left
       checkExpression right
       pure Bool
@@ -3124,9 +3197,11 @@
   The operators \lstinline@and@, \lstinline@or@ and \lstinline@xor@ are all
   checked in the same manner.
 
+  \newpage
+
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression BinaryExpression {left, binary, right}
-      | AndOperator {} <- binary = do
+    checkExpression BinaryExpression{left, binary, right}
+      | AndOperator{} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
 
@@ -3141,8 +3216,8 @@
   both the left and right operands are of the same type:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkExpression BinaryExpression {left, binary, right}
-      | PlainAssignOperator {} <- binary = do
+    checkExpression BinaryExpression{left, binary, right}
+      | PlainAssignOperator{} <- binary = do
         leftT <- checkExpression left
         rightT <- checkExpression right
 
@@ -3163,7 +3238,7 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression expression@CallExpression{funId, args} =
-      let SymbolId {name, interval} = funId
+      let SymbolId{name, interval} = funId
        in lookupFunSignature name >>= \case
             Just ((paramTs, returnT), _) -> go 0 args paramTs
               where
@@ -3182,6 +3257,8 @@
             Nothing -> report' (UnknownFun name interval)
   \end{lstlisting}
 
+  \newpage
+
   \subsection{Checking statements}
 
   The function \lstinline@checkStatement :: Type -> Statement -> Typer Bool@
@@ -3199,11 +3276,11 @@
   is defined in the next section.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkStatement _ ExpressionStatement {value} = do
+    checkStatement _ ExpressionStatement{value} = do
       checkExpression value
       pure False
 
-    checkStatement _ DefinitionStatement {definition} = do
+    checkStatement _ DefinitionStatement{definition} = do
       checkDefinitions [definition]
       pure False
   \end{lstlisting}
@@ -3214,7 +3291,7 @@
   such case, the whole if-else statement surely must return control as well.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkStatement expectedT IfElseStatement {predicate, trueBranch, falseBranch} = do
+    checkStatement expectedT IfElseStatement{predicate, trueBranch, falseBranch} = do
       t <- checkExpression predicate
       unless (t <: Bool) (report (InvalidType predicate Bool t))
       trueBranchDoesReturn <- withNewScope (checkStatement expectedT trueBranch)
@@ -3227,7 +3304,7 @@
   \lstinline@False@ is returned.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkStatement expectedT IfStatement {predicate, trueBranch} = do
+    checkStatement expectedT IfStatement{predicate, trueBranch} = do
       t <- checkExpression predicate
       unless (t <: Bool) (report (InvalidType predicate Bool t))
       withNewScope (checkStatement expectedT trueBranch)
@@ -3238,13 +3315,17 @@
   similar to if and if-else statements respectively.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkStatement expectedT WhileStatement {predicate, body} = do
+    checkStatement expectedT WhileStatement{predicate, body} = do
       t <- checkExpression predicate
       unless (t <: Bool) (report (InvalidType predicate Bool t))
       withNewScope (checkStatement expectedT body)
       pure False
+  \end{lstlisting}
 
-    checkStatement expectedT DoWhileStatement {body, predicate} = do
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    checkStatement expectedT DoWhileStatement{body, predicate} = do
       doesReturn <- withNewScope (checkStatement expectedT body)
       t <- checkExpression predicate
       unless (t <: Bool) (report (InvalidType predicate Bool t))
@@ -3256,12 +3337,12 @@
   \lstinline@unit@ is returned instead.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkStatement expectedT ReturnStatement {result = Just result} = do
+    checkStatement expectedT ReturnStatement{result = Just result} = do
       t <- checkExpression result
       unless (t <: expectedT) (report (InvalidType result expectedT t))
       pure True
 
-    checkStatement expectedT statement@ReturnStatement {result = Nothing} = do
+    checkStatement expectedT statement@ReturnStatement{result = Nothing} = do
       unless (Unit <: expectedT) (report (MissingReturnValue statement expectedT))
       pure True
   \end{lstlisting}
@@ -3270,7 +3351,7 @@
   \lstinline@Bool@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkStatement _ AssertStatement {predicate} = do
+    checkStatement _ AssertStatement{predicate} = do
       t <- checkExpression predicate
       unless (t <: Bool) (report (InvalidType predicate Bool t))
       pure False
@@ -3279,7 +3360,7 @@
   For breakpoint statements, nothing needs to be done.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkStatement _ BreakpointStatement {} = pure False
+    checkStatement _ BreakpointStatement{} = pure False
   \end{lstlisting}
 
   Finally, blocks are handled by recursively type checking all statements they
@@ -3292,9 +3373,9 @@
   environment, using the \lstinline@withNewScope@ function.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkStatement expectedT BlockStatement {statements} = withNewScope $ do
+    checkStatement expectedT BlockStatement{statements} = withNewScope $ do
       for_ statements $ \case
-        DefinitionStatement {definition} -> checkDefinition1 definition
+        DefinitionStatement{definition} -> checkDefinition1 definition
         _ -> pure ()
 
       foldlM f False statements
@@ -3302,12 +3383,14 @@
       where
         f doesReturn statement = (doesReturn ||) <$> check statement
 
-        check DefinitionStatement {definition} = do
+        check DefinitionStatement{definition} = do
           checkDefinition2 definition
           pure False
 
         check statement = checkStatement expectedT statement
   \end{lstlisting}
+
+  \newpage
 
   \subsection{Checking variable and function definitions}
 
@@ -3333,9 +3416,9 @@
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkDefinition1 :: Definition -> Typer ()
     checkDefinition1 = \case
-      VarDefinition {} -> pure ()
+      VarDefinition{} -> pure ()
 
-      FunDefinition {funId = SymbolId {name}, params, returnInfo} -> do
+      FunDefinition{funId = SymbolId{name}, params, returnInfo} -> do
         paramTs <- for params $ \(_, _, typeInfo) -> case typeInfo of
           Just (_, paramTypeId) -> getType paramTypeId
           Nothing -> pure Unknown
@@ -3348,14 +3431,14 @@
 
     getType :: TypeId -> Typer Type
     getType = \case
-      PlainTypeId {name, interval} -> lookupType name >>= \case
+      PlainTypeId{name, interval} -> lookupType name >>= \case
         Just (t, _) -> pure t
 
         Nothing -> do
           report (UnknownType name interval)
           defineType name (Placeholder name)
 
-      ArrayTypeId {innerTypeId} -> do
+      ArrayTypeId{innerTypeId} -> do
         t <- getType innerTypeId
         pure (Array t)
   \end{lstlisting}
@@ -3367,7 +3450,7 @@
   For variable definitions, implementation is trivial:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkDefinition2 VarDefinition {varId = SymbolId {name}, value} = do
+    checkDefinition2 VarDefinition{varId = SymbolId{name}, value} = do
       t <- checkExpression value
       defineVarType name t
   \end{lstlisting}
@@ -3389,9 +3472,9 @@
   \end{enumerate}
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    checkDefinition2 FunDefinition {funId, params, returnInfo, body} =
+    checkDefinition2 FunDefinition{funId, params, returnInfo, body} =
       withNewScope $ do
-        for_ params $ \(_, SymbolId {name}, typeInfo) -> case typeInfo of
+        for_ params $ \(_, SymbolId{name}, typeInfo) -> case typeInfo of
           Just (_, paramTypeId) -> do
             paramT <- getType paramTypeId
             defineVarType name paramT
@@ -3425,7 +3508,11 @@
       funs :: [(String, Function)],
       vars :: [(String, Reference)]
     }
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     type State = [Frame]
 
     data Evaluator a = Evaluator (State -> IO (Result a, State))
@@ -3444,7 +3531,6 @@
       = UserDefined Definition
       | BuiltinToInt
       | BuiltinToFloat
-      deriving (Eq, Show, Read)
   \end{lstlisting}
 
   Values are not stored directly inside \lstinline@State@; rather, each
@@ -3494,6 +3580,8 @@
   \lstinline@writeRef@ functions are provided. These create, read from and
   modify references respectively.
 
+  \pagebreak
+
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     newRef :: MonadIO m => Value -> m Reference
     newRef v = liftIO $ do
@@ -3540,10 +3628,8 @@
       compareVals v1 v2
   \end{lstlisting}
 
-  A \lstinline@Value@ can be an array containing references; thus, to implement
-  pass by value, the ability to clone values is needed. The functions
-  \lstinline@cloneVal@ and \lstinline@cloneRef@ are implemented to provide such
-  functionality.
+  To implement pass by value, functions to clone values and references are
+  provided.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     cloneVal :: MonadIO m => Value -> m Value
@@ -3556,7 +3642,11 @@
       Array rs -> do
         rs' <- Vector.forM rs cloneRef
         pure (Array rs')
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     cloneRef :: MonadIO m => Reference -> m Reference
     cloneRef r = do
       v <- readRef r
@@ -3618,6 +3708,8 @@
   \lstinline@cloneVals@ and \lstinline@compareVals@ to be used within the
   \lstinline@Evaluator@ monad as well.
 
+  \newpage
+
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     instance MonadIO Evaluator where
       liftIO :: IO a -> Evaluator a
@@ -3667,31 +3759,35 @@
 
       frame : frames -> do
         let funs' = (name, fun) : funs frame
-        pure (Done (), frame {funs = funs'} : frames)
+        pure (Done (), frame{funs = funs'} : frames)
 
     lookupFun :: String -> Evaluator (Maybe (Function, Int))
     lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
       where
         go _ [] = Nothing
 
-        go depth (Frame {poffset, funs} : frames) = case lookup name funs of
+        go depth (Frame{poffset, funs} : frames) = case lookup name funs of
           Just fun -> Just (fun, depth)
           Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     defineVar :: String -> Reference -> Evaluator ()
     defineVar name r = Evaluator $ \case
       [] -> pure (Done (), [Frame Nothing 0 [] [(name, r)]])
 
       frame : frames -> do
         let vars' = (name, r) : vars frame
-        pure (Done (), frame {vars = vars'} : frames)
+        pure (Done (), frame{vars = vars'} : frames)
 
     lookupVar :: String -> Evaluator (Maybe (Reference, Int))
     lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
       where
         go _ [] = Nothing
 
-        go depth (Frame {poffset, vars} : frames) = case lookup name vars of
+        go depth (Frame{poffset, vars} : frames) = case lookup name vars of
           Just ref -> Just (ref, depth)
           Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
   \end{lstlisting}
@@ -3736,24 +3832,26 @@
   \lstinline@evalExpression :: Expression -> Evaluator Reference@ evaluates
   expressions and returns a cell containing the resulting value.
 
+  \newpage
+
   Evaluating integer and floating-point literals is trivial: all that needs to
   be done is to allocate a new cell containing the value of the literal. For
   integers, an exception is raised if the literal is out of the 64-bit range.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression expression@IntegerExpression {integer} =
+    evalExpression expression@IntegerExpression{integer} =
       case toIntegralSized integer of
         Just x -> newRef (Int x)
         Nothing -> raise (IntegerOverflow expression)
 
-    evalExpression RationalExpression {rational} =
+    evalExpression RationalExpression{rational} =
       newRef (Float (fromRat rational))
   \end{lstlisting}
 
   Variable literals get simply looked up in the running state:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression VarExpression {varName, interval} =
+    evalExpression VarExpression{varName, interval} =
       lookupVar varName >>= \case
         Just (r, _) -> pure r
         Nothing -> raise (UnknownVar varName interval)
@@ -3767,7 +3865,7 @@
   also appear to modify the newly created array.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression ArrayExpression {elems} = do
+    evalExpression ArrayExpression{elems} = do
       rs <- Vector.unfoldrM f elems
       newRef (Array rs)
 
@@ -3786,13 +3884,17 @@
   raised.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression AccessExpression {array, index} = do
+    evalExpression AccessExpression{array, index} = do
       arrayR <- evalExpression array
       arrayV <- readRef arrayR
 
       indexR <- evalExpression index
       indexV <- readRef indexR
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       case (arrayV, indexV) of
         (Array rs, Int x) -> case toIntegralSized x of
           Just n | Just r <- rs !? n -> pure r
@@ -3830,8 +3932,8 @@
   are raised if subexpressions yield the wrong type.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression UnaryExpression {unary, operand}
-      | PlusOperator {} <- unary = do
+    evalExpression UnaryExpression{unary, operand}
+      | PlusOperator{} <- unary = do
         operandR <- evalExpression operand
         operandV <- readRef operandR
 
@@ -3843,15 +3945,19 @@
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
 
-    evalExpression expression@UnaryExpression {unary, operand}
-      | MinusOperator {} <- unary = do
+    evalExpression expression@UnaryExpression{unary, operand}
+      | MinusOperator{} <- unary = do
         operandR <- evalExpression operand
         operandV <- readRef operandR
 
         case operandV of
           Int x | Just y <- safeUnary negate x -> newRef (Int y)
           Int _ -> raise (IntegerOverflow expression)
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
           Float x -> newRef (Float (negate x))
 
           _ -> do
@@ -3864,8 +3970,8 @@
   recursively, then some function is applied if its type is correct.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression UnaryExpression {unary, operand}
-      | NotOperator {} <- unary = do
+    evalExpression UnaryExpression{unary, operand}
+      | NotOperator{} <- unary = do
         operandR <- evalExpression operand
         operandV <- readRef operandR
 
@@ -3876,8 +3982,8 @@
             operandT <- getType operandV
             raise (InvalidUnary unary operandT)
 
-    evalExpression UnaryExpression {unary, operand}
-      | LenOperator {} <- unary = do
+    evalExpression UnaryExpression{unary, operand}
+      | LenOperator{} <- unary = do
         operandR <- evalExpression operand
         operandV <- readRef operandR
 
@@ -3896,8 +4002,8 @@
   dividend not to be 0.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression expression@BinaryExpression {left, binary, right}
-      | DivideOperator {} <- binary = do
+    evalExpression expression@BinaryExpression{left, binary, right}
+      | DivideOperator{} <- binary = do
         leftR <- evalExpression left
         leftV <- readRef leftR
 
@@ -3910,7 +4016,11 @@
           (Int _, Int _) -> raise (IntegerOverflow expression)
 
           (Float x, Float y) -> newRef (Float (x / y))
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
           (_, _) -> do
             leftT <- getType leftV
             rightT <- getType rightV
@@ -3939,8 +4049,8 @@
   \end{enumerate}
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression expression@BinaryExpression {left, binary, right}
-      | AddOperator {} <- binary = do
+    evalExpression expression@BinaryExpression{left, binary, right}
+      | AddOperator{} <- binary = do
         leftR <- evalExpression left
         leftV <- readRef leftR
 
@@ -3971,12 +4081,14 @@
             raise (InvalidBinary binary leftT rightT)
   \end{lstlisting}
 
+  \newpage
+
   The operators \lstinline@<@, \lstinline@<=@, \lstinline@>@, \lstinline@>=@
   are implemented trivially:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression BinaryExpression {left, binary, right}
-      | LessOperator {} <- binary = do
+    evalExpression BinaryExpression{left, binary, right}
+      | LessOperator{} <- binary = do
         leftR <- evalExpression left
         leftV <- readRef leftR
 
@@ -3993,16 +4105,11 @@
             raise (InvalidBinary binary leftT rightT)
   \end{lstlisting}
 
-  Equality and inequality expressions are evaluated via \lstinline@compareRefs@:
+  Equality and inequality are handled with the \lstinline@compareRefs@ function.
+  For example, binary expressions with \lstinline@!=@ are evaluated as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression BinaryExpression {left, binary = EqualOperator {}, right} = do
-      leftR <- evalExpression left
-      rightR <- evalExpression right
-      x <- compareRefs leftR rightR
-      newRef (Bool x)
-
-    evalExpression BinaryExpression {left, binary = NotEqualOperator {}, right} = do
+    evalExpression BinaryExpression{left, binary = NotEqualOperator{}, right} = do
       leftR <- evalExpression left
       rightR <- evalExpression right
       x <- compareRefs leftR rightR
@@ -4014,8 +4121,8 @@
   binary operands.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression BinaryExpression {left, binary, right}
-      | AndOperator {} <- binary = do
+    evalExpression BinaryExpression{left, binary, right}
+      | AndOperator{} <- binary = do
         leftR <- evalExpression left
         leftV <- readRef leftR
 
@@ -4035,11 +4142,13 @@
                 raise (InvalidBinary binary leftT rightT)
   \end{lstlisting}
 
+  \newpage
+
   For \lstinline@xor@, both operands need to be evaluated.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression BinaryExpression {left, binary, right}
-      | XorOperator {} <- binary = do
+    evalExpression BinaryExpression{left, binary, right}
+      | XorOperator{} <- binary = do
         leftR <- evalExpression left
         leftV <- readRef leftR
 
@@ -4060,7 +4169,7 @@
   operand.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression BinaryExpression {left, binary = PlainAssignOperator {}, right} = do
+    evalExpression BinaryExpression{left, binary = PlainAssignOperator{}, right} = do
       leftR <- evalExpression left
 
       rightR <- evalExpression right
@@ -4075,8 +4184,8 @@
   implemented as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression expression@BinaryExpression {left, binary, right}
-      | DivideAssignOperator {} <- binary = do
+    evalExpression expression@BinaryExpression{left, binary, right}
+      | DivideAssignOperator{} <- binary = do
         leftR <- evalExpression left
         leftV <- readRef leftR
 
@@ -4096,6 +4205,8 @@
             raise (InvalidBinary binary leftT rightT)
   \end{lstlisting}
 
+  \newpage
+
   Executing function calls is probably the most complex part of Devin's
   evaluator. The called function is looked up, raising an error if it is not
   found. Arguments are evaluated from left to right; if an argument has the
@@ -4109,29 +4220,28 @@
   copy is performed.
 
   When a user-defined function's body is evaluated, a new frame is pushed by
-  calling \lstinline@withNewFrame (depth + 1)@, where \lstinline@depth@ is the
-  nesting level of the callee with respect to the caller. Recall that
-  \lstinline@withNewFrame :: Int -> Evaluator a -> Evaluator a@ runs another
-  evaluator on a modified state where a frame is added temporarily.
+  calling \lstinline@withNewFrame (Just name) (depth + 1)@; \lstinline@name@
+  identifies the function being evaluated, while \lstinline@depth@ is the
+  nesting level of the callee with respect to the caller.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression expression@CallExpression {funId, args} = do
-      let SymbolId {name, interval} = funId
+    evalExpression expression@CallExpression{funId, args} = do
+      let SymbolId{name, interval} = funId
 
       argRs <- for args evalExpression
 
       lookupFun name >>= \case
-        Just (UserDefined FunDefinition {params, body}, depth) ->
+        Just (UserDefined FunDefinition{params, body}, depth) ->
           withNewFrame (Just name) (depth + 1) (go 0 params argRs)
           where
             -- Pass argument by value:
-            go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do
+            go n ((Nothing, SymbolId{name}, _) : params) (argR : argRs) = do
               argR' <- cloneRef argR
               defineVar name argR'
               go (n + 1) params argRs
 
             -- Pass argument by reference:
-            go n ((Just _, SymbolId {name}, _) : params) (argR : argRs) = do
+            go n ((Just _, SymbolId{name}, _) : params) (argR : argRs) = do
               defineVar name argR
               go (n + 1) params argRs
 
@@ -4150,7 +4260,11 @@
           withNewFrame (Just name) (depth + 1) $ case argRs of
             [argR] -> do
               argV <- readRef argR
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
               case argV of
                 Float x -> newRef (Int (round x))
 
@@ -4188,11 +4302,11 @@
   implementation is discussed in the next section):
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression DefinitionStatement {definition} = do
+    evalExpression DefinitionStatement{definition} = do
       evalDefinition definition
       pure Nothing
 
-    evalExpression ExpressionStatement {value} = do
+    evalExpression ExpressionStatement{value} = do
       evalExpression value
       pure Nothing
   \end{lstlisting}
@@ -4203,10 +4317,14 @@
   pushed to evaluate branches.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression IfStatement {predicate, trueBranch} = do
+    evalExpression IfStatement{predicate, trueBranch} = do
       r <- evalExpression predicate
       v <- readRef r
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       case v of
         Bool True -> withNewFrame Nothing 1 (evalStatement trueBranch)
         Bool False -> pure Nothing
@@ -4215,7 +4333,7 @@
           t <- getType v
           raise (InvalidType predicate Type.Bool t)
 
-    evalExpression IfElseStatement {predicate, trueBranch, falseBranch} = do
+    evalExpression IfElseStatement{predicate, trueBranch, falseBranch} = do
       r <- evalExpression predicate
       v <- readRef r
 
@@ -4233,7 +4351,7 @@
   statements are of course implemented similarly to while statements.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression statement@WhileStatement {predicate, body} = do
+    evalExpression statement@WhileStatement{predicate, body} = do
       r <- evalExpression predicate
       v <- readRef r
 
@@ -4254,21 +4372,23 @@
   return \lstinline@unit@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression ReturnStatement {result = Just result} = do
+    evalExpression ReturnStatement{result = Just result} = do
       r <- evalExpression result
       pure (Just r)
 
-    evalExpression ReturnStatement {result = Nothing} = do
+    evalExpression ReturnStatement{result = Nothing} = do
       r <- newRef Unit
       pure (Just r)
   \end{lstlisting}
+
+  \newpage
 
   For assertions, the predicate is evaluated. If it is not of type
   \lstinline@Bool@, or if it is \lstinline@false@, an exception describing the
   error is raised.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression statement@AssertStatement {predicate} = do
+    evalExpression statement@AssertStatement{predicate} = do
       r <- evalExpression predicate
       v <- readRef r
 
@@ -4284,7 +4404,7 @@
   Breakpoint statements are handled trivially:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression BreakpointStatement {} = do
+    evalExpression statement@BreakpointStatement{} = do
       breakpoint statement
       pure Nothing
   \end{lstlisting}
@@ -4295,15 +4415,15 @@
   which returns control.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression BlockStatement {statements} = withNewFrame Nothing 1 $ do
+    evalExpression BlockStatement{statements} = withNewFrame Nothing 1 $ do
       for_ statements $ \case
-        DefinitionStatement {definition} -> evalDefinition1 definition
+        DefinitionStatement{definition} -> evalDefinition1 definition
         _ -> pure ()
 
       firstJustM eval statements
 
       where
-        eval DefinitionStatement {definition} = do
+        eval DefinitionStatement{definition} = do
           evalDefinition2 definition
           pure Nothing
 
@@ -4320,6 +4440,8 @@
   in both the type checker and evaluator; however, implementation is so trivial
   that there's little benefit in refactoring.
 
+  \newpage
+
   As with type checking, evaluation is performed in two passes. In the first
   pass, function definitions are bound to the current frame; in the second,
   variable definitions are evaluated.
@@ -4332,19 +4454,17 @@
 
     evalDefinition1 :: Definition -> Evaluator ()
     evalDefinition1 definition = case definition of
-      VarDefinition {} -> pure ()
-
-      FunDefinition {funId = SymbolId {name}} ->
-        defineFun name (UserDefined definition)
+      VarDefinition{} -> pure ()
+      FunDefinition{funId = SymbolId{name}} -> defineFun name (UserDefined definition)
 
     evalDefinition2 :: Definition -> Evaluator ()
     evalDefinition2 = \case
-      VarDefinition {varId = SymbolId {name}, value} -> do
+      VarDefinition{varId = SymbolId{name}, value} -> do
         r <- evalExpression value
         r' <- cloneRef r
         defineVar name r'
 
-      FunDefinition {} -> pure ()
+      FunDefinition{} -> pure ()
   \end{lstlisting}
 
   \section{The parser}
@@ -4373,9 +4493,11 @@
 
     getOffset :: Monad m => ParsecT (a, s) u m a
     getOffset = do
-      State {stateInput = (offset, _)} <- getParserState
+      State{stateInput = (offset, _)} <- getParserState
       pure offset
   \end{lstlisting}
+
+  \newpage
 
   The module \lstinline@Devin.Parsers@ implements the functions required to
   parse Devin code. A Devin parser is a \lstinline@Parsec (Int, s) [Token] a@,
@@ -4498,7 +4620,11 @@
     token literal = syntax $ do
       text literal
       pure Token
+  \end{lstlisting}
 
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     text :: Stream s m Char => String -> ParserT s m String
     text literal = try (string literal) <?> ("“" ++ literal ++ "”")
 
@@ -4543,6 +4669,7 @@
   be accepted as well.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
+    -- Regex: [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
     identifier :: Stream s m Char => ParserT s m String
     identifier = flip label "identifier" $ do
       start <- satisfy (isStart . generalCategory)
@@ -4558,7 +4685,11 @@
         isStart LetterNumber = True
         isStart ConnectorPunctuation = True
         isStart _ = False
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         isContinue NonSpacingMark = True
         isContinue SpacingCombiningMark = True
         isContinue DecimalNumber = True
@@ -4623,6 +4754,11 @@
       binary <- try $ between s s $ syntax $ choice
         [
           text "==" $> EqualOperator,
+  \end{lstlisting}
+
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
           text "!=" $> NotEqualOperator
         ]
 
@@ -4671,6 +4807,8 @@
   handles parenthesized expressions, function calls, variables and array access
   expressions. Interested readers may read the complete implementation in the
   \hyperref[chapter:devin-source-code]{appendix}.
+
+  \newpage
 
   \subsection{Parsing statements}
 
@@ -4734,7 +4872,11 @@
       predicate <- s *> expression
       body <- s *> statement
       pure (WhileStatement whileKeyword predicate body)
+  \end{lstlisting}
 
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     doWhileStatement :: Stream s m Char => ParserT s m Statement
     doWhileStatement = do
       doKeyword <- keyword "do"
@@ -4793,6 +4935,8 @@
   \lstinline@(<*)@ serve a similar purpose: sequencing two parsers and
   discarding the result of one of the two operands. As a mnemonic, the angle
   bracket points to the parser whose result has to be kept.
+
+  \newpage
 
   \subsection{Parsing variable and function definitions}
 
@@ -4854,6 +4998,8 @@
       pure (FunDefinition defKeyword funId open params commas close returnInfo body)
   \end{lstlisting}
 
+  \newpage
+
   Parameters are parsed by the \lstinline@param@ helper function:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -4905,6 +5051,8 @@
     there's built-in support for showing line numbers, automatic indentation,
     and syntax highlighting.
 
+    \newpage
+
     GtkSourceView's syntax highlighting functionality is quite handy: all that
     would be required to do is to write a text file describing Devin's grammar
     and let the library do it's magic. However, should such functionality be
@@ -4947,6 +5095,8 @@
     \includegraphics[scale=0.8]{7.png}
     \caption{A simple counting UI}
   \end{figure}
+
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     module Main (main) where
@@ -5003,6 +5153,8 @@
   callback which starts the actual application. The window and all its contents
   are built in \lstinline@onActivate@.
 
+  \newpage
+
   The first three lines of \lstinline@onActivate@ create a label initially set
   to \lstinline@0@ and two buttons: \lstinline@buttonMinus@ and
   \lstinline@buttonPlus@. Note that \lstinline@gi-gtk@ employs the
@@ -5040,6 +5192,26 @@
 
     onActivate' :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
     onActivate' application = do
+      let buildFn = do
+            label <- Gtk.getObject Gtk.Label (Text.pack "label")
+            buttonMinus <- Gtk.getObject Gtk.Button (Text.pack "buttonMinus")
+            buttonPlus <- Gtk.getObject Gtk.Button (Text.pack "buttonPlus")
+            window <- Gtk.getObject Gtk.ApplicationWindow (Text.pack "window")
+
+            Gtk.onButtonClicked buttonMinus $ do
+              t <- Gtk.labelGetLabel label
+              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) - 1)))
+
+            Gtk.onButtonClicked buttonPlus $ do
+              t <- Gtk.labelGetLabel label
+              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) + 1)))
+
+            pure window
+  \end{lstlisting}
+
+  \newpage
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       let string =
             "<interface>\n\
             \  <object class=\"GtkApplicationWindow\" id=\"window\">\n\
@@ -5075,22 +5247,6 @@
             \    </child>\n\
             \  </object>\n\
             \</interface>\0"
-
-      let buildFn = do
-            label <- Gtk.getObject Gtk.Label (Text.pack "label")
-            buttonMinus <- Gtk.getObject Gtk.Button (Text.pack "buttonMinus")
-            buttonPlus <- Gtk.getObject Gtk.Button (Text.pack "buttonPlus")
-            window <- Gtk.getObject Gtk.ApplicationWindow (Text.pack "window")
-
-            Gtk.onButtonClicked buttonMinus $ do
-              t <- Gtk.labelGetLabel label
-              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) - 1)))
-
-            Gtk.onButtonClicked buttonPlus $ do
-              t <- Gtk.labelGetLabel label
-              Gtk.labelSetLabel label (Text.pack (show (read (Text.unpack t) + 1)))
-
-            pure window
 
       builder <- Gtk.builderNewFromString (Text.pack string) (-1)
       window <- Gtk.buildWithBuilder buildFn builder
@@ -5133,9 +5289,9 @@
   computations; more complex solutions might be required in different
   circumstances. Availability of practical material discussing this matter is
   unfortunately sparse: in fact, implementing debugging functionality has been
-  one of the hardest parts of this whole project, alongside working around
-  \lstinline@gi-gtk@'s incomplete language binding and understanding how to
-  perform manual syntax highlighting on the \lstinline@GtkSourceView@ widget.
+  one of the hardest parts of this whole project.
+
+  \pagebreak
 
   Developing Devin has been insightful to a better understanding on the matter
   of programming languages. Actual implementation made it clear which kinds of
@@ -5293,6 +5449,10 @@
   \lstinputlisting
     [basicstyle=\ttfamily\footnotesize,aboveskip=0pt,belowskip=\baselineskip]
     {../app/Devin/Highlight/Syntax.hs}
+
+  \newpage
+
+  \thispagestyle{empty}
 
   \printbibliography[heading=bibintoc]
 \end{document}
