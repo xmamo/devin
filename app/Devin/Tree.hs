@@ -270,15 +270,16 @@ stateForest :: MonadIO m => State -> m (Tree.Forest (Text, Text))
 stateForest = \case
   [] -> pure []
 
-  Frame {label = Nothing, vars = [], funs = []} : frames -> stateForest frames
+  Frame {label, funs, vars} : frames -> do
+    frameForest <- case (funs, vars) of
+      ([], []) -> pure [Tree.Node ("—", "") []]
 
-  Frame {label, poffset, funs, vars} : frames -> do
-    let offset = virtualOffset poffset frames
-    let poffsetTree = Tree.Node (".poffset", Text.pack (show offset)) []
-    let funsForest = foldl f [] funs
-    varsForest <- foldlM g [] vars
-    let frameForest = poffsetTree : funsForest ++ varsForest
-    forest <- stateForest frames
+      (_, _) -> do
+        let funsForest = foldl f [] funs
+        varsForest <- foldlM g [] vars
+        pure (funsForest ++ varsForest)
+
+    forest <- stateForest (h frames)
 
     case label of
       Nothing ->
@@ -288,18 +289,6 @@ stateForest = \case
         pure (Tree.Node (Text.pack ("Frame " ++ label), "") frameForest : forest)
 
     where
-      virtualOffset = go 0
-
-      go result offset _ | offset <= 0 = result
-
-      go result _ [] = result
-
-      go result offset (Frame {label = Nothing, vars = [], funs = []} : frames) =
-        go result (offset - 1) frames
-
-      go result offset (_ : frames) =
-        go (result + 1) (offset - 1) frames
-
       f funsForest (name, _) =
         Tree.Node (Text.pack name, "—") [] : funsForest
 
@@ -308,6 +297,8 @@ stateForest = \case
         s <- displayVal v
         pure (Tree.Node (Text.pack name, Text.pack s) [] : varsForest)
 
+      h (Frame {label = Nothing, funs = [], vars = []} : frames) = h frames
+      h frames = frames
 
 
 displayVal :: MonadIO m => Value -> m String
