@@ -62,7 +62,7 @@ type State = [Frame]
 
 
 data Frame = Frame {
-  offset :: Int,  -- Static link
+  poffset :: Int,  -- Static link
   funs :: [(String, Function)],
   vars :: [(String, Reference)]
 }
@@ -144,7 +144,7 @@ makePredefinedState = liftIO $ do
   falseR <- newRef (Bool False)
   unitR <- newRef Unit
   let funs = [("toInt", BuiltinToInt), ("toFloat", BuiltinToFloat)]
-  let vars = [("true", trueR), ("false", falseR), ("unit", unitR)]
+  let vars = [("false", falseR), ("true", trueR), ("unit", unitR)]
   pure [Frame 0 funs vars]
 
 
@@ -225,9 +225,9 @@ lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
   where
     go _ [] = Nothing
 
-    go depth (Frame {offset, funs} : frames) = case lookup name funs of
+    go depth (Frame {poffset, funs} : frames) = case lookup name funs of
       Just fun -> Just (fun, depth)
-      Nothing -> go (depth + max 1 offset) (drop (offset - 1) frames)
+      Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
 
 
 defineVar :: String -> Reference -> Evaluator ()
@@ -244,9 +244,9 @@ lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
   where
     go _ [] = Nothing
 
-    go depth (Frame {offset, vars} : frames) = case lookup name vars of
+    go depth (Frame {poffset, vars} : frames) = case lookup name vars of
       Just ref -> Just (ref, depth)
-      Nothing -> go (depth + max 1 offset) (drop (offset - 1) frames)
+      Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
 
 
 withNewFrame :: Int -> Evaluator a -> Evaluator a

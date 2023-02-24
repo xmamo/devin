@@ -18,7 +18,7 @@ module Devin.Tree (
 ) where
 
 import Control.Monad.IO.Class
-import Data.Traversable
+import Data.Foldable
 import Numeric
 
 import Data.Text (Text)
@@ -267,19 +267,24 @@ tokenTree label Token {} = Tree.Node ("Token", Text.pack label) []
 
 
 stateForest :: MonadIO m => State -> m (Tree.Forest (Text, Text))
-stateForest = \case
-  [] -> pure []
+stateForest frames = snd <$> go frames
+  where
+    go [] = pure (0, [])
 
-  Frame {vars = []} : frames -> stateForest frames
+    go (Frame {vars = []} : frames) = do
+      (skipped, forest) <- go frames
+      pure (skipped + 1, forest)
 
-  Frame {vars} : frames -> do
-    subforest <- for vars $ \(name, r) -> do
-      v <- readRef r
-      s <- displayVal v
-      pure (Tree.Node (Text.pack name, Text.pack s) [])
+    go (Frame {poffset, vars} : frames) = do
+      let f subforest (name, r) = do
+            v <- readRef r
+            s <- displayVal v
+            pure (Tree.Node (Text.pack name, Text.pack s) [] : subforest)
 
-    forest <- stateForest frames
-    pure (Tree.Node ("Frame", "") subforest : forest)
+      subforest <- foldlM f [] vars
+      (skipped, forest) <- go frames
+      let label = (Text.pack ("Frame (poffset = " ++ shows (poffset - skipped) ")"), "")
+      pure (skipped, Tree.Node label subforest : forest)
 
 
 displayVal :: MonadIO m => Value -> m String
