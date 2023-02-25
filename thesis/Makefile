@@ -19,5 +19,4 @@ clean:
 	if [ -f PhdThesis/Makefile ]; then $(MAKE) -C PhdThesis clean; fi
 	if [ -f theorems/Makefile ]; then $(MAKE) -C theorems clean; fi
 	latexmk -bibtex -C
-	rm -f *~
-	rm -f *.run.xml
+	rm -f *~ *.run.xml pdfa.xmpi

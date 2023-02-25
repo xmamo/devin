@@ -20,12 +20,14 @@
 
 % Other packages
 \usepackage{forest}
+\usepackage[a-1b]{pdfx}
 
 % The theorems package by prof. Marco Comini
 \usepackage{theorems}
 
 % The hyperref package. Has to be loaded last!
-\usepackage[hidelinks,pdfpagelayout=TwoPageRight]{hyperref}
+\usepackage{hyperref}
+\hypersetup{hidelinks,pdfpagelayout=TwoPageRight}
 
 \author{Matteo Morena}
 \supervisor{Prof.\ Marco Comini}
@@ -2536,6 +2538,8 @@
       } -> Expression
   \end{lstlisting}
 
+  \newpage
+
   \subsection{Representing statements}
 
   Any expression followed by a semicolon becomes a statement. The type
@@ -2652,6 +2656,8 @@
       } -> Definition
   \end{lstlisting}
 
+  \newpage
+
   \section{Representing semantic errors}
 
   Both the evaluator and the type checker benefit from having some data type to
@@ -2706,7 +2712,7 @@
       } -> Error
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       -- Runtime errors:
@@ -2763,7 +2769,7 @@
       | Placeholder String
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   To compare types, the relation operator \lstinline@(<:)@ is provided:
 
