@@ -370,8 +370,9 @@
   \end{lstlisting}
 
   The complexity of \lstinline@(++)@ is
-  $O\mathopen{}\left(n\right)\mathclose{}$, where $n$ is the length of the first
-  operand. This is easily provable by analyzing the function's implementation:
+  $\ensuregreek{Ο}\mathopen{}\left(n\right)\mathclose{}$, where $n$ is the
+  length of the first operand. This is easily provable by analyzing the
+  function's implementation:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     (++) :: [a] -> [a] -> [a]
@@ -5182,7 +5183,8 @@
   The main window is created with \lstinline@Gtk.applicationWindowNew@. Its
   title is set to the empty string and it is configured not to be resizable.
   Finally, event handlers for button clicks are registered with
-  \lstinline@Gtk.onButtonClicked@.
+  \lstinline@Gtk.onButtonClicked@. After all is done, the application window is
+  displayed to the user with \lstinline@Gtk.widgetShowAll@.
 
   As can be seen, using GTK+ within Haskell is not too difficult, even if
   imperative-style programming is required. In most circumstances, code working
