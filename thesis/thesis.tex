@@ -25,18 +25,10 @@
 % The theorems package by prof. Marco Comini
 \usepackage{theorems}
 
-% The hyperref package. Has to be loaded last!
-\usepackage{hyperref}
-\hypersetup{hidelinks,pdfpagelayout=TwoPageRight}
-
 \author{Matteo Morena}
 \supervisor{Prof.\ Marco Comini}
 \date{2021--2022}
-
-\title{
-  Implementation of an interpreter with graphical interface of a simple
-  imperative language
-}
+\title{Implementation of an interpreter with graphical interface of a simple imperative language}
 
 \setlength{\evensidemargin}{3mm}
 \setlength{\oddsidemargin}{7mm}
@@ -62,6 +54,19 @@
   columns=fullflexible,
   keepspaces=true,
   literate={‘}{`}{1}{’}{'}{1}{“}{`}{1}{”}{'}{1}{—}{-}{1}
+}
+
+\hypersetup{
+  hidelinks,
+  bookmarksopen=true,
+  bookmarksnumbered=true,
+  pdfpagemode=UseOutlines,
+  pdfduplex=DuplexFlipLongEdge,
+  pdflang=en,
+  pdfnewwindow=true,
+  pdfpagelayout=TwoPageRight,
+  pdfpicktraybypdfsize=true,
+  pdfprintscaling=None
 }
 
 \begin{document}
@@ -1743,9 +1748,7 @@
       \end{forest}
     \end{tabular}
 
-    \caption{
-      Two semantically equivalent abstract syntax trees for \texttt{2+3*(4+5)}
-    }
+    \caption{Two semantically equivalent abstract syntax trees for \texttt{2+3*(4+5)}}
     \label{figure:ast}
   \end{figure}
 
