@@ -453,7 +453,7 @@ text :: Stream s m Char => String -> ParserT s m String
 text literal = try (string literal) <?> ("“" ++ literal ++ "”")
 
 
--- [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
+-- Regular expression: [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
 identifier :: Stream s m Char => ParserT s m String
 identifier = flip label "identifier" $ do
   start <- satisfy (isStart . generalCategory)

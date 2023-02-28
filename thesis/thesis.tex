@@ -4675,7 +4675,7 @@
   be accepted as well.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    -- Regex: [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
+    -- Regular expression: [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
     identifier :: Stream s m Char => ParserT s m String
     identifier = flip label "identifier" $ do
       start <- satisfy (isStart . generalCategory)
