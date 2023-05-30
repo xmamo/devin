@@ -391,7 +391,7 @@ checkExpression expression = case expression of
     leftT <- checkExpression left
     rightT <- checkExpression right
 
-    if leftT <: rightT then
+    if rightT <: leftT then
       pure rightT
     else
       report' (InvalidBinary binary leftT rightT)
