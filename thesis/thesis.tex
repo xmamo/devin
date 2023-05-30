@@ -98,12 +98,12 @@
     languages is a rewarding process; it is my objective to provide an
     introduction to anybody interested in such topic.
 
-    Many resources explain the theory behind programming languages; it is my
-    opinion that true understanding comes only after practice as well: that is,
-    by actual implementation. Devin is a small, minimal, language. I think that
-    it strikes a good balance in terms of explanatory power: it is simple enough
-    to be described entirely, but complex enough to hint how more advanced
-    features would have to be implemented.
+    Lots of resources explain the theory behind programming languages; many
+    forego implementation. I believe that true understanding comes only after
+    practice as well: that is, by writing actual code. Devin is a small,
+    minimal, language. I think that it strikes a good balance in terms of
+    explanatory power: it is simple enough to be described entirely, but complex
+    enough to hint how more advanced features would have to be implemented.
   \end{abstract}
 
   \currentpdfbookmark{\acknowledgmentsname}{acknowledgments}
@@ -375,9 +375,8 @@
   \end{lstlisting}
 
   The complexity of \lstinline@(++)@ is
-  $\ensuregreek{Ο}\mathopen{}\left(n\right)\mathclose{}$, where $n$ is the
-  length of the first operand. This is easily provable by analyzing the
-  function's implementation:
+  $O\mathopen{}\left(n\right)\mathclose{}$, where $n$ is the length of the first
+  operand. This is easily provable by analyzing the function's implementation:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     (++) :: [a] -> [a] -> [a]
@@ -884,8 +883,8 @@
   case of C\#). The requirement that every object must be hashable stems from
   the need to support a generic hash table container. While the rationale for
   this requirement is certainly understandable, it can be argued that there are
-  objects for which hashing or even equality methods don't make much sense.
-  Alas, there's no way in Java and C\# to have classes implement methods with
+  objects for which hashing or even equality methods don't make much sense;
+  alas, there's no way in Java and C\# to have classes implement methods with
   constraints. Haskell, on the other hand, allows this: sets of functions can be
   defined only if certain conditions are met. For example, considering lists,
   the cons operator \lstinline@(:)@ is defined for \emph{all} lists, while the
@@ -1370,10 +1369,10 @@
   achieve good performance, such as when implementing an algorithm which makes
   use of dynamic programming.
 
-  Consider function to compute the Levenshtein distance between two strings;
-  that is, the minimum number of single-character edits (insertions, deletions
-  or substitutions) required to change one string into the other. Without going
-  into too much detail, the complexity of a na\"ive recursive implementation is
+  As an example, consider the function to compute the Levenshtein distance
+  between two strings; that is, the minimum number of single-character edits
+  (insertions, deletions or substitutions) required to change one string into
+  the other. The complexity of a na\"ive recursive implementation is
   exponential: it is exactly in cases like these that using well-known iterative
   algotithms which employ mutation is beneficial.
 
@@ -2231,7 +2230,7 @@
 
   Functions can be defined either globally or within other functions. They obey
   to the same scoping rules as variables. The entry point for Devin programs is
-  a global functions named \lstinline@main@; it must take no arguments.
+  a global function named \lstinline@main@; it must take no arguments.
 
   The syntax for calling functions is the same as in C:
   \lstinline[mathescape]@$f$()@ calls $f$ with zero arguments,
@@ -2297,10 +2296,10 @@
   Once a valid program has been written, it can be run by clicking the
   $\blacktriangleright$ button. The state of execution can be observed with
   breakpoint statements; these signal the evaluator to pause execution and
-  display the current \emph{runtime stack}, as seen in
+  display the current runtime stack, as seen in
   \autoref{figure:debugger}. The stack is the data structure which maps
   variables and function arguments to their values. Each time a function gets
-  called, a new \emph{frame} is pushed onto the stack; it contains associations
+  called, a new frame is pushed onto the stack; it contains associations
   between parameter names and the passed values. Variable definitions within the
   called function add new associations to the newly pushed frame. When the
   called function returns, the topmost frame is popped off the stack and
@@ -2550,7 +2549,7 @@
   \lstinline@Statement@ represents these, along with if, while, do-while,
   return, assert, breakpoint and block statements.
 
-  In any point in which a statement may occur, a variable or function definition
+  At any point in which a statement may occur, a variable or function definition
   can be placed instead. The data constructor \lstinline@DefinitionStatement@
   represents this idea.
 
@@ -3082,7 +3081,7 @@
         operandT <- checkExpression operand
 
         case operandT of
-          Unknown -> pure Int
+          Unknown -> pure Unknown
           Array _ -> pure Int
           _ -> report' (InvalidUnary unary operandT)
   \end{lstlisting}
@@ -3183,31 +3182,32 @@
           (_, _) -> report' (InvalidBinary binary leftT rightT)
   \end{lstlisting}
 
-  Equality and inequality can be tested between values of any two types. Values
-  of different types are deemed to be always different.
-
-  The following listing implements type checking for \lstinline@==@ and
-  \lstinline@!=@. Notice that \lstinline@left@ and \lstinline@right@ are
-  recursively type checked even though the result type (\lstinline@Bool@) is
-  known. This is important, as failing to check sub-expressions could lead to
-  runtime errors during evaluation.
+  Equality and inequality can be tested between values of any two types: values
+  of different types are deemed to be different. Thus, \lstinline@==@ and
+  \lstinline@!=@ are type checked as follows:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression{left, binary = EqualOperator{}, right} = do
-      checkExpression left
-      checkExpression right
-      pure Bool
+      leftT <- checkExpression left
+      rightT <- checkExpression right
+
+      case (leftT, rightT) of
+        (Unknown, _) -> pure Unknown
+        (_, Unknown) -> pure Unknown
+        _ -> pure Bool
 
     checkExpression BinaryExpression{left, binary = NotEqualOperator{}, right} = do
-      checkExpression left
-      checkExpression right
-      pure Bool
+      leftT <- checkExpression left
+      rightT <- checkExpression right
+
+      case (leftT, rightT) of
+        (Unknown, _) -> pure Unknown
+        (_, Unknown) -> pure Unknown
+        _ -> pure Bool
   \end{lstlisting}
 
   The operators \lstinline@and@, \lstinline@or@ and \lstinline@xor@ are all
-  checked in the same manner.
-
-  \newpage
+  checked in the same manner:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression BinaryExpression{left, binary, right}
@@ -3232,7 +3232,7 @@
         rightT <- checkExpression right
 
         if leftT <: rightT then
-          pure leftT
+          pure rightT
         else
           report' (InvalidBinary binary leftT rightT)
   \end{lstlisting}
@@ -3601,8 +3601,10 @@
     readRef :: MonadIO m => Reference -> m Value
     readRef (Reference ref) = liftIO (readIORef ref)
 
-    writeRef :: MonadIO m => Reference -> Value -> m ()
-    writeRef (Reference ref) v = liftIO (writeIORef ref v)
+    writeRef :: MonadIO m => Reference -> Value -> m Reference
+    writeRef (Reference ref) v = liftIO $ do
+      writeIORef ref v
+      pure (Reference ref)
   \end{lstlisting}
 
   Equality between pairs of values or cells can be tested with
@@ -3617,9 +3619,8 @@
       (Float x, Float y) -> pure (x == y)
 
       (Array rs1, Array rs2) -> do
-        let n1 = Vector.length rs1
-        let n2 = Vector.length rs2
-        if n1 /= n2 then pure False else go n1 0
+        let length = Vector.length rs1
+        if Vector.length rs2 /= length then pure False else go n 0
 
         where
           go n i | i >= n = pure True
@@ -3735,7 +3736,7 @@
 
   Contrary to the environment used in static type checking, there's not a
   one-to-one correspondence between the evaluator's runtime stack and lexical
-  scoping. As such, each frame has to keep track which of is its lexical parent;
+  scoping. As such, each frame has to keep track which of its lexical parent;
   this is done with the \lstinline@poffset@ field, which stands for \emph{parent
   offset}. This value is used in \lstinline@lookupFun@ and
   \lstinline@lookupVar@, as it indicates how many frames need to be skipped
@@ -4186,7 +4187,7 @@
       rightV <- readRef rightR
       rightV' <- cloneVal rightV
 
-      writeRef' leftR rightV'
+      writeRef leftR rightV'
   \end{lstlisting}
 
   The other assignment operators are implemented according to the shorthands of
@@ -4204,10 +4205,10 @@
 
         case (leftV, rightV) of
           (Int _, Int 0) -> raise (DivisionByZero expression)
-          (Int x, Int y) | Just z <- safeBinary div x y -> writeRef' leftR (Int z)
+          (Int x, Int y) | Just z <- safeBinary div x y -> writeRef leftR (Int z)
           (Int _, Int _) -> raise (IntegerOverflow expression)
 
-          (Float x, Float y) -> writeRef' leftR (Float (x / y))
+          (Float x, Float y) -> writeRef leftR (Float (x / y))
 
           (_, _) -> do
             leftT <- getType leftV
@@ -4580,10 +4581,11 @@
       pure (f (start, end))
   \end{lstlisting}
 
-  Numbers with decimals are parsed similarly with respect to integers. The dot,
-  parsed with \lstinline@char '.'@, does not get used directly to compute the
-  value of the parsed rational; the combinator \lstinline@(*>)@ sequences two
-  parsers, discarding the result of the first operand.
+  Numbers with decimals are parsed similarly to integers. The dot, parsed with
+  \lstinline@char '.'@, is ignored by employing \lstinline@(*>)@: this
+  combinator sequences two parsers, discarding the result of the first operand.
+  The expression \texttt{$p$ \$> $q$}, used in both earlier and in following
+  listing, is equivalent to \lstinline[mathescape]@$p$ *> pure $q$@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     rationalExpression :: Stream s m Char => ParserT s m Expression
@@ -4597,7 +4599,7 @@
   \end{lstlisting}
 
   Array literals are parsed as a list of comma separated expressions surrounded
-  by a pair of square brackets (\lstinline@[@, \lstinline@]@).
+  by brackets:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     arrayExpression :: Stream s m Char => ParserT s m Expression
@@ -4636,7 +4638,7 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     text :: Stream s m Char => String -> ParserT s m String
-    text literal = try (string literal) <?> ("“" ++ literal ++ "”")
+    text literal = try (string literal) <?> ("\u201c" ++ literal ++ "\u201d")
 
     s :: Stream s m Char => ParserT s m ()
     s = skipMany (skipMany1 (space <?> "") <|> void (comment <?> ""))
@@ -4648,7 +4650,7 @@
   \lstinline@skipMany@ and \lstinline@skipMany1@ are similar to \lstinline@many@
   and \lstinline@many1@, except that they ignore the result. The combinator
   \lstinline@(<?>)@ gives a label to a parser; if an empty string is provided,
-  any previous label is removed.
+  any previous label is discarded.
 
   As mentioned, comments are accumulated in the parser's state. They are parsed
   as follows:
@@ -4730,6 +4732,10 @@
       ]
   \end{lstlisting}
 
+  The \lstinline@choice@ combinator tries to apply the parsers in a list in
+  order, until one of them succeeds; the value provided by parser which succeeds
+  is returned. Such combinator is equivalent to \lstinline@foldr (<|>) empty@.
+
   Unary expressions are parsed as a unary operator followed by some expression.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
@@ -4759,16 +4765,17 @@
 
       pure (\left right -> BinaryExpression left binary right)
 
+  \end{lstlisting}
+
+  \pagebreak
+
+  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     expression2 :: Stream s m Char => ParserT s m Expression
     expression2 = chainl1 expression3 $ do
       binary <- try $ between s s $ syntax $ choice
         [
           text "==" $> EqualOperator,
-  \end{lstlisting}
 
-  \newpage
-
-  \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
           text "!=" $> NotEqualOperator
         ]
 
@@ -5074,9 +5081,9 @@
 
     This consideration gives rise to the first problem: using only part of
     GtkSourceView's features, while performing syntax highlighting based on the
-    output of Devin's parser. The library operates on such an abstraction level
+    output of Devin's parser. GtkSourceView operates on such an abstraction level
     that understanding how to do syntax highlighting from scratch is not
-    trivial; in fact, I had to read GtkSourceView's implementation of automatic
+    trivial; in fact, I had to read the library's implementation of automatic
     syntax highlighting in order to do so.
 
     \item The second problem relies in the fact that the \lstinline@gi-gtk@
@@ -5196,7 +5203,8 @@
 
   The package \lstinline@gi-gtk-hs@ provides an idiomatic API on top of
   \lstinline@gi-gtk@ to load widgets from XML strings. The following listing
-  illustrates its usage:
+  illustrates an alternative \lstinline@onActivate@ implementation employing
+  such functionality:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     import qualified Data.GI.Gtk.BuildFn as Gtk
@@ -5301,8 +5309,6 @@
   circumstances. Availability of practical material discussing this matter is
   unfortunately sparse: in fact, implementing debugging functionality has been
   one of the hardest parts of this whole project.
-
-  \pagebreak
 
   Developing Devin has been insightful to a better understanding on the matter
   of programming languages. Actual implementation made it clear which kinds of

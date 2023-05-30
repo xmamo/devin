@@ -169,9 +169,8 @@ compareVals v1 v2 = case (v1, v2) of
   (Float x, Float y) -> pure (x == y)
 
   (Array rs1, Array rs2) -> do
-    let n1 = Vector.length rs1
-    let n2 = Vector.length rs2
-    if n1 /= n2 then pure False else go n1 0
+    let n = Vector.length rs1
+    if Vector.length rs2 /= n then pure False else go n 0
 
     where
       go n i | i >= n = pure True
@@ -194,8 +193,10 @@ readRef :: MonadIO m => Reference -> m Value
 readRef (Reference ref) = liftIO (readIORef ref)
 
 
-writeRef :: MonadIO m => Reference -> Value -> m ()
-writeRef (Reference ref) v = liftIO (writeIORef ref v)
+writeRef :: MonadIO m => Reference -> Value -> m Reference
+writeRef (Reference ref) v = liftIO $ do
+  writeIORef ref v
+  pure (Reference ref)
 
 
 cloneRef :: MonadIO m => Reference -> m Reference

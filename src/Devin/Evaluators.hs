@@ -576,7 +576,7 @@ evalExpression expression = case expression of
     rightV <- readRef rightR
     rightV' <- cloneVal rightV
 
-    writeRef' leftR rightV'
+    writeRef leftR rightV'
 
   BinaryExpression {left, binary, right} | AddAssignOperator {} <- binary -> do
     leftR <- evalExpression left
@@ -586,10 +586,10 @@ evalExpression expression = case expression of
     rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (+) x y -> writeRef' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary (+) x y -> writeRef leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeRef' leftR (Float (x + y))
+      (Float x, Float y) -> writeRef leftR (Float (x + y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -604,10 +604,10 @@ evalExpression expression = case expression of
     rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (-) x y -> writeRef' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary (-) x y -> writeRef leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeRef' leftR (Float (x - y))
+      (Float x, Float y) -> writeRef leftR (Float (x - y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -622,10 +622,10 @@ evalExpression expression = case expression of
     rightV <- readRef rightR
 
     case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (*) x y -> writeRef' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary (*) x y -> writeRef leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeRef' leftR (Float (x * y))
+      (Float x, Float y) -> writeRef leftR (Float (x * y))
 
       (Array rs, Int y) -> do
         let n = Vector.length rs
@@ -635,7 +635,7 @@ evalExpression expression = case expression of
 
           Just n' -> do
             rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
-            writeRef' leftR (Array rs')
+            writeRef leftR (Array rs')
 
       (_, _) -> do
         leftT <- getType leftV
@@ -651,10 +651,10 @@ evalExpression expression = case expression of
 
     case (leftV, rightV) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary div x y -> writeRef' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary div x y -> writeRef leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeRef' leftR (Float (x / y))
+      (Float x, Float y) -> writeRef leftR (Float (x / y))
 
       (_, _) -> do
         leftT <- getType leftV
@@ -670,7 +670,7 @@ evalExpression expression = case expression of
 
     case (leftV, rightV) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary mod x y -> writeRef' leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary mod x y -> writeRef leftR (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
       (_, _) -> do
@@ -703,9 +703,3 @@ getType = \case
 
     ok <- allM (\r -> f <$> (getType =<< readRef r)) rs
     pure (Type.Array (if ok then t else Type.Unknown))
-
-
-writeRef' :: Reference -> Value -> Evaluator Reference
-writeRef' r v = do
-  writeRef r v
-  pure r

@@ -234,7 +234,7 @@ checkExpression expression = case expression of
     operandT <- checkExpression operand
 
     case operandT of
-      Unknown -> pure Int
+      Unknown -> pure Unknown
       Array _ -> pure Int
       _ -> report' (InvalidUnary unary operandT)
 
@@ -296,14 +296,22 @@ checkExpression expression = case expression of
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary = EqualOperator {}, right} -> do
-    checkExpression left
-    checkExpression right
-    pure Bool
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      _ -> pure Bool
 
   BinaryExpression {left, binary = NotEqualOperator {}, right} -> do
-    checkExpression left
-    checkExpression right
-    pure Bool
+    leftT <- checkExpression left
+    rightT <- checkExpression right
+
+    case (leftT, rightT) of
+      (Unknown, _) -> pure Unknown
+      (_, Unknown) -> pure Unknown
+      _ -> pure Bool
 
   BinaryExpression {left, binary, right} | LessOperator {} <- binary -> do
     leftT <- checkExpression left
@@ -384,7 +392,7 @@ checkExpression expression = case expression of
     rightT <- checkExpression right
 
     if leftT <: rightT then
-      pure leftT
+      pure rightT
     else
       report' (InvalidBinary binary leftT rightT)
 
