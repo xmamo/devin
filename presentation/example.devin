@@ -1,0 +1,22 @@
+var global = 0;
+
+def main() -> Unit {
+	var local = 0;
+
+	def factorial(n: Int) -> Int {
+		assert n >= 0;
+
+		local += 1;
+		global -= 1;
+		breakpoint;
+
+		if n == 0 {
+			return 1;
+		} else {
+			return n * factorial(n - 1);
+		}
+	}
+
+	var m = factorial(4);
+	breakpoint;
+}
