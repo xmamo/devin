@@ -5,7 +5,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Devin.Tree (
-  Tree,
   devinTree,
   definitionTree,
   statementTree,
