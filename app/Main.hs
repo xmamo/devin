@@ -16,7 +16,6 @@ import Control.Monad.IO.Class
 import Data.Foldable
 import Data.IORef
 import Data.String
-import System.Environment
 import System.Exit
 
 import Text.Parsec.Error
@@ -51,10 +50,8 @@ import Devin.Tree
 
 
 main :: IO ()
-main = do
-  setEnv "LC_ALL" "POSIX"
-
-  Gtk.applicationNew Nothing [G.ApplicationFlagsFlagsNone] >>= \case
+main =
+  Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
     Nothing -> exitFailure
 
     Just application -> do
