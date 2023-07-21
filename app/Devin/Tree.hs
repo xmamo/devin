@@ -14,7 +14,8 @@ module Devin.Tree (
   binaryOperatorTree,
   symbolIdTree,
   tokenTree,
-  stateForest
+  stateForest,
+  frameForest
 ) where
 
 import Control.Monad.IO.Class
@@ -270,35 +271,29 @@ stateForest :: MonadIO m => State -> m (Tree.Forest (Text, Text))
 stateForest = \case
   [] -> pure []
 
-  Frame {label, funs, vars} : frames -> do
-    frameForest <- case (funs, vars) of
-      ([], []) -> pure [Tree.Node ("—", "") []]
+  frames -> do
+    (tree, frames') <- go frames []
+    forest' <- stateForest frames'
+    pure (tree : forest')
 
-      (_, _) -> do
-        let funsForest = foldl f [] funs
-        varsForest <- foldlM g [] vars
-        pure (funsForest ++ varsForest)
+  where
+    go [] forest = pure (Tree.Node ("—", "") forest, [])
 
-    forest <- stateForest (h frames)
+    go (frame : frames) xs = do
+      forest' <- frameForest frame xs
 
-    case label of
-      Nothing ->
-        pure (Tree.Node ("Frame", "") frameForest : forest)
+      case label frame of
+        Nothing -> go frames forest'
+        Just label -> pure (Tree.Node (Text.pack label, "") forest', frames)
 
-      Just label ->
-        pure (Tree.Node (Text.pack ("Frame " ++ label), "") frameForest : forest)
 
-    where
-      f funsForest (name, _) =
-        Tree.Node (Text.pack name, "—") [] : funsForest
-
-      g varsForest (name, r) = do
-        v <- readRef r
-        s <- displayVal v
-        pure (Tree.Node (Text.pack name, Text.pack s) [] : varsForest)
-
-      h (Frame {label = Nothing, funs = [], vars = []} : frames) = h frames
-      h frames = frames
+frameForest :: MonadIO m => Frame -> Tree.Forest (Text, Text) -> m (Tree.Forest (Text, Text))
+frameForest Frame {vars} xs = foldlM f xs vars
+  where
+    f varsForest (name, r) = do
+      v <- readRef r
+      s <- displayVal v
+      pure (Tree.Node (Text.pack name, Text.pack s) [] : varsForest)
 
 
 displayVal :: MonadIO m => Value -> m String
