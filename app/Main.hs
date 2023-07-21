@@ -43,10 +43,11 @@ import qualified Data.GI.Gtk.BuildFn as Gtk
 import qualified Data.GI.Gtk.Threading as Gtk
 import qualified GI.GtkSource as GtkSource
 
+import Devin.Debug.Evaluator
+import Devin.Debug.Syntax
 import Devin.Highlight
 import Devin.Highlight.Braces
 import Devin.Highlight.Syntax
-import Devin.Tree
 
 
 main :: IO ()

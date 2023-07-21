@@ -65,10 +65,11 @@ executable devin
   main-is: Main.hs
 
   other-modules:
+    Devin.Debug.Evaluator,
+    Devin.Debug.Syntax,
     Devin.Highlight,
     Devin.Highlight.Braces,
-    Devin.Highlight.Syntax,
-    Devin.Tree
+    Devin.Highlight.Syntax
 
   build-depends:
     base,
