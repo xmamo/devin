@@ -30,7 +30,10 @@ stateForest = \case
   frames -> do
     (tree, frames') <- go frames []
     forest' <- stateForest frames'
-    pure (tree : forest')
+
+    case tree of
+      Tree.Node label [] -> pure (Tree.Node label [Tree.Node ("—", "") []] : forest')
+      _ -> pure (tree : forest')
 
   where
     go [] forest = pure (Tree.Node ("—", "") forest, [])
