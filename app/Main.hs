@@ -90,7 +90,6 @@ onActivate application = do
 
   codeTextView <- GtkSource.viewNewWithBuffer codeBuffer
   GtkSource.viewSetShowLineNumbers codeTextView True
-  GtkSource.viewSetHighlightCurrentLine codeTextView True
   GtkSource.viewSetAutoIndent codeTextView True
   GtkSource.viewSetTabWidth codeTextView 4
   Gtk.textViewSetMonospace codeTextView True
@@ -343,8 +342,8 @@ onActivate application = do
                   \    <property name=\"title\">Error</property>\n\
                   \    <property name=\"message-type\">error</property>\n\
                   \    <property name=\"buttons\">close</property>\n\
-                  \    <property name=\"text\">" ++ t' ++ "</property>\n\
                   \    <property name=\"use-markup\">true</property>\n\
+                  \    <property name=\"text\">" ++ t' ++ "</property>\n\
                   \  </object>\n\
                   \</interface>\0"
 
