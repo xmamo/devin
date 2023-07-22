@@ -35,9 +35,9 @@ library
 
   build-depends:
     base,
-    vector,
+    extra,
     parsec,
-    extra
+    vector
 
 test-suite devin-test
   import: common
@@ -52,9 +52,9 @@ test-suite devin-test
 
   build-depends:
     base,
-    parsec,
     devin,
-    hspec
+    hspec,
+    parsec
 
   build-tool-depends:
     hspec-discover:hspec-discover
@@ -73,17 +73,17 @@ executable devin
 
   build-depends:
     base,
-    vector,
-    parsec,
-    extra,
-    devin,
-    text,
     containers,
-    haskell-gi-overloading == 0.0,
-    gi-gobject,
+    devin,
+    extra,
     gi-gio,
+    gi-gobject,
     gi-gtk-hs,
-    gi-gtksource
+    gi-gtksource,
+    haskell-gi-overloading == 0.0,
+    parsec,
+    text,
+    vector
 
   ghc-options:
     -threaded
