@@ -11,6 +11,7 @@ common common
 
   ghc-options:
     -Wall
+    -Wextra
     -Wno-name-shadowing
     -Wno-type-defaults
     -Wno-unused-do-bind
