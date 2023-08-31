@@ -362,7 +362,7 @@
     list456 = [4, 5, 6]
   \end{lstlisting}
 
-  The \emph{cons} operator \lstinline@(:)@ can be used to efficiently prepend an
+  The \emph{cons operator} \lstinline@(:)@ can be used to efficiently prepend an
   element to a list. Two lists can be concatenated with the \lstinline@(++)@
   operator.
 
@@ -607,7 +607,7 @@
   \section{Higher-order functions}
 
   Arguably one of the most important features of any functional programming
-  language is the support for higher-order functions, that is, functions which
+  language is the support for higher-order functions; that is, functions which
   take other functions as arguments or yield a function as result. Since Haskell
   functions are first-class, implementing and using higher-order functions is
   very succinct syntactically.
@@ -733,8 +733,8 @@
   binding precedence, allowing it to be used to omit parentheses. For example,
   the expression \lstinline@f $ g $ h x@ would evaluate to
   \lstinline@f (g (h x))@. Haskell programmers frequently employ this operator;
-  to avoid writing needlessly cryptic code, I'll avoid using it unless
-  strictly necessary.
+  to avoid writing needlessly cryptic code, I won't be using it unless strictly
+  necessary.
 
   Haskell's standard library exposes many other higher-order functions and
   operators; these are all documented at
@@ -1301,7 +1301,7 @@
   With the power of monads, Haskell allows for imperative looking code to be
   expressed. Emphasis on \emph{looking}: there's no actual imperative control
   flow; rather, referentially transparent representations of computations are
-  bound together with \lstinline@(>>=)@.
+  chained together with \lstinline@(>>=)@.
 
   While imperative-style is always an option, it should be preferred to program
   in other ways, as Haskell doesn't have any syntax for constructs such as
@@ -1413,9 +1413,9 @@
   \end{lstlisting}
 
   The import declaration \lstinline@import qualified Data.List@ imports the
-  entities exported by the \lstinline@Data.List@ module. As explained in
-  \autoref{section:strings}, the function \lstinline@words@  splits a string on
-  white space; its dual, \lstinline@unwords@, joins a list of strings with
+  entities exported by the \lstinline@Data.List@ module. Further, as explained
+  in \autoref{section:strings}, the function \lstinline@words@  splits a string
+  on white space; its dual, \lstinline@unwords@, joins a list of strings with
   separating spaces.
 
   Imported modules may be assigned an alias using the \lstinline@as@ clause:
@@ -1579,7 +1579,7 @@
         g x y = not (f x y)
   \end{lstlisting}
 
-  Finally, many instances can be generated in terms of others:
+  Finally, instances may be generated in terms of others:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     maybeEqInstanceGivenEq :: Eq a -> Eq (Maybe a)
@@ -1676,7 +1676,7 @@
   Consider the expression \lstinline@2+3*(4+5)@ in the language of arithmetic
   expressions as defined in the previous section. A concrete syntax tree
   typically indicates which grammatical rules were used while parsing to match a
-  given substring (see \autoref{figure:cst}).
+  given substring, as shown in \autoref{figure:cst}.
 
   \begin{figure}[h]
     \centering
@@ -2310,8 +2310,8 @@
 
   \begin{itemize}
     \item Each block pushes a new frame onto the stack: this allows treating
-    nested scopes with the same mechanism as function calls. The debugger skips
-    visualization of empty frames, as they occur somewhat frequently.
+    nested scopes with the same mechanism as function calls. The debugger hides
+    this detail by displaying what appears to be a single frame for each call.
 
     \item Program execution always starts with a non-empty stack containing a
     single frame. This frame associates the name \lstinline@true@ to the truth
@@ -2352,10 +2352,10 @@
   sum a floating-point number to an integer. While this restriction might seem
   unconventional at first, there is a very specific reason for it.
 
-  In Devin, both integers and floating-point numbers occupy 64 bits. Summing two
-  numbers of the same type $T$ yields yet another number of type $T$: nothing
-  surprising here. But what should be the result of summing an integer to a
-  floating-point number, or vice versa? Many languages take the approach of
+  In Devin, both integers and floating-point numbers occupy 64 bits. Summing up
+  two numbers of the same type $T$ yields yet another number of type $T$:
+  nothing surprising here. But what should be the result of summing an integer
+  to a floating-point number, or vice versa? Many languages take the approach of
   silently converting the integer operand to a floating-point value, and then
   performing the actual summation. Double-precision floating-point format
   numbers as specified in IEEE 754 can't safely represent integers less than
@@ -2386,7 +2386,7 @@
 
   \chapter{Implementing Devin}
 
-  Devin's implementation spans approximately 4500 lines of code and is entirely
+  Devin's implementation spans approximately 3500 lines of code and is entirely
   written in Haskell. Given the size of its implementation, some details are
   omitted for brevity. In particular, import declarations and
   \lstinline@LANGUAGE@ pragmas are left out for simplicity. Note that some of
@@ -3454,7 +3454,7 @@
   \end{lstlisting}
 
   The function \lstinline@checkDefinition2 :: Definition -> Typer ()@ type
-  checks variable and function definitions, adding a new binding to the
+  checks variable and function definitions, adding new bindings to the
   environment.
 
   For variable definitions, implementation is trivial:
@@ -3736,8 +3736,8 @@
 
   Contrary to the environment used in static type checking, there's not a
   one-to-one correspondence between the evaluator's runtime stack and lexical
-  scoping. As such, each frame has to keep track which of its lexical parent;
-  this is done with the \lstinline@poffset@ field, which stands for \emph{parent
+  scoping. As such, each frame has to keep track of its lexical parent; this is
+  done with the \lstinline@poffset@ field, which stands for \emph{parent
   offset}. This value is used in \lstinline@lookupFun@ and
   \lstinline@lookupVar@, as it indicates how many frames need to be skipped
   during search:
@@ -4039,7 +4039,7 @@
   \end{lstlisting}
 
   The binary operators \lstinline@+@ and \lstinline@*@ are overloaded and are
-  meant to work with both arrays and numbers. For simplicity, only the
+  meant to work with both arrays and numbers. For brevity, only the
   implementation of \lstinline@+@ is explained.
 
   First, both the left and right operands of \lstinline@+@ are evaluated. If
@@ -4638,7 +4638,7 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     text :: Stream s m Char => String -> ParserT s m String
-    text literal = try (string literal) <?> ("\u201c" ++ literal ++ "\u201d")
+    text literal = try (string literal) <?> ("“" ++ literal ++ "”")
 
     s :: Stream s m Char => ParserT s m ()
     s = skipMany (skipMany1 (space <?> "") <|> void (comment <?> ""))
@@ -5058,7 +5058,7 @@
   package is mostly a thin wrapper on top GTK+; as a consequence, windows and
   widgets are to be constructed imperatively rather than declaratively.
 
-  Devin's UI implementation is complex, requiring more than 1100 lines of code.
+  Devin's UI implementation is complex, requiring more than 900 lines of code.
   Many considerations were made while developing the UI; to be short, I'll
   highlight two of them:
 
@@ -5072,12 +5072,12 @@
 
     GtkSourceView's syntax highlighting functionality is quite handy: all that
     would be required to do is to write a text file describing Devin's grammar
-    and let the library do it's magic. However, should such functionality be
-    used? Two grammars would have to be carefully kept in sync: the one
-    implicitly defining Devin's parser, and the one providing syntax
-    highlighting. One could say that allowing for minor potential discrepancies
-    between the two which few would notice is good enough. Or, one could be
-    pedantic and accept only one source of truth. I chose the second option.
+    and let the library do its magic. However, should such functionality be
+    used? Two grammars would have to be carefully kept in sync: one for Devin's
+    parser, and one to perform syntax highlighting. One could argue that
+    allowing for minor potential discrepancies between the two is good enough:
+    few would notice. Or, one could be pedantic and accept only one source of
+    truth. I chose the second option.
 
     This consideration gives rise to the first problem: using only part of
     GtkSourceView's features, while performing syntax highlighting based on the
@@ -5105,7 +5105,7 @@
 
   Let's consider developing a simple graphical counting application. It should
   display a number $n$ and provide two buttons: one to increment $n$, and one to
-  decrement $n$. Of course, the initial value of $n$ should be $0$.
+  decrement $n$; the initial value of $n$ should be $0$.
 
   \begin{figure}[h]
     \centering
