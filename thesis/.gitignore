@@ -1,5 +1,9 @@
 /PhdThesis/
 /theorems/
+
+/PhdThesis.tbz
+/theorems.tbz
+/pdfa.xmpi
 /*.aux
 /*.bbl
 /*.bcf
@@ -24,4 +28,3 @@
 /*.toc
 /*.xdv
 /*~
-/pdfa.xmpi
