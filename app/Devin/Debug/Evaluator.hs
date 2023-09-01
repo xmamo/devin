@@ -38,8 +38,8 @@ stateForest = \case
   where
     go [] forest = pure (Tree.Node ("—", "") forest, [])
 
-    go (frame : frames) xs = do
-      forest' <- frameForest frame xs
+    go (frame : frames) forest = do
+      forest' <- frameForest frame forest
 
       case label frame of
         Nothing -> go frames forest'

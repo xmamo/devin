@@ -159,6 +159,7 @@ expressionTree = \case
       go es cs,
       [tokenTree "]" close]
     ]
+
     where
       go es [] = map expressionTree es
       go [] cs = map (tokenTree ",") cs
@@ -178,6 +179,7 @@ expressionTree = \case
       go as cs,
       [tokenTree ")" close]
     ]
+
     where
       go as [] = map expressionTree as
       go [] cs = map (tokenTree ",") cs

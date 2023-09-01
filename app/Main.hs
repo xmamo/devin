@@ -146,123 +146,116 @@ onActivate application = do
   applyTags tags tagTable
 
   syntaxTreeRef <- newIORef Nothing
-  parserThreadIdRef <- newIORef =<< forkIO (pure ())
-  typerThreadIdRef <- newIORef =<< forkIO (pure ())
-  evaluatorThreadIdVar <- newIORef =<< forkIO (pure ())
-  playButtonClickCallbackVar <- newIORef (pure ())
+  workerThreadIdRef <- newIORef =<< forkIO (pure ())
+  evaluatorThreadIdRef <- newIORef =<< forkIO (pure ())
+  playButtonClickCallbackRef <- newIORef (pure ())
 
   -- Set up codeBuffer callback for "changed" signals.
   -- The callback takes care of syntax highlighting.
 
   Gtk.onTextBufferChanged codeBuffer $ do
-    -- The newly inserted code might be syntactically invalid. Preemptively
-    -- discard the old syntax tree (if any) and disable the playButton.
+    killThread =<< readIORef workerThreadIdRef
+
     atomicWriteIORef syntaxTreeRef Nothing
     Gtk.widgetSetSensitive playButton False
 
-    (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-    text <- Gtk.textBufferGetText codeBuffer startIter endIter True
+    atomicWriteIORef workerThreadIdRef =<< forkIO (do
+      (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+      text <- Gtk.textBufferGetText codeBuffer startIter endIter True
 
-    parserThreadId <- readIORef parserThreadIdRef
-    killThread parserThreadId
+      -- Run the parser
+      let parser = liftA2 (,) Parsers.devin getState
+      parserResult <- runParserT parser [] "" (0, text)
 
-    typerThreadId <- readIORef typerThreadIdRef
-    killThread typerThreadId
+      case parserResult of
+        -- Parser failure:
+        Left parseError -> do
+          let offset = toOffset (errorPos parseError) text
+          let messages = errorMessages parseError
 
-    let parser = liftA2 (,) Parsers.devin getState
+          Gtk.postGUIASync $ do
+            -- Remove previous error highlighting, if any
+            (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+            Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
-    parserThread <- forkIO $ runParserT parser [] "" (0, text) >>= \case
-      -- Parser failure:
-      Left parseError -> do
-        let offset = toOffset (errorPos parseError) text
-        let messages = errorMessages parseError
+            -- Highlight as error, starting from the parseError offset
+            startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
+            Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
-        Gtk.postGUIASync $ do
-          -- Remove previous error highlighting, if any
-          (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-          Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
+            -- Update the error log; clear the syntax tree preview
+            (line, column) <- getLineColumn startIter
+            let datum = (showLineColumn (line, column), showMessages messages)
+            Gtk.seqStoreClear logStore
+            Gtk.seqStoreAppend logStore datum
+            Gtk.forestStoreClear syntaxTreeStore
 
-          -- Highlight as error, starting from the parseError offset
-          startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
-          Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
+        -- Parser success:
+        Right (devin, comments) -> do
+          let Devin {definitions} = devin
+          atomicWriteIORef syntaxTreeRef (Just devin)
 
-          -- Update the error log; clear the syntax tree preview
-          (line, column) <- getLineColumn startIter
-          let datum = (showLineColumn (line, column), showMessages messages)
-          Gtk.seqStoreClear logStore
-          Gtk.seqStoreAppend logStore datum
-          Gtk.forestStoreClear syntaxTreeStore
+          Gtk.postGUIASync $ do
+            -- Remove any previous highlighting
+            (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+            Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
+            Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
+            Gtk.textBufferRemoveTag codeBuffer (keywordTag tags) startIter endIter
+            Gtk.textBufferRemoveTag codeBuffer (varIdTag tags) startIter endIter
+            Gtk.textBufferRemoveTag codeBuffer (funIdTag tags) startIter endIter
+            Gtk.textBufferRemoveTag codeBuffer (typeTag tags) startIter endIter
+            Gtk.textBufferRemoveTag codeBuffer (numberTag tags) startIter endIter
+            Gtk.textBufferRemoveTag codeBuffer (operatorTag tags) startIter endIter
+            Gtk.textBufferRemoveTag codeBuffer (commentTag tags) startIter endIter
+            Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
-      -- Parser success:
-      Right (devin, comments) -> do
-        let Devin {definitions} = devin
-        atomicWriteIORef syntaxTreeRef (Just devin)
+            -- Highlight syntax
+            highlightDevin tags codeBuffer devin
+            for_ comments (highlightInterval (commentTag tags) codeBuffer)
 
-        Gtk.postGUIASync $ do
-          -- Remove any previous highlighting
-          (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-          Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (keywordTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (varIdTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (funIdTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (typeTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (numberTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (operatorTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (commentTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
+            -- Highlight matching braces
+            insertMark <- Gtk.textBufferGetInsert codeBuffer
+            insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
+            highlightDevinBraces tags codeBuffer insertIter devin
 
-          -- Highlight syntax
-          highlightDevin tags codeBuffer devin
-          for_ comments (highlightInterval (commentTag tags) codeBuffer)
+            -- Update the syntax tree preview
+            let syntaxTree = map definitionTree definitions
+            rootPath <- Gtk.treePathNew
+            Gtk.forestStoreClear syntaxTreeStore
+            Gtk.forestStoreInsertForest syntaxTreeStore rootPath -1 syntaxTree
+            Gtk.treeViewExpandAll syntaxTreeView
 
-          -- Highlight matching braces
-          insertMark <- Gtk.textBufferGetInsert codeBuffer
-          insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
-          highlightDevinBraces tags codeBuffer insertIter devin
+          -- Run the typer
+          let typer = checkDevin devin
+          let typerResult = runTyper typer predefinedEnv
 
-          -- Update the syntax tree preview
-          let syntaxTree = map definitionTree definitions
-          rootPath <- Gtk.treePathNew
-          Gtk.forestStoreClear syntaxTreeStore
-          Gtk.forestStoreInsertForest syntaxTreeStore rootPath 0 syntaxTree
-          Gtk.treeViewExpandAll syntaxTreeView
+          case typerResult of
+            -- Typer success:
+            ((), env, []) -> do
+              let (hasMain, _, _) = runTyper checkHasMain env
 
-        typerThreadId <- readIORef typerThreadIdRef
-        killThread typerThreadId
+              Gtk.postGUIASync $ do
+                Gtk.widgetSetSensitive playButton hasMain
+                Gtk.seqStoreClear logStore
 
-        typerThreadId <- forkIO $ case runTyper (checkDevin devin) predefinedEnv of
-          -- Typer success:
-          ((), env, []) -> do
-            let (hasMain, _, _) = runTyper checkHasMain env
+              where
+                checkHasMain = lookupFunSignature "main" >>= \case
+                  Just (([], _), _) -> pure True
+                  _ -> pure False
 
-            Gtk.postGUIASync $ do
-              Gtk.widgetSetSensitive playButton hasMain
+            -- Typer failure:
+            ((), _, errors) -> Gtk.postGUIASync $ do
               Gtk.seqStoreClear logStore
 
-            where
-              checkHasMain = lookupFunSignature "main" >>= \case
-                Just (([], _), _) -> pure True
-                _ -> pure False
+              for_ errors $ \error -> do
+                -- Highlight the part of code which caused the failure
+                startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
+                endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
+                Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
-          -- Typer failure:
-          ((), _, errors) -> Gtk.postGUIASync $ do
-            Gtk.seqStoreClear logStore
-
-            for_ errors $ \error -> do
-              -- Highlight the part of code which caused the failure
-              startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
-              endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
-              Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
-
-              -- Append the error description to the log
-              (line, column) <- getLineColumn startIter
-              let datum = (showLineColumn (line, column), Text.pack (display error))
-              Gtk.seqStoreAppend logStore datum
-
-        atomicWriteIORef typerThreadIdRef typerThreadId
-
-    atomicWriteIORef parserThreadIdRef parserThread
+                -- Append the error description to the log
+                (line, column) <- getLineColumn startIter
+                let datum = (showLineColumn (line, column), Text.pack (display error))
+                Gtk.seqStoreAppend logStore datum)
 
   -- Set up codeBuffer callback for "notify::cursor-position" signals.
   -- The callback takes care of highlighting matching braces.
@@ -291,31 +284,32 @@ onActivate application = do
         Gtk.widgetShowAll scrolledWindow2
 
         state <- makePredefinedState
-        evaluatorThreadId <- forkIO (go (evalDevin devin) state)
-        atomicWriteIORef evaluatorThreadIdVar evaluatorThreadId
+        evaluatorThreadId <- forkIO (runEvaluator (evalDevin devin) state)
+        atomicWriteIORef evaluatorThreadIdRef evaluatorThreadId
 
-      go evaluator state = do
+      runEvaluator evaluator state = do
         (result, state') <- runEvaluatorStep evaluator state
 
         Gtk.postGUIASync $ do
           forest <- stateForest state'
           rootPath <- Gtk.treePathNew
           Gtk.forestStoreClear stateStore
-          Gtk.forestStoreInsertForest stateStore rootPath 0 forest
+          Gtk.forestStoreInsertForest stateStore rootPath -1 forest
           Gtk.treeViewExpandAll stateView
 
         case result of
           Done _ -> Gtk.postGUIASync cleanup
 
           Breakpoint statement evaluator' -> do
-            atomicWriteIORef playButtonClickCallbackVar $ do
-              Gtk.postGUIASync (Gtk.widgetSetSensitive playButton False)
+            atomicWriteIORef playButtonClickCallbackRef $ do
+              Gtk.postGUIASync $ do
+                Gtk.widgetSetSensitive playButton False
 
-              (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-              Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
+                (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+                Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
-              evaluatorThreadId <- forkIO (go evaluator' state')
-              atomicWriteIORef evaluatorThreadIdVar evaluatorThreadId
+              evaluatorThreadId <- forkIO (runEvaluator evaluator' state')
+              atomicWriteIORef evaluatorThreadIdRef evaluatorThreadId
 
             Gtk.postGUIASync $ do
               Gtk.widgetSetSensitive playButton True
@@ -367,19 +361,19 @@ onActivate application = do
         Gtk.containerAdd scrolledWindow2 syntaxTreeView
         Gtk.widgetShowAll scrolledWindow2
 
-        writeIORef playButtonClickCallbackVar initialPlayButtonCallback
+        atomicWriteIORef playButtonClickCallbackRef initialPlayButtonCallback
 
   -- Set up playButton and stopButton callbacks for "clicked" signals:
 
-  atomicWriteIORef playButtonClickCallbackVar initialPlayButtonCallback
+  atomicWriteIORef playButtonClickCallbackRef initialPlayButtonCallback
 
   Gtk.onButtonClicked stopButton $ do
-    evaluatorThreadId <- readIORef evaluatorThreadIdVar
+    evaluatorThreadId <- readIORef evaluatorThreadIdRef
     killThread evaluatorThreadId
     cleanup
 
   Gtk.onButtonClicked playButton $ do
-    playButtonClickCallback <- readIORef playButtonClickCallbackVar
+    playButtonClickCallback <- readIORef playButtonClickCallbackRef
     playButtonClickCallback
 
   -- Display the UI:
@@ -419,17 +413,15 @@ getColumn :: (Num a, MonadIO m) => Gtk.TextIter -> m a
 getColumn iter = do
   iter' <- Gtk.textIterCopy iter
   Gtk.textIterSetLineOffset iter' 0
-  go iter' 1
 
-  where
-    go iter' column = do
-      result <- Gtk.textIterCompare iter' iter
+  flip loopM 1 $ \column -> do
+    result <- Gtk.textIterCompare iter' iter
 
-      if result >= 0 then
-        pure column
-      else do
-        Gtk.textIterForwardCursorPosition iter'
-        go iter' (column + 1)
+    if result >= 0 then
+      pure (Right column)
+    else do
+      Gtk.textIterForwardCursorPosition iter'
+      pure (Left (column + 1))
 
 
 showLineColumn :: (Num a, Show a, IsString b) => (a, a) -> b
@@ -448,9 +440,11 @@ showMessages messages =
       s3 = "Expecting"
       s4 = "Unexpected"
       s5 = "end of input"
+
    in case showErrorMessages s1 s2 s3 s4 s5 (filter f messages) of
         ('\n' : string) -> fromString string
         string -> fromString string
+
   where
     f (Expect _) = True
     f (Message _) = True
