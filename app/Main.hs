@@ -328,7 +328,7 @@ onActivate application = do
 
             (line, column) <- getLineColumn startIter
             let t = showsLineColumn (line, column) (' ' : display error)
-            let t' = "&lt;tt&gt;" ++ escapeXml t ++ "&lt;/tt&gt;"
+            let t' = "&lt;tt&gt;" ++ escapeXml (escapeXml t) ++ "&lt;/tt&gt;"
 
             let string =
                   "<interface>\n\
