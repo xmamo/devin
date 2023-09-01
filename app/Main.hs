@@ -298,7 +298,7 @@ onActivate application = do
           Gtk.treeViewExpandAll stateView
 
         case result of
-          Done _ -> Gtk.postGUIASync cleanup
+          Done _ -> Gtk.postGUIASync debugger_cleanup
 
           Breakpoint statement evaluator' -> do
             atomicWriteIORef playButtonClickCallbackRef $ do
@@ -348,9 +348,9 @@ onActivate application = do
             Gtk.dialogRun dialog
             Gtk.widgetDestroy dialog
             Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
-            cleanup
+            debugger_cleanup
 
-      cleanup = do
+      debugger_cleanup = do
         (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
         Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
@@ -370,7 +370,7 @@ onActivate application = do
   Gtk.onButtonClicked stopButton $ do
     evaluatorThreadId <- readIORef evaluatorThreadIdRef
     killThread evaluatorThreadId
-    cleanup
+    debugger_cleanup
 
   Gtk.onButtonClicked playButton $ do
     playButtonClickCallback <- readIORef playButtonClickCallbackRef
