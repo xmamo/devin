@@ -41,8 +41,8 @@ toOffset sourcePos stream = runIdentity (toOffsetT sourcePos stream)
 toOffsetT :: (Num a, Stream s m Char) => SourcePos -> s -> m a
 toOffsetT sourcePos stream = go 0 (initialPos "") stream
   where
-    go offset sourcePos' _ | sourcePos' >= sourcePos = pure offset
+    go result sourcePos' _ | sourcePos' >= sourcePos = pure result
 
-    go offset sourcePos' stream = uncons stream >>= \case
-      Just (c, rest) -> go (offset + 1) (updatePosChar sourcePos' c) rest
-      Nothing -> pure offset
+    go result sourcePos' stream = uncons stream >>= \case
+      Just (c, rest) -> go (result + 1) (updatePosChar sourcePos' c) rest
+      Nothing -> pure result

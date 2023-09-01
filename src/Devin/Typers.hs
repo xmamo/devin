@@ -14,6 +14,8 @@ import Control.Monad
 import Data.Foldable
 import Data.Traversable
 
+import Control.Monad.Extra
+
 import Devin.Error
 import Devin.Syntax
 import Devin.Type
@@ -134,13 +136,13 @@ checkStatement expectedT statement = case statement of
     foldlM f False statements
 
     where
-      f doesReturn statement = (doesReturn ||) <$> check statement
-
-      check DefinitionStatement {definition} = do
+      f doesReturn DefinitionStatement {definition} = do
         checkDefinition2 definition
-        pure False
+        pure doesReturn
 
-      check statement = checkStatement expectedT statement
+      f doesReturn statement = do
+        doesReturn' <- checkStatement expectedT statement
+        pure (doesReturn || doesReturn')
 
 
 checkExpression :: Expression -> Typer Type
@@ -157,21 +159,20 @@ checkExpression expression = case expression of
 
   ArrayExpression {elems = elem : elems} -> do
     t <- checkExpression elem
-    go elems t
 
-    where
-      go [] t = pure (Array t)
+    flip loopM elems $ \case
+      [] -> pure (Right (Array t))
 
-      go (elem : elems) t = checkExpression elem >>= \case
+      elem : elems -> checkExpression elem >>= \case
         Unknown -> do
           for_ elems checkExpression
-          pure (Array Unknown)
+          pure (Right (Array Unknown))
 
-        t' | t' <: t -> go elems t
+        t' | t' <: t -> pure (Left elems)
 
         t' -> do
           report (InvalidType elem t t')
-          go elems t
+          pure (Left elems)
 
   AccessExpression {array, index} -> do
     arrayT <- checkExpression array

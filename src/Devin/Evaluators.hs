@@ -18,7 +18,8 @@ import Numeric
 import Data.Vector ((!), (!?))
 import qualified Data.Vector as Vector
 
-import Data.Foldable.Extra
+import Control.Monad.Extra hiding (allM)
+import Data.Foldable.Extra (allM)
 
 import Devin.Error
 import Devin.Evaluator
@@ -154,14 +155,12 @@ evalStatement statement = case statement of
       DefinitionStatement {definition} -> evalDefinition1 definition
       _ -> pure ()
 
-    firstJustM eval statements
-
-    where
-      eval DefinitionStatement {definition} = do
+    flip firstJustM statements $ \case
+      DefinitionStatement {definition} -> do
         evalDefinition2 definition
         pure Nothing
 
-      eval statement = evalStatement statement
+      statement -> evalStatement statement
 
 
 evalExpression :: Expression -> Evaluator Reference
@@ -177,16 +176,15 @@ evalExpression expression = case expression of
     Nothing -> raise (UnknownVar varName interval)
 
   ArrayExpression {elems} -> do
-    rs <- Vector.unfoldrM f elems
-    newRef (Array rs)
+    rs <- flip Vector.unfoldrM elems $ \case
+      [] -> pure Nothing
 
-    where
-      f [] = pure Nothing
-
-      f (elem : elems) = do
+      (elem : elems) -> do
         r <- evalExpression elem
         r' <- cloneRef r
         pure (Just (r', elems))
+
+    newRef (Array rs)
 
   AccessExpression {array, index} -> do
     arrayR <- evalExpression array
@@ -214,6 +212,7 @@ evalExpression expression = case expression of
     lookupFun name >>= \case
       Just (UserDefined FunDefinition {params, body}, depth) ->
         withNewFrame (Just name) (depth + 1) (go 0 params argRs)
+
         where
           -- Pass argument by value:
           go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do

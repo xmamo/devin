@@ -2599,7 +2599,7 @@
       } -> Statement
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
       AssertStatement :: {
@@ -2963,7 +2963,7 @@
     checkExpression RationalExpression{} = pure Float
   \end{lstlisting}
 
-  \pagebreak
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     checkExpression VarExpression{varName, interval} =
@@ -3025,6 +3025,11 @@
         (Unknown, Unknown) -> pure Unknown
         (Unknown, Int) -> pure Unknown
         (Unknown, _) -> report' (InvalidType index Int indexT)
+    \end{lstlisting}
+
+    \newpage
+
+    \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         (Array t, Unknown) -> pure t
         (Array t, Int) -> pure t
         (Array _, _) -> report' (InvalidType index Int indexT)
@@ -3391,13 +3396,13 @@
       foldlM f False statements
 
       where
-        f doesReturn statement = (doesReturn ||) <$> check statement
-
-        check DefinitionStatement{definition} = do
+        f doesReturn DefinitionStatement{definition} = do
           checkDefinition2 definition
-          pure False
+          pure doesReturn
 
-        check statement = checkStatement expectedT statement
+        f doesReturn statement = do
+          doesReturn' <- checkStatement expectedT statement
+          pure (doesReturn || doesReturn')
   \end{lstlisting}
 
   \newpage
@@ -3618,9 +3623,8 @@
       (Int x, Int y) -> pure (x == y)
       (Float x, Float y) -> pure (x == y)
 
-      (Array rs1, Array rs2) -> do
-        let length = Vector.length rs1
-        if Vector.length rs2 /= length then pure False else go n 0
+      (Array rs1, Array rs2) | n <- Vector.length rs1, Vector.length rs2 == n ->
+        go n 0
 
         where
           go n i | i >= n = pure True
@@ -3877,16 +3881,15 @@
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     evalExpression ArrayExpression{elems} = do
-      rs <- Vector.unfoldrM f elems
-      newRef (Array rs)
+      rs <- flip Vector.unfoldrM elems $ \case
+        [] -> pure Nothing
 
-      where
-        f [] = pure Nothing
-
-        f (elem : elems) = do
+        (elem : elems) -> do
           r <- evalExpression elem
           r' <- cloneRef r
           pure (Just (r', elems))
+
+      newRef (Array rs)
   \end{lstlisting}
 
   Access to array elements is evaluated by considering the array to access and
@@ -4244,6 +4247,7 @@
       lookupFun name >>= \case
         Just (UserDefined FunDefinition{params, body}, depth) ->
           withNewFrame (Just name) (depth + 1) (go 0 params argRs)
+
           where
             -- Pass argument by value:
             go n ((Nothing, SymbolId{name}, _) : params) (argR : argRs) = do
@@ -4431,14 +4435,12 @@
         DefinitionStatement{definition} -> evalDefinition1 definition
         _ -> pure ()
 
-      firstJustM eval statements
-
-      where
-        eval DefinitionStatement{definition} = do
+      flip firstJustM statements $ \case
+        DefinitionStatement{definition} -> do
           evalDefinition2 definition
           pure Nothing
 
-        eval statement = evalStatement statement
+        statement -> evalStatement statement
   \end{lstlisting}
 
   \subsection{Evaluating variable and function definitions}
@@ -4450,8 +4452,6 @@
   This leads to some code duplication, as bindings are handled in a similar way
   in both the type checker and evaluator; however, implementation is so trivial
   that there's little benefit in refactoring.
-
-  \newpage
 
   As with type checking, evaluation is performed in two passes. In the first
   pass, function definitions are bound to the current frame; in the second,
@@ -4508,12 +4508,14 @@
       pure offset
   \end{lstlisting}
 
-  \newpage
-
   The module \lstinline@Devin.Parsers@ implements the functions required to
-  parse Devin code. A Devin parser is a \lstinline@Parsec (Int, s) [Token] a@,
-  where: \lstinline@Int@ is the offset, \lstinline@s@ is the underlying
-  \lstinline@Steam@ (either \lstinline@String@ or \lstinline@Text@),
+  parse Devin source code. A Devin parser is a
+  \lstinline@Parsec (Int, s) [Token] a@, where: \lstinline@Int@ is the offset,
+  \lstinline@s@ is the \linebreak
+
+  \pagebreak
+
+  underlying \lstinline@Steam@ (either \lstinline@String@ or \lstinline@Text@),
   \lstinline@[Token]@ is the list of comments accumulated in the state,
   \lstinline@a@ is the result of the parser.
 
@@ -4569,6 +4571,8 @@
   \lstinline@try@ makes a parser atomic, in the sense that it either succeeds or
   fails without consuming any input. \lstinline@flip label "number"@ gives a
   description to be used for error reporting.
+
+  \pagebreak
 
   The helper function \lstinline@syntax@ is implemented as follows:
 
@@ -4699,7 +4703,7 @@
         isStart _ = False
   \end{lstlisting}
 
-  \newpage
+  \pagebreak
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
         isContinue NonSpacingMark = True

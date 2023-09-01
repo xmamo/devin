@@ -168,9 +168,8 @@ compareVals v1 v2 = case (v1, v2) of
   (Int x, Int y) -> pure (x == y)
   (Float x, Float y) -> pure (x == y)
 
-  (Array rs1, Array rs2) -> do
-    let n = Vector.length rs1
-    if Vector.length rs2 /= n then pure False else go n 0
+  (Array rs1, Array rs2) | n <- Vector.length rs1, Vector.length rs2 == n ->
+    go n 0
 
     where
       go n i | i >= n = pure True

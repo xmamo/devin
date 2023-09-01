@@ -23,6 +23,8 @@ import Control.Monad
 import Data.Char
 import Data.Functor
 
+import Control.Monad.Extra
+
 import Devin.Parsec hiding (token)
 import Devin.Syntax hiding (definition)
 
@@ -264,7 +266,13 @@ expression6 = do
       parenthesizedExpression
     ]
 
-  left <- go term
+  left <- flip loopM term $ \term -> optionMaybe (try (s *> token "[")) >>= \case
+    Nothing -> pure (Right term)
+
+    Just open -> do
+      index <- s *> expression
+      close <- s *> token "]"
+      pure (Left (AccessExpression term open index close))
 
   optionMaybe (try (s *> assignOperator)) >>= \case
     Nothing -> pure left
@@ -274,14 +282,6 @@ expression6 = do
       pure (BinaryExpression left binary right)
 
   where
-    go term = optionMaybe (try (s *> token "[")) >>= \case
-      Nothing -> pure term
-
-      Just open -> do
-        index <- s *> expression
-        close <- s *> token "]"
-        go (AccessExpression term open index close)
-
     assignOperator = syntax $ choice
       [
         (try (char '=' <* notFollowedBy (char '=')) <?> "“=”") $> PlainAssignOperator,

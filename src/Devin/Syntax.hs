@@ -435,6 +435,7 @@ instance Display Expression where
       showChar '[' .
       displays elem .
       go elems
+
       where
         go [] = showChar ']'
         go (elem : elems) = showString ", " . displays elem . go elems
@@ -448,6 +449,7 @@ instance Display Expression where
       showChar '(' .
       displays arg .
       go args
+
       where
         go [] = showChar ')'
         go (arg : args) = showString ", " . displays arg . go args
