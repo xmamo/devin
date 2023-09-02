@@ -73,15 +73,17 @@ onActivate application = do
 
   -- Build the UI:
 
-  stopButton <- Gtk.buttonNewFromIconName (Just stopIconName) 2
+  stopButton <- Gtk.buttonNewFromIconName (Just stopIconName) 1
   Gtk.widgetSetSensitive stopButton False
 
-  playButton <- Gtk.buttonNewFromIconName (Just playIconName) 2
+  playButton <- Gtk.buttonNewFromIconName (Just playIconName) 1
   Gtk.widgetSetSensitive playButton False
 
-  actionBar <- Gtk.actionBarNew
-  Gtk.actionBarPackStart actionBar stopButton
-  Gtk.actionBarPackStart actionBar playButton
+  headerBar <- Gtk.headerBarNew
+  Gtk.headerBarSetTitle headerBar (Just "Devin")
+  Gtk.headerBarSetShowCloseButton headerBar True
+  Gtk.containerAdd headerBar stopButton
+  Gtk.containerAdd headerBar playButton
 
   codeBuffer <- GtkSource.bufferNew noTextTagTable
   GtkSource.bufferSetHighlightSyntax codeBuffer False
@@ -127,14 +129,10 @@ onActivate application = do
   Gtk.panedPack1 paned2 paned1 True False
   Gtk.panedPack2 paned2 scrolledWindow3 False False
 
-  box <- Gtk.boxNew Gtk.OrientationVertical 0
-  Gtk.boxPackStart box actionBar False False 0
-  Gtk.boxPackStart box paned2 True True 0
-
   window <- Gtk.applicationWindowNew application
-  Gtk.windowSetTitle window ""
   Gtk.windowSetDefaultSize window 1280 720
-  Gtk.containerAdd window box
+  Gtk.windowSetTitlebar window (Just headerBar)
+  Gtk.containerAdd window paned2
 
   -- Set up some stuff needed for later:
 
@@ -381,16 +379,17 @@ onActivate application = do
 
 
 setUpTwoColumns ::
-  (Gtk.IsTreeModel (model (Text, Text)), Gtk.IsTypedTreeModel model, Gtk.IsTreeView a, MonadIO m) =>
+  (Gtk.IsTypedTreeModel model, Gtk.IsTreeModel (model (Text, Text)), Gtk.IsTreeView a, MonadIO m) =>
   model (Text, Text) -> a -> m ()
 setUpTwoColumns model treeView = for_ [fst, snd] $ \f -> do
   cellRenderer <- Gtk.cellRendererTextNew
   Gtk.setCellRendererTextFamily cellRenderer "monospace"
 
-  let g = Gtk.setCellRendererTextText cellRenderer . f
   treeViewColumn <- Gtk.treeViewColumnNew
   Gtk.cellLayoutPackStart treeViewColumn cellRenderer True
-  Gtk.cellLayoutSetDataFunction treeViewColumn cellRenderer model g
+
+  Gtk.cellLayoutSetDataFunction treeViewColumn cellRenderer model $ \row ->
+    Gtk.setCellRendererTextText cellRenderer (f row)
 
   Gtk.treeViewAppendColumn treeView treeViewColumn
 
