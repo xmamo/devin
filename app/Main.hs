@@ -37,9 +37,9 @@ import qualified Data.Text as Text
 
 import qualified GI.GObject as G
 import qualified GI.Gio as G
+import qualified Data.GI.Gtk.Threading as Gdk
 import qualified Data.GI.Gtk as Gtk
 import qualified Data.GI.Gtk.BuildFn as Gtk
-import qualified Data.GI.Gtk.Threading as Gtk
 import qualified GI.GtkSource as GtkSource
 
 import Devin.Debug.Evaluator
@@ -62,6 +62,8 @@ main =
 
 onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
 onActivate application = do
+  Gdk.setCurrentThreadAsGUIThread
+
   let stopIconName = "media-playback-stop-symbolic"
   let playIconName = "media-playback-start-symbolic"
   let noTextTagTable = Nothing :: Maybe Gtk.TextTagTable
@@ -143,116 +145,124 @@ onActivate application = do
   applyTags tags tagTable
 
   syntaxTreeRef <- newIORef Nothing
-  workerThreadIdRef <- newIORef =<< forkIO (pure ())
   evaluatorThreadIdRef <- newIORef =<< forkIO (pure ())
   playButtonClickCallbackRef <- newIORef (pure ())
+
+  -- Start the parse and type check worker thread:
+
+  workerSemaphore <- newEmptyMVar
+
+  forkIO $ forever $ do
+    takeMVar workerSemaphore
+
+    text <- Gdk.postGUISync $ do
+      writeIORef syntaxTreeRef Nothing
+      Gtk.widgetSetSensitive playButton False
+
+      (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+      Gtk.textBufferGetText codeBuffer startIter endIter True
+
+    -- Run the parser
+    let parser = liftA2 (,) Parsers.devin getState
+    parserResult <- runParserT parser [] "" (0, text)
+
+    case parserResult of
+      -- Parser failure:
+      Left parseError -> do
+        let offset = toOffset (errorPos parseError) text
+        let messages = errorMessages parseError
+
+        Gdk.postGUIASync $ do
+          -- Remove previous error highlighting, if any
+          (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+          Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
+
+          -- Highlight as error, starting from the parseError offset
+          startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
+          Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
+
+          -- Update the error log; clear the syntax tree preview
+          (line, column) <- getLineColumn startIter
+          let datum = (showLineColumn (line, column), showMessages messages)
+          Gtk.seqStoreClear logStore
+          Gtk.seqStoreAppend logStore datum
+          Gtk.forestStoreClear syntaxTreeStore
+
+      -- Parser success:
+      Right (devin, comments) -> do
+        let Devin {definitions} = devin
+
+        Gdk.postGUIASync $ do
+          writeIORef syntaxTreeRef (Just devin)
+
+          -- Remove any previous highlighting
+          (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+          Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (keywordTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (varIdTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (funIdTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (typeTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (numberTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (operatorTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (commentTag tags) startIter endIter
+          Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
+
+          -- Highlight syntax
+          highlightDevin tags codeBuffer devin
+          for_ comments (highlightInterval (commentTag tags) codeBuffer)
+
+          -- Highlight matching braces
+          insertMark <- Gtk.textBufferGetInsert codeBuffer
+          insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
+          highlightDevinBraces tags codeBuffer insertIter devin
+
+          -- Update the syntax tree preview
+          let syntaxTree = map definitionTree definitions
+          rootPath <- Gtk.treePathNew
+          Gtk.forestStoreClear syntaxTreeStore
+          Gtk.forestStoreInsertForest syntaxTreeStore rootPath -1 syntaxTree
+          Gtk.treeViewExpandAll syntaxTreeView
+
+        -- Run the typer
+        let typer = checkDevin devin
+        let typerResult = runTyper typer predefinedEnv
+
+        case typerResult of
+          -- Typer success:
+          ((), env, []) -> do
+            let (hasMain, _, _) = runTyper checkHasMain env
+
+            Gdk.postGUIASync $ do
+              Gtk.widgetSetSensitive playButton hasMain
+              Gtk.seqStoreClear logStore
+
+            where
+              checkHasMain = lookupFunSignature "main" >>= \case
+                Just (([], _), _) -> pure True
+                _ -> pure False
+
+          -- Typer failure:
+          ((), _, errors) -> Gdk.postGUIASync $ do
+            Gtk.seqStoreClear logStore
+
+            for_ errors $ \error -> do
+              -- Highlight the part of code which caused the failure
+              startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
+              endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
+              Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
+
+              -- Append the error description to the log
+              (line, column) <- getLineColumn startIter
+              let datum = (showLineColumn (line, column), Text.pack (display error))
+              Gtk.seqStoreAppend logStore datum
 
   -- Set up codeBuffer callback for "changed" signals.
   -- The callback takes care of syntax highlighting.
 
   Gtk.onTextBufferChanged codeBuffer $ do
-    killThread =<< readIORef workerThreadIdRef
-
-    atomicWriteIORef syntaxTreeRef Nothing
-    Gtk.widgetSetSensitive playButton False
-
-    atomicWriteIORef workerThreadIdRef =<< forkIO (do
-      (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-      text <- Gtk.textBufferGetText codeBuffer startIter endIter True
-
-      -- Run the parser
-      let parser = liftA2 (,) Parsers.devin getState
-      parserResult <- runParserT parser [] "" (0, text)
-
-      case parserResult of
-        -- Parser failure:
-        Left parseError -> do
-          let offset = toOffset (errorPos parseError) text
-          let messages = errorMessages parseError
-
-          Gtk.postGUIASync $ do
-            -- Remove previous error highlighting, if any
-            (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-            Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
-
-            -- Highlight as error, starting from the parseError offset
-            startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
-            Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
-
-            -- Update the error log; clear the syntax tree preview
-            (line, column) <- getLineColumn startIter
-            let datum = (showLineColumn (line, column), showMessages messages)
-            Gtk.seqStoreClear logStore
-            Gtk.seqStoreAppend logStore datum
-            Gtk.forestStoreClear syntaxTreeStore
-
-        -- Parser success:
-        Right (devin, comments) -> do
-          let Devin {definitions} = devin
-          atomicWriteIORef syntaxTreeRef (Just devin)
-
-          Gtk.postGUIASync $ do
-            -- Remove any previous highlighting
-            (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-            Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
-            Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
-            Gtk.textBufferRemoveTag codeBuffer (keywordTag tags) startIter endIter
-            Gtk.textBufferRemoveTag codeBuffer (varIdTag tags) startIter endIter
-            Gtk.textBufferRemoveTag codeBuffer (funIdTag tags) startIter endIter
-            Gtk.textBufferRemoveTag codeBuffer (typeTag tags) startIter endIter
-            Gtk.textBufferRemoveTag codeBuffer (numberTag tags) startIter endIter
-            Gtk.textBufferRemoveTag codeBuffer (operatorTag tags) startIter endIter
-            Gtk.textBufferRemoveTag codeBuffer (commentTag tags) startIter endIter
-            Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
-
-            -- Highlight syntax
-            highlightDevin tags codeBuffer devin
-            for_ comments (highlightInterval (commentTag tags) codeBuffer)
-
-            -- Highlight matching braces
-            insertMark <- Gtk.textBufferGetInsert codeBuffer
-            insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
-            highlightDevinBraces tags codeBuffer insertIter devin
-
-            -- Update the syntax tree preview
-            let syntaxTree = map definitionTree definitions
-            rootPath <- Gtk.treePathNew
-            Gtk.forestStoreClear syntaxTreeStore
-            Gtk.forestStoreInsertForest syntaxTreeStore rootPath -1 syntaxTree
-            Gtk.treeViewExpandAll syntaxTreeView
-
-          -- Run the typer
-          let typer = checkDevin devin
-          let typerResult = runTyper typer predefinedEnv
-
-          case typerResult of
-            -- Typer success:
-            ((), env, []) -> do
-              let (hasMain, _, _) = runTyper checkHasMain env
-
-              Gtk.postGUIASync $ do
-                Gtk.widgetSetSensitive playButton hasMain
-                Gtk.seqStoreClear logStore
-
-              where
-                checkHasMain = lookupFunSignature "main" >>= \case
-                  Just (([], _), _) -> pure True
-                  _ -> pure False
-
-            -- Typer failure:
-            ((), _, errors) -> Gtk.postGUIASync $ do
-              Gtk.seqStoreClear logStore
-
-              for_ errors $ \error -> do
-                -- Highlight the part of code which caused the failure
-                startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
-                endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
-                Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
-
-                -- Append the error description to the log
-                (line, column) <- getLineColumn startIter
-                let datum = (showLineColumn (line, column), Text.pack (display error))
-                Gtk.seqStoreAppend logStore datum)
+    tryPutMVar workerSemaphore ()
+    pure ()
 
   -- Set up codeBuffer callback for "notify::cursor-position" signals.
   -- The callback takes care of highlighting matching braces.
@@ -287,7 +297,7 @@ onActivate application = do
       runEvaluator evaluator state = do
         (result, state') <- runEvaluatorStep evaluator state
 
-        Gtk.postGUIASync $ do
+        Gdk.postGUIASync $ do
           forest <- stateForest state'
           rootPath <- Gtk.treePathNew
           Gtk.forestStoreClear stateStore
@@ -295,11 +305,11 @@ onActivate application = do
           Gtk.treeViewExpandAll stateView
 
         case result of
-          Done _ -> Gtk.postGUIASync debugger_cleanup
+          Done _ -> Gdk.postGUIASync debugger_cleanup
 
           Breakpoint statement evaluator' -> do
             atomicWriteIORef playButtonClickCallbackRef $ do
-              Gtk.postGUIASync $ do
+              Gdk.postGUIASync $ do
                 Gtk.widgetSetSensitive playButton False
 
                 (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
@@ -308,11 +318,11 @@ onActivate application = do
               evaluatorThreadId <- forkIO (runEvaluator evaluator' state')
               atomicWriteIORef evaluatorThreadIdRef evaluatorThreadId
 
-            Gtk.postGUIASync $ do
+            Gdk.postGUIASync $ do
               Gtk.widgetSetSensitive playButton True
               highlightInterval (highlightTag tags) codeBuffer statement
 
-          Error error -> Gtk.postGUIASync $ do
+          Error error -> Gdk.postGUIASync $ do
             startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
             endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
             Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
