@@ -130,7 +130,7 @@ onActivate application = do
   Gtk.panedPack2 paned2 scrolledWindow3 False False
 
   window <- Gtk.applicationWindowNew application
-  Gtk.windowSetDefaultSize window 1280 720
+  Gtk.windowSetDefaultSize window 1024 576
   Gtk.windowSetTitlebar window (Just headerBar)
   Gtk.containerAdd window paned2
 
