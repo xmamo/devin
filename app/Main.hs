@@ -62,14 +62,14 @@ main =
 
 onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
 onActivate application = do
-  syntaxTreeStore <- Gtk.forestStoreNew []
-  stateStore <- Gtk.forestStoreNew []
-  logStore <- Gtk.seqStoreNew []
-
   let stopIconName = "media-playback-stop-symbolic"
   let playIconName = "media-playback-start-symbolic"
   let noTextTagTable = Nothing :: Maybe Gtk.TextTagTable
   let noAdjustment = Nothing :: Maybe Gtk.Adjustment
+
+  syntaxTreeStore <- Gtk.forestStoreNew []
+  stateStore <- Gtk.forestStoreNew []
+  logStore <- Gtk.seqStoreNew []
 
   -- Build the UI:
 
@@ -112,27 +112,27 @@ onActivate application = do
   Gtk.treeViewSetEnableSearch logView False
   setUpTwoColumns logStore logView
 
-  scrolledWindow1 <- Gtk.scrolledWindowNew noAdjustment noAdjustment
-  Gtk.containerAdd scrolledWindow1 codeTextView
+  codeScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  Gtk.containerAdd codeScrolledWindow codeTextView
 
-  scrolledWindow2 <- Gtk.scrolledWindowNew noAdjustment noAdjustment
-  Gtk.containerAdd scrolledWindow2 syntaxTreeView
+  syntaxTreeScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  Gtk.containerAdd syntaxTreeScrolledWindow syntaxTreeView
 
-  scrolledWindow3 <- Gtk.scrolledWindowNew noAdjustment noAdjustment
-  Gtk.containerAdd scrolledWindow3 logView
+  logScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  Gtk.containerAdd logScrolledWindow logView
 
-  paned1 <- Gtk.panedNew Gtk.OrientationHorizontal
-  Gtk.panedPack1 paned1 scrolledWindow1 True False
-  Gtk.panedPack2 paned1 scrolledWindow2 True False
+  horizontalPaned <- Gtk.panedNew Gtk.OrientationHorizontal
+  Gtk.panedPack1 horizontalPaned codeScrolledWindow True False
+  Gtk.panedPack2 horizontalPaned syntaxTreeScrolledWindow True False
 
-  paned2 <- Gtk.panedNew Gtk.OrientationVertical
-  Gtk.panedPack1 paned2 paned1 True False
-  Gtk.panedPack2 paned2 scrolledWindow3 False False
+  verticalPaned <- Gtk.panedNew Gtk.OrientationVertical
+  Gtk.panedPack1 verticalPaned horizontalPaned True False
+  Gtk.panedPack2 verticalPaned logScrolledWindow False False
 
   window <- Gtk.applicationWindowNew application
   Gtk.windowSetDefaultSize window 1024 576
   Gtk.windowSetTitlebar window (Just headerBar)
-  Gtk.containerAdd window paned2
+  Gtk.containerAdd window verticalPaned
 
   -- Set up some stuff needed for later:
 
@@ -276,9 +276,9 @@ onActivate application = do
         Gtk.widgetSetSensitive playButton False
         Gtk.widgetSetSensitive stopButton True
         Gtk.textViewSetEditable codeTextView False
-        Gtk.containerRemove scrolledWindow2 syntaxTreeView
-        Gtk.containerAdd scrolledWindow2 stateView
-        Gtk.widgetShowAll scrolledWindow2
+        Gtk.containerRemove syntaxTreeScrolledWindow syntaxTreeView
+        Gtk.containerAdd syntaxTreeScrolledWindow stateView
+        Gtk.widgetShowAll syntaxTreeScrolledWindow
 
         state <- makePredefinedState
         evaluatorThreadId <- forkIO (runEvaluator (evalDevin devin) state)
@@ -354,9 +354,9 @@ onActivate application = do
         Gtk.textViewSetEditable codeTextView True
         Gtk.widgetSetSensitive playButton True
         Gtk.widgetSetSensitive stopButton False
-        Gtk.containerRemove scrolledWindow2 stateView
-        Gtk.containerAdd scrolledWindow2 syntaxTreeView
-        Gtk.widgetShowAll scrolledWindow2
+        Gtk.containerRemove syntaxTreeScrolledWindow stateView
+        Gtk.containerAdd syntaxTreeScrolledWindow syntaxTreeView
+        Gtk.widgetShowAll syntaxTreeScrolledWindow
 
         atomicWriteIORef playButtonClickCallbackRef initialPlayButtonCallback
 
@@ -381,17 +381,17 @@ onActivate application = do
 setUpTwoColumns ::
   (Gtk.IsTypedTreeModel model, Gtk.IsTreeModel (model (Text, Text)), Gtk.IsTreeView a, MonadIO m) =>
   model (Text, Text) -> a -> m ()
-setUpTwoColumns model treeView = for_ [fst, snd] $ \f -> do
+setUpTwoColumns model view = for_ [fst, snd] $ \f -> do
   cellRenderer <- Gtk.cellRendererTextNew
   Gtk.setCellRendererTextFamily cellRenderer "monospace"
 
-  treeViewColumn <- Gtk.treeViewColumnNew
-  Gtk.cellLayoutPackStart treeViewColumn cellRenderer True
+  viewColumn <- Gtk.treeViewColumnNew
+  Gtk.cellLayoutPackStart viewColumn cellRenderer True
 
-  Gtk.cellLayoutSetDataFunction treeViewColumn cellRenderer model $ \row ->
+  Gtk.cellLayoutSetDataFunction viewColumn cellRenderer model $ \row ->
     Gtk.setCellRendererTextText cellRenderer (f row)
 
-  Gtk.treeViewAppendColumn treeView treeViewColumn
+  Gtk.treeViewAppendColumn view viewColumn
 
 
 getLineColumn :: (Num a, MonadIO m) => Gtk.TextIter -> m (a, a)
