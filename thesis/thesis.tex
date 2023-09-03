@@ -4310,18 +4310,18 @@
 
   The function
   \lstinline@evalStatement :: Statement -> Evaluator (Maybe Reference)@
-  evaluates statements. Evaluation yields \lstinline@Just@ on statements
-  returning control, else \lstinline@Nothing@.
+  evaluates statements; its result is \lstinline@Just@ on statements returning
+  control, \lstinline@Nothing@ otherwise.
 
   The following two base cases are trivial (\lstinline@evalDefinitions@'s
   implementation is discussed in the next section):
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression DefinitionStatement{definition} = do
+    evalStatement DefinitionStatement{definition} = do
       evalDefinition definition
       pure Nothing
 
-    evalExpression ExpressionStatement{value} = do
+    evalStatement ExpressionStatement{value} = do
       evalExpression value
       pure Nothing
   \end{lstlisting}
@@ -4332,7 +4332,7 @@
   pushed to evaluate branches.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression IfStatement{predicate, trueBranch} = do
+    evalStatement IfStatement{predicate, trueBranch} = do
       r <- evalExpression predicate
       v <- readRef r
   \end{lstlisting}
@@ -4348,7 +4348,7 @@
           t <- getType v
           raise (InvalidType predicate Type.Bool t)
 
-    evalExpression IfElseStatement{predicate, trueBranch, falseBranch} = do
+    evalStatement IfElseStatement{predicate, trueBranch, falseBranch} = do
       r <- evalExpression predicate
       v <- readRef r
 
@@ -4366,7 +4366,7 @@
   statements are of course implemented similarly to while statements.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression statement@WhileStatement{predicate, body} = do
+    evalStatement statement@WhileStatement{predicate, body} = do
       r <- evalExpression predicate
       v <- readRef r
 
@@ -4387,11 +4387,11 @@
   return \lstinline@unit@.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression ReturnStatement{result = Just result} = do
+    evalStatement ReturnStatement{result = Just result} = do
       r <- evalExpression result
       pure (Just r)
 
-    evalExpression ReturnStatement{result = Nothing} = do
+    evalStatement ReturnStatement{result = Nothing} = do
       r <- newRef Unit
       pure (Just r)
   \end{lstlisting}
@@ -4403,7 +4403,7 @@
   error is raised.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression statement@AssertStatement{predicate} = do
+    evalStatement statement@AssertStatement{predicate} = do
       r <- evalExpression predicate
       v <- readRef r
 
@@ -4419,7 +4419,7 @@
   Breakpoint statements are handled trivially:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression statement@BreakpointStatement{} = do
+    evalStatement statement@BreakpointStatement{} = do
       breakpoint statement
       pure Nothing
   \end{lstlisting}
@@ -4430,7 +4430,7 @@
   which returns control.
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    evalExpression BlockStatement{statements} = withNewFrame Nothing 1 $ do
+    evalStatement BlockStatement{statements} = withNewFrame Nothing 1 $ do
       for_ statements $ \case
         DefinitionStatement{definition} -> evalDefinition1 definition
         _ -> pure ()
