@@ -52,14 +52,14 @@ evalDefinition1 definition = case definition of
 evalDefinition2 :: Definition -> Evaluator ()
 evalDefinition2 = \case
   VarDefinition {varId = SymbolId {name}, value} -> do
-    r <- evalExpression value
-    r' <- cloneRef r
-    defineVar name r'
+    cell <- evalExpression value
+    cell' <- cloneCell cell
+    defineVar name cell'
 
   FunDefinition {} -> pure ()
 
 
-evalStatement :: Statement -> Evaluator (Maybe Reference)
+evalStatement :: Statement -> Evaluator (Maybe Cell)
 evalStatement statement = case statement of
   DefinitionStatement {definition} -> do
     evalDefinition definition
@@ -70,78 +70,78 @@ evalStatement statement = case statement of
     pure Nothing
 
   IfStatement {predicate, trueBranch} -> do
-    r <- evalExpression predicate
-    v <- readRef r
+    cell <- evalExpression predicate
+    val <- readCell cell
 
-    case v of
+    case val of
       Bool True -> withNewFrame Nothing 1 (evalStatement trueBranch)
       Bool False -> pure Nothing
 
       _ -> do
-        t <- getType v
+        t <- getType val
         raise (InvalidType predicate Type.Bool t)
 
   IfElseStatement {predicate, trueBranch, falseBranch} -> do
-    r <- evalExpression predicate
-    v <- readRef r
+    val <- evalExpression predicate
+    cell <- readCell val
 
-    case v of
+    case cell of
       Bool True -> withNewFrame Nothing 1 (evalStatement trueBranch)
       Bool False -> withNewFrame Nothing 1 (evalStatement falseBranch)
 
       _ -> do
-        t <- getType v
+        t <- getType cell
         raise (InvalidType predicate Type.Bool t)
 
   WhileStatement {predicate, body} -> do
-    r <- evalExpression predicate
-    v <- readRef r
+    cell <- evalExpression predicate
+    val <- readCell cell
 
-    case v of
+    case val of
       Bool False -> pure Nothing
 
       Bool True -> withNewFrame Nothing 1 (evalStatement body) >>= \case
-        Just r -> pure (Just r)
+        Just cell -> pure (Just cell)
         Nothing -> evalStatement statement
 
       _ -> do
-        t <- getType v
+        t <- getType val
         raise (InvalidType predicate Type.Bool t)
 
   DoWhileStatement {body, predicate} ->
     withNewFrame Nothing 1 (evalStatement body) >>= \case
-      Just r -> pure (Just r)
+      Just cell -> pure (Just cell)
 
       Nothing -> do
-        r <- evalExpression predicate
-        v <- readRef r
+        cell <- evalExpression predicate
+        val <- readCell cell
 
-        case v of
+        case val of
           Bool False -> pure Nothing
           Bool True -> evalStatement statement
 
           _ -> do
-            t <- getType v
+            t <- getType val
             raise (InvalidType predicate Type.Bool t)
 
   ReturnStatement {result = Just result} -> do
-    r <- evalExpression result
-    pure (Just r)
+    cell <- evalExpression result
+    pure (Just cell)
 
   ReturnStatement {result = Nothing} -> do
-    r <- newRef Unit
-    pure (Just r)
+    cell <- newCell Unit
+    pure (Just cell)
 
   AssertStatement {predicate} -> do
-    r <- evalExpression predicate
-    v <- readRef r
+    cell <- evalExpression predicate
+    val <- readCell cell
 
-    case v of
+    case val of
       Bool False -> raise (AssertionFailed statement)
       Bool True -> pure Nothing
 
       _ -> do
-        t <- getType v
+        t <- getType val
         raise (InvalidType predicate Type.Bool t)
 
   BreakpointStatement {} -> do
@@ -161,171 +161,171 @@ evalStatement statement = case statement of
       statement -> evalStatement statement
 
 
-evalExpression :: Expression -> Evaluator Reference
+evalExpression :: Expression -> Evaluator Cell
 evalExpression expression = case expression of
   IntegerExpression {integer} -> case toIntegralSized integer of
-    Just x -> newRef (Int x)
+    Just x -> newCell (Int x)
     Nothing -> raise (IntegerOverflow expression)
 
-  RationalExpression {rational} -> newRef (Float (fromRat rational))
+  RationalExpression {rational} -> newCell (Float (fromRat rational))
 
   VarExpression {varName, interval} -> lookupVar varName >>= \case
-    Just (r, _) -> pure r
+    Just (cell, _) -> pure cell
     Nothing -> raise (UnknownVar varName interval)
 
   ArrayExpression {elems} -> do
-    rs <- flip Vector.unfoldrM elems $ \case
+    cells <- flip Vector.unfoldrM elems $ \case
       [] -> pure Nothing
 
       (elem : elems) -> do
-        r <- evalExpression elem
-        r' <- cloneRef r
-        pure (Just (r', elems))
+        cell <- evalExpression elem
+        cell' <- cloneCell cell
+        pure (Just (cell', elems))
 
-    newRef (Array rs)
+    newCell (Array cells)
 
   AccessExpression {array, index} -> do
-    arrayR <- evalExpression array
-    arrayV <- readRef arrayR
+    arrayCell <- evalExpression array
+    arrayVal <- readCell arrayCell
 
-    indexR <- evalExpression index
-    indexV <- readRef indexR
+    indexCell <- evalExpression index
+    indexVal <- readCell indexCell
 
-    case (arrayV, indexV) of
-      (Array rs, Int x) -> case toIntegralSized x of
-        Just n | Just r <- rs !? n -> pure r
+    case (arrayVal, indexVal) of
+      (Array cells, Int x) -> case toIntegralSized x of
+        Just n | Just cell <- cells !? n -> pure cell
         _ -> raise (IndexOutOfBounds index x)
 
       (Array _, _) -> do
-        indexT <- getType indexV
+        indexT <- getType indexVal
         raise (InvalidType index Type.Int indexT)
 
       (_, _) -> do
-        arrayT <- getType arrayV
+        arrayT <- getType arrayVal
         raise (InvalidType array (Type.Array Type.Unknown) arrayT)
 
   CallExpression {funId = SymbolId {name, interval}, args} -> do
-    argRs <- for args evalExpression
+    argCells <- for args evalExpression
 
     lookupFun name >>= \case
       Just (UserDefined FunDefinition {params, body}, depth) ->
-        withNewFrame (Just name) (depth + 1) (go 0 params argRs)
+        withNewFrame (Just name) (depth + 1) (go 0 params argCells)
 
         where
           -- Pass argument by value:
-          go n ((Nothing, SymbolId {name}, _) : params) (argR : argRs) = do
-            argR' <- cloneRef argR
-            defineVar name argR'
-            go (n + 1) params argRs
+          go n ((Nothing, SymbolId {name}, _) : params) (argCell : argCells) = do
+            argCell' <- cloneCell argCell
+            defineVar name argCell'
+            go (n + 1) params argCells
 
           -- Pass argument by reference:
-          go n ((Just _, SymbolId {name}, _) : params) (argR : argRs) = do
-            defineVar name argR
-            go (n + 1) params argRs
+          go n ((Just _, SymbolId {name}, _) : params) (argCell : argCells) = do
+            defineVar name argCell
+            go (n + 1) params argCells
 
           -- If argument count is correct:
           go _ [] [] = evalStatement body >>= \case
-            Just r -> cloneRef r
-            Nothing -> newRef Unit
+            Just cell -> cloneCell cell
+            Nothing -> newCell Unit
 
           -- If argument count is incorrect:
-          go n params argRs = do
+          go n params argCells = do
             let expected = n + length params
-            let actual = n + length argRs
+            let actual = n + length argCells
             raise (InvalidArgCount expression expected actual)
 
-      Just (BuiltinNot, _) | [argR] <- argRs -> do
-        argV <- readRef argR
+      Just (BuiltinNot, _) | [cell] <- argCells -> do
+        val <- readCell cell
 
-        case argV of
-          Bool x -> newRef (Bool (not x))
+        case val of
+          Bool x -> newCell (Bool (not x))
 
           _ -> do
-            argT <- getType argV
+            argT <- getType val
             raise (InvalidType (head args) Type.Bool argT)
 
       Just (BuiltinNot, _) ->
-        raise (InvalidArgCount expression 1 (length argRs))
+        raise (InvalidArgCount expression 1 (length argCells))
 
-      Just (BuiltinLen, _) | [argR] <- argRs -> do
-        argV <- readRef argR
+      Just (BuiltinLen, _) | [cell] <- argCells -> do
+        val <- readCell cell
 
-        case argV of
-          Array rs -> newRef (Int (fromIntegral (length rs)))
+        case val of
+          Array cells -> newCell (Int (fromIntegral (length cells)))
 
           _ -> do
-            argT <- getType argV
+            argT <- getType val
             raise (InvalidType (head args) (Type.Array Type.Unknown) argT)
 
       Just (BuiltinLen, _) ->
-        raise (InvalidArgCount expression 1 (length argRs))
+        raise (InvalidArgCount expression 1 (length argCells))
 
-      Just (BuiltinToInt, _) | [argR] <- argRs -> do
-        argV <- readRef argR
+      Just (BuiltinToInt, _) | [cell] <- argCells -> do
+        val <- readCell cell
 
-        case argV of
-          Float x -> newRef (Int (round x))
+        case val of
+          Float x -> newCell (Int (round x))
 
           _ -> do
-            argT <- getType argV
+            argT <- getType val
             raise (InvalidType (head args) Type.Float argT)
 
       Just (BuiltinToInt, _) ->
-        raise (InvalidArgCount expression 1 (length argRs))
+        raise (InvalidArgCount expression 1 (length argCells))
 
-      Just (BuiltinToFloat, _) | [argR] <- argRs -> do
-        argV <- readRef argR
+      Just (BuiltinToFloat, _) | [cell] <- argCells -> do
+        val <- readCell cell
 
-        case argV of
-          Int x -> newRef (Float (fromIntegral x))
+        case val of
+          Int x -> newCell (Float (fromIntegral x))
 
           _ -> do
-            argT <- getType argV
+            argT <- getType val
             raise (InvalidType (head args) Type.Int argT)
 
       Just (BuiltinToFloat, _) ->
-        raise (InvalidArgCount expression 1 (length argRs))
+        raise (InvalidArgCount expression 1 (length argCells))
 
       _ -> raise (UnknownFun name interval)
 
   UnaryExpression {unary, operand} | PlusOperator {} <- unary -> do
-    operandR <- evalExpression operand
-    operandV <- readRef operandR
+    cell <- evalExpression operand
+    val <- readCell cell
 
-    case operandV of
-      Int x -> newRef (Int x)
-      Float x -> newRef (Float x)
+    case val of
+      Int x -> newCell (Int x)
+      Float x -> newCell (Float x)
 
       _ -> do
-        operandT <- getType operandV
+        operandT <- getType val
         raise (InvalidUnary unary operandT)
 
   UnaryExpression {unary, operand} | MinusOperator {} <- unary -> do
-    operandR <- evalExpression operand
-    operandV <- readRef operandR
+    cell <- evalExpression operand
+    val <- readCell cell
 
-    case operandV of
-      Int x | Just y <- safeUnary negate x -> newRef (Int y)
+    case val of
+      Int x | Just y <- safeUnary negate x -> newCell (Int y)
       Int _ -> raise (IntegerOverflow expression)
 
-      Float x -> newRef (Float (negate x))
+      Float x -> newCell (Float (negate x))
 
       _ -> do
-        operandT <- getType operandV
+        operandT <- getType val
         raise (InvalidUnary unary operandT)
 
   BinaryExpression {left, binary, right} | AddOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (+) x y -> newRef (Int z)
+    case (leftVal, rightVal) of
+      (Int x, Int y) | Just z <- safeBinary (+) x y -> newCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> newRef (Float (x + y))
+      (Float x, Float y) -> newCell (Float (x + y))
 
       (Array rs1, Array rs2) -> do
         let n1 = Vector.length rs1
@@ -335,318 +335,318 @@ evalExpression expression = case expression of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n3 -> do
-            let f i = cloneRef (if i < n1 then rs1 ! i else rs2 ! (i - n1))
-            rs3 <- Vector.generateM n3 f
-            newRef (Array rs3)
+            let f i = cloneCell (if i < n1 then rs1 ! i else rs2 ! (i - n1))
+            cells <- Vector.generateM n3 f
+            newCell (Array cells)
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | SubtractOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (-) x y -> newRef (Int z)
+    case (leftVal, rightVal) of
+      (Int x, Int y) | Just z <- safeBinary (-) x y -> newCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> newRef (Float (x - y))
+      (Float x, Float y) -> newCell (Float (x - y))
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | MultiplyOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (*) x y -> newRef (Int z)
+    case (leftVal, rightVal) of
+      (Int x, Int y) | Just z <- safeBinary (*) x y -> newCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> newRef (Float (x * y))
+      (Float x, Float y) -> newCell (Float (x * y))
 
-      (Int x, Array _) | x <= 0 -> newRef (Array Vector.empty)
-      (Array _, Int y) | y <= 0 -> newRef (Array Vector.empty)
+      (Int x, Array _) | x <= 0 -> newCell (Array Vector.empty)
+      (Array _, Int y) | y <= 0 -> newCell (Array Vector.empty)
 
-      (Int x, Array rs) -> do
-        let n = Vector.length rs
+      (Int x, Array cells) -> do
+        let n = Vector.length cells
 
         case safeBinary (*) x n of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n' -> do
-            rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
-            newRef (Array rs')
+            cells' <- Vector.generateM n' (\i -> cloneCell (cells ! (i `mod` n)))
+            newCell (Array cells')
 
-      (Array rs, Int y) -> do
-        let n = Vector.length rs
+      (Array cells, Int y) -> do
+        let n = Vector.length cells
 
         case safeBinary (*) n y of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n' -> do
-            rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
-            newRef (Array rs')
+            cells' <- Vector.generateM n' (\i -> cloneCell (cells ! (i `mod` n)))
+            newCell (Array cells')
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | DivideOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
+    case (leftVal, rightVal) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary div x y -> newRef (Int z)
+      (Int x, Int y) | Just z <- safeBinary div x y -> newCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> newRef (Float (x / y))
+      (Float x, Float y) -> newCell (Float (x / y))
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | ModuloOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
+    case (leftVal, rightVal) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary mod x y -> newRef (Int z)
+      (Int x, Int y) | Just z <- safeBinary mod x y -> newCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | EqualOperator {} <- binary -> do
-    leftR <- evalExpression left
-    rightR <- evalExpression right
+    leftCell <- evalExpression left
+    rightCell <- evalExpression right
 
-    compareRefs leftR rightR >>= \case
-      Right ordering -> newRef (Bool (ordering == EQ))
+    compareCells leftCell rightCell >>= \case
+      Right ordering -> newCell (Bool (ordering == EQ))
       Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | NotEqualOperator {} <- binary -> do
-    leftR <- evalExpression left
-    rightR <- evalExpression right
+    leftCell <- evalExpression left
+    rightCell <- evalExpression right
 
-    compareRefs leftR rightR >>= \case
-      Right ordering -> newRef (Bool (ordering /= EQ))
+    compareCells leftCell rightCell >>= \case
+      Right ordering -> newCell (Bool (ordering /= EQ))
       Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | LessOperator {} <- binary -> do
-    leftR <- evalExpression left
-    rightR <- evalExpression right
+    leftCell <- evalExpression left
+    rightCell <- evalExpression right
 
-    compareRefs leftR rightR >>= \case
-      Right ordering -> newRef (Bool (ordering < EQ))
+    compareCells leftCell rightCell >>= \case
+      Right ordering -> newCell (Bool (ordering < EQ))
       Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | LessOrEqualOperator {} <- binary -> do
-    leftR <- evalExpression left
-    rightR <- evalExpression right
+    leftCell <- evalExpression left
+    rightCell <- evalExpression right
 
-    compareRefs leftR rightR >>= \case
-      Right ordering -> newRef (Bool (ordering <= EQ))
+    compareCells leftCell rightCell >>= \case
+      Right ordering -> newCell (Bool (ordering <= EQ))
       Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | GreaterOperator {} <- binary -> do
-    leftR <- evalExpression left
-    rightR <- evalExpression right
+    leftCell <- evalExpression left
+    rightCell <- evalExpression right
 
-    compareRefs leftR rightR >>= \case
-      Right ordering -> newRef (Bool (ordering > EQ))
+    compareCells leftCell rightCell >>= \case
+      Right ordering -> newCell (Bool (ordering > EQ))
       Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | GreaterOrEqualOperator {} <- binary -> do
-    leftR <- evalExpression left
-    rightR <- evalExpression right
+    leftCell <- evalExpression left
+    rightCell <- evalExpression right
 
-    compareRefs leftR rightR >>= \case
-      Right ordering -> newRef (Bool (ordering >= EQ))
+    compareCells leftCell rightCell >>= \case
+      Right ordering -> newCell (Bool (ordering >= EQ))
       Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | AndOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    case leftV of
-      Bool False -> newRef (Bool False)
+    case leftVal of
+      Bool False -> newCell (Bool False)
 
       _ -> do
-        rightR <- evalExpression right
-        rightV <- readRef rightR
+        rightCell <- evalExpression right
+        rightVal <- readCell rightCell
 
-        case (leftV, rightV) of
-          (Bool x, Bool y) -> newRef (Bool (x && y))
+        case (leftVal, rightVal) of
+          (Bool x, Bool y) -> newCell (Bool (x && y))
 
           (_, _) -> do
-            leftT <- getType leftV
-            rightT <- getType rightV
+            leftT <- getType leftVal
+            rightT <- getType rightVal
             raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | OrOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    case leftV of
-      Bool True -> newRef (Bool True)
+    case leftVal of
+      Bool True -> newCell (Bool True)
 
       _ -> do
-        rightR <- evalExpression right
-        rightV <- readRef rightR
+        rightCell <- evalExpression right
+        rightVal <- readCell rightCell
 
-        case (leftV, rightV) of
-          (Bool x, Bool y) -> newRef (Bool (x || y))
+        case (leftVal, rightVal) of
+          (Bool x, Bool y) -> newCell (Bool (x || y))
 
           (_, _) -> do
-            leftT <- getType leftV
-            rightT <- getType rightV
+            leftT <- getType leftVal
+            rightT <- getType rightVal
             raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | XorOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
-      (Bool x, Bool y) -> newRef (Bool (x /= y))
+    case (leftVal, rightVal) of
+      (Bool x, Bool y) -> newCell (Bool (x /= y))
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary = PlainAssignOperator {}, right} -> do
-    leftR <- evalExpression left
+    leftCell <- evalExpression left
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
-    rightV' <- cloneVal rightV
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    writeRef leftR rightV'
+    rightVal' <- cloneVal rightVal
+    writeCell leftCell rightVal'
 
   BinaryExpression {left, binary, right} | AddAssignOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (+) x y -> writeRef leftR (Int z)
+    case (leftVal, rightVal) of
+      (Int x, Int y) | Just z <- safeBinary (+) x y -> writeCell leftCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeRef leftR (Float (x + y))
+      (Float x, Float y) -> writeCell leftCell (Float (x + y))
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | SubtractAssignOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (-) x y -> writeRef leftR (Int z)
+    case (leftVal, rightVal) of
+      (Int x, Int y) | Just z <- safeBinary (-) x y -> writeCell leftCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeRef leftR (Float (x - y))
+      (Float x, Float y) -> writeCell leftCell (Float (x - y))
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | MultiplyAssignOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
-      (Int x, Int y) | Just z <- safeBinary (*) x y -> writeRef leftR (Int z)
+    case (leftVal, rightVal) of
+      (Int x, Int y) | Just z <- safeBinary (*) x y -> writeCell leftCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeRef leftR (Float (x * y))
+      (Float x, Float y) -> writeCell leftCell (Float (x * y))
 
-      (Array rs, Int y) -> do
-        let n = Vector.length rs
+      (Array cells, Int y) -> do
+        let n = Vector.length cells
 
         case safeBinary (*) n y of
           Nothing -> raise (IntegerOverflow expression)
 
           Just n' -> do
-            rs' <- Vector.generateM n' (\i -> cloneRef (rs ! (i `mod` n)))
-            writeRef leftR (Array rs')
+            cells' <- Vector.generateM n' (\i -> cloneCell (cells ! (i `mod` n)))
+            writeCell leftCell (Array cells')
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | DivideAssignOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
+    case (leftVal, rightVal) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary div x y -> writeRef leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary div x y -> writeCell leftCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
-      (Float x, Float y) -> writeRef leftR (Float (x / y))
+      (Float x, Float y) -> writeCell leftCell (Float (x / y))
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | ModuloAssignOperator {} <- binary -> do
-    leftR <- evalExpression left
-    leftV <- readRef leftR
+    leftCell <- evalExpression left
+    leftVal <- readCell leftCell
 
-    rightR <- evalExpression right
-    rightV <- readRef rightR
+    rightCell <- evalExpression right
+    rightVal <- readCell rightCell
 
-    case (leftV, rightV) of
+    case (leftVal, rightVal) of
       (Int _, Int 0) -> raise (DivisionByZero expression)
-      (Int x, Int y) | Just z <- safeBinary mod x y -> writeRef leftR (Int z)
+      (Int x, Int y) | Just z <- safeBinary mod x y -> writeCell leftCell (Int z)
       (Int _, Int _) -> raise (IntegerOverflow expression)
 
       (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
+        leftT <- getType leftVal
+        rightT <- getType rightVal
         raise (InvalidBinary binary leftT rightT)
 
   ParenthesizedExpression {inner} -> evalExpression inner

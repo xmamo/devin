@@ -12,18 +12,18 @@ module Devin.Evaluator (
   Frame (..),
   Function (..),
   Value (..),
-  Reference,
+  Cell,
   runEvaluatorStep,
   runEvaluator,
   makePredefinedState,
   getType,
   cloneVal,
   compareVals,
-  newRef,
-  readRef,
-  writeRef,
-  cloneRef,
-  compareRefs,
+  newCell,
+  readCell,
+  writeCell,
+  cloneCell,
+  compareCells,
   defineFun,
   lookupFun,
   defineVar,
@@ -68,7 +68,7 @@ data Frame = Frame {
   label :: Maybe String,
   poffset :: Int,  -- Static link
   funs :: [(String, Function)],
-  vars :: [(String, Reference)]
+  vars :: [(String, Cell)]
 }
 
 
@@ -86,10 +86,10 @@ data Value
   | Bool Bool
   | Int Int64
   | Float Double
-  | Array (Vector Reference)
+  | Array (Vector Cell)
 
 
-newtype Reference = Reference (IORef Value)
+newtype Cell = Cell (IORef Value)
 
 
 instance Applicative Evaluator where
@@ -151,9 +151,9 @@ makePredefinedState = liftIO $ do
   let f3 = ("toInt", BuiltinToInt)
   let f4 = ("toFloat", BuiltinToFloat)
 
-  v1 <- (,) "true" <$> newRef (Bool True)
-  v2 <- (,) "false" <$> newRef (Bool False)
-  v3 <- (,) "unit" <$> newRef Unit
+  v1 <- (,) "true" <$> newCell (Bool True)
+  v2 <- (,) "false" <$> newCell (Bool False)
+  v3 <- (,) "unit" <$> newCell Unit
 
   pure [Frame Nothing 0 [f4, f3, f2, f1] [v3, v2, v1]]
 
@@ -165,16 +165,16 @@ getType = \case
   Int _ -> pure Type.Int
   Float _ -> pure Type.Float
 
-  Array rs | Vector.null rs -> pure (Type.Array Type.Unknown)
+  Array cells | Vector.null cells -> pure (Type.Array Type.Unknown)
 
-  Array rs -> do
-    r <- readRef (Vector.head rs)
-    t <- getType r
+  Array cells -> do
+    cell <- readCell (Vector.head cells)
+    t <- getType cell
 
     let f Type.Unknown = False
         f t' = t' <: t
 
-    ok <- allM (\r -> f <$> (getType =<< readRef r)) rs
+    ok <- allM (\cell -> f <$> (getType =<< readCell cell)) cells
     pure (Type.Array (if ok then t else Type.Unknown))
 
 
@@ -185,9 +185,9 @@ cloneVal = \case
   Int x -> pure (Int x)
   Float x -> pure (Float x)
 
-  Array rs -> do
-    rs' <- Vector.forM rs cloneRef
-    pure (Array rs')
+  Array cells -> do
+    cells' <- Vector.forM cells cloneCell
+    pure (Array cells')
 
 
 compareVals :: MonadIO m => Value -> Value -> m (Either (Type, Type) Ordering)
@@ -197,7 +197,7 @@ compareVals v1 v2 = case (v1, v2) of
   (Int x, Int y) -> pure (Right (compare x y))
   (Float x, Float y) -> pure (Right (compare x y))
 
-  (Array rs1, Array rs2) -> go (Vector.length rs1) (Vector.length rs2) 0
+  (Array cells1, Array cells2) -> go (Vector.length cells1) (Vector.length cells2) 0
     where
       go n1 n2 i | i >= n1 =
         pure (Right (if i == n2 then EQ else LT))
@@ -206,10 +206,10 @@ compareVals v1 v2 = case (v1, v2) of
         pure (Right (if i == n1 then EQ else GT))
 
       go n1 n2 i = do
-        x <- readRef (rs1 ! i)
-        y <- readRef (rs2 ! i)
+        val1 <- readCell (cells1 ! i)
+        val2 <- readCell (cells2 ! i)
 
-        compareVals x y >>= \case
+        compareVals val1 val2 >>= \case
           Right EQ -> go n1 n2 (i + 1)
           Right ordering -> pure (Right ordering)
           Left (t1, t2) -> pure (Left (t1, t2))
@@ -220,34 +220,34 @@ compareVals v1 v2 = case (v1, v2) of
     pure (Left (t1, t2))
 
 
-newRef :: MonadIO m => Value -> m Reference
-newRef v = liftIO $ do
-  ref <- newIORef v
-  pure (Reference ref)
+newCell :: MonadIO m => Value -> m Cell
+newCell val = liftIO $ do
+  ref <- newIORef val
+  pure (Cell ref)
 
 
-readRef :: MonadIO m => Reference -> m Value
-readRef (Reference ref) = liftIO (readIORef ref)
+readCell :: MonadIO m => Cell -> m Value
+readCell (Cell ref) = liftIO (readIORef ref)
 
 
-writeRef :: MonadIO m => Reference -> Value -> m Reference
-writeRef (Reference ref) v = liftIO $ do
-  writeIORef ref v
-  pure (Reference ref)
+writeCell :: MonadIO m => Cell -> Value -> m Cell
+writeCell (Cell ref) val = liftIO $ do
+  writeIORef ref val
+  pure (Cell ref)
 
 
-cloneRef :: MonadIO m => Reference -> m Reference
-cloneRef r = do
-  v <- readRef r
-  v' <- cloneVal v
-  newRef v'
+cloneCell :: MonadIO m => Cell -> m Cell
+cloneCell cell = do
+  val <- readCell cell
+  val' <- cloneVal val
+  newCell val'
 
 
-compareRefs :: MonadIO m => Reference -> Reference -> m (Either (Type, Type) Ordering)
-compareRefs r1 r2 = do
-  v1 <- readRef r1
-  v2 <- readRef r2
-  compareVals v1 v2
+compareCells :: MonadIO m => Cell -> Cell -> m (Either (Type, Type) Ordering)
+compareCells cell1 cell2 = do
+  val1 <- readCell cell1
+  val2 <- readCell cell2
+  compareVals val1 val2
 
 
 defineFun :: String -> Function -> Evaluator ()
@@ -269,22 +269,22 @@ lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
       Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
 
 
-defineVar :: String -> Reference -> Evaluator ()
-defineVar name r = Evaluator $ \case
-  [] -> pure (Done (), [Frame Nothing 0 [] [(name, r)]])
+defineVar :: String -> Cell -> Evaluator ()
+defineVar name cell = Evaluator $ \case
+  [] -> pure (Done (), [Frame Nothing 0 [] [(name, cell)]])
 
   frame : frames -> do
-    let vars' = (name, r) : vars frame
+    let vars' = (name, cell) : vars frame
     pure (Done (), frame {vars = vars'} : frames)
 
 
-lookupVar :: String -> Evaluator (Maybe (Reference, Int))
+lookupVar :: String -> Evaluator (Maybe (Cell, Int))
 lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
   where
     go _ [] = Nothing
 
     go depth (Frame {poffset, vars} : frames) = case lookup name vars of
-      Just ref -> Just (ref, depth)
+      Just cell -> Just (cell, depth)
       Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
 
 

@@ -42,6 +42,7 @@ generateTags :: (GtkSource.IsStyleScheme a, MonadIO m) => Maybe a -> m Tags
 generateTags scheme = do
   languageManager <- GtkSource.languageManagerGetDefault
   defaultLanguage <- GtkSource.languageManagerGetLanguage languageManager "def"
+
   tag01 <- getTag defaultLanguage scheme "search-match"
   tag02 <- getTag defaultLanguage scheme "bracket-match"
   tag03 <- getTag defaultLanguage scheme "def:keyword"
@@ -52,6 +53,7 @@ generateTags scheme = do
   tag08 <- getTag defaultLanguage scheme "def:operator"
   tag09 <- getTag defaultLanguage scheme "def:comment"
   tag10 <- getTag defaultLanguage scheme "def:error"
+
   pure (Tags tag01 tag02 tag03 tag04 tag05 tag06 tag07 tag08 tag09 tag10)
 
 
