@@ -176,8 +176,6 @@ data Expression where
 data UnaryOperator
   = PlusOperator {interval :: (Int, Int)}
   | MinusOperator {interval :: (Int, Int)}
-  | NotOperator {interval :: (Int, Int)}
-  | LenOperator {interval :: (Int, Int)}
   deriving (Eq, Show, Read, Data)
 
 
@@ -295,15 +293,11 @@ instance Interval UnaryOperator where
   start :: Num a => UnaryOperator -> a
   start PlusOperator {interval} = start interval
   start MinusOperator {interval} = start interval
-  start NotOperator {interval} = start interval
-  start LenOperator {interval} = start interval
 
 
   end :: Num a => UnaryOperator -> a
   end PlusOperator {interval} = end interval
   end MinusOperator {interval} = end interval
-  end NotOperator {interval} = end interval
-  end LenOperator {interval} = end interval
 
 
 instance Interval BinaryOperator where
@@ -413,14 +407,6 @@ instance Display Expression where
       showChar '-' .
       displays operand
 
-    UnaryExpression {unary = NotOperator {}, operand} ->
-      showString "not " .
-      displays operand
-
-    UnaryExpression {unary = LenOperator {}, operand} ->
-      showString "len " .
-      displays operand
-
     BinaryExpression {left, binary, right} ->
       displays left .
       showChar ' ' .
@@ -459,8 +445,6 @@ instance Display UnaryOperator where
   displays :: UnaryOperator -> ShowS
   displays PlusOperator {} = showChar '+'
   displays MinusOperator {} = showChar '-'
-  displays NotOperator {} = showString "not"
-  displays LenOperator {} = showString "len"
 
 
 instance Display BinaryOperator where

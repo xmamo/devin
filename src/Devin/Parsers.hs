@@ -364,9 +364,7 @@ unaryOperator :: Stream s m Char => ParserT s m UnaryOperator
 unaryOperator = syntax $ choice
   [
     text "+" $> PlusOperator,
-    text "-" $> MinusOperator,
-    keyword "not" $> NotOperator,
-    keyword "len" $> LenOperator
+    text "-" $> MinusOperator
   ]
 
 

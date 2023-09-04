@@ -71,6 +71,8 @@ data Frame = Frame {
 
 data Function
   = UserDefined Definition
+  | BuiltinNot
+  | BuiltinLen
   | BuiltinToInt
   | BuiltinToFloat
   deriving (Eq, Show, Read, Data)
@@ -141,12 +143,16 @@ runEvaluator mx state = do
 
 makePredefinedState :: MonadIO m => m State
 makePredefinedState = liftIO $ do
-  trueR <- newRef (Bool True)
-  falseR <- newRef (Bool False)
-  unitR <- newRef Unit
-  let funs = [("toFloat", BuiltinToFloat), ("toInt", BuiltinToInt)]
-  let vars = [("false", falseR), ("true", trueR), ("unit", unitR)]
-  pure [Frame Nothing 0 funs vars]
+  let f1 = ("not", BuiltinNot)
+  let f2 = ("len", BuiltinLen)
+  let f3 = ("toInt", BuiltinToInt)
+  let f4 = ("toFloat", BuiltinToFloat)
+
+  v1 <- (,) "true" <$> newRef (Bool True)
+  v2 <- (,) "false" <$> newRef (Bool False)
+  v3 <- (,) "unit" <$> newRef Unit
+
+  pure [Frame Nothing 0 [f4, f3, f2, f1] [v3, v2, v1]]
 
 
 cloneVal :: MonadIO m => Value -> m Value

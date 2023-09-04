@@ -208,8 +208,6 @@ expressionTree = \case
 unaryOperatorTree :: UnaryOperator -> Tree (Text, Text)
 unaryOperatorTree PlusOperator {} = Tree.Node ("PlusOperator", "+") []
 unaryOperatorTree MinusOperator {} = Tree.Node ("MinusOperator", "-") []
-unaryOperatorTree NotOperator {} = Tree.Node ("NotOperator", "not") []
-unaryOperatorTree LenOperator {} = Tree.Node ("LenOperator", "len") []
 
 
 binaryOperatorTree :: BinaryOperator -> Tree (Text, Text)

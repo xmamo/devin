@@ -176,10 +176,10 @@ spec = do
         \def bubbleSort(ref array: [Int]) -> Unit {\n\
         \    var i = 0;\n\
         \\n\
-        \    while i < len array {\n\
+        \    while i < len(array) {\n\
         \        var j = i + 1;\n\
         \\n\
-        \        while j < len array {\n\
+        \        while j < len(array) {\n\
         \            if array[i] > array[j] {\n\
         \                var t = array[i];\n\
         \                array[i] = array[j];\n\

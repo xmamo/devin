@@ -223,22 +223,6 @@ checkExpression expression = case expression of
       Float -> pure Float
       _ -> report' (InvalidUnary unary operandT)
 
-  UnaryExpression {unary, operand} | NotOperator {} <- unary -> do
-    operandT <- checkExpression operand
-
-    case operandT of
-      Unknown -> pure Unknown
-      Bool -> pure Bool
-      _ -> report' (InvalidUnary unary operandT)
-
-  UnaryExpression {unary, operand} | LenOperator {} <- unary -> do
-    operandT <- checkExpression operand
-
-    case operandT of
-      Unknown -> pure Unknown
-      Array _ -> pure Int
-      _ -> report' (InvalidUnary unary operandT)
-
   BinaryExpression {left, binary, right} | AddOperator {} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right

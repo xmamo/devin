@@ -62,10 +62,21 @@ instance Monad Typer where
 
 predefinedEnv :: Environment
 predefinedEnv =
-  let types = [("Unit", Unit), ("Bool", Bool), ("Int", Int), ("Float", Float)]
-      funs = [("toInt", ([Float], Int)), ("toFloat", ([Int], Float))]
-      vars = [("true", Bool), ("false", Bool), ("unit", Unit)]
-   in [Scope types funs vars]
+  let t1 = ("Unit", Unit)
+      t2 = ("Bool", Bool)
+      t3 = ("Int", Int)
+      t4 = ("Float", Float)
+
+      f1 = ("not", ([Bool], Bool))
+      f2 = ("len", ([Array Unknown], Int))
+      f3 = ("toInt", ([Float], Int))
+      f4 = ("toFloat", ([Int], Float))
+
+      v1 = ("true", Bool)
+      v2 = ("false", Bool)
+      v3 = ("unit", Unit)
+
+   in [Scope [t4, t3, t2, t1] [f4, f3, f2, f1] [v3, v2, v1]]
 
 
 defineType :: String -> Type -> Typer Type

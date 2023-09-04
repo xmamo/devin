@@ -236,33 +236,57 @@ evalExpression expression = case expression of
             let actual = n + length argRs
             raise (InvalidArgCount expression expected actual)
 
-      Just (BuiltinToInt, depth) ->
-        withNewFrame (Just name) (depth + 1) $ case argRs of
-          [argR] -> do
-            argV <- readRef argR
+      Just (BuiltinNot, _) | [argR] <- argRs -> do
+        argV <- readRef argR
 
-            case argV of
-              Float x -> newRef (Int (round x))
+        case argV of
+          Bool x -> newRef (Bool (not x))
 
-              _ -> do
-                argT <- getType argV
-                raise (InvalidType (head args) Type.Float argT)
+          _ -> do
+            argT <- getType argV
+            raise (InvalidType (head args) Type.Bool argT)
 
-          _ -> raise (InvalidArgCount expression 1 (length argRs))
+      Just (BuiltinNot, _) ->
+        raise (InvalidArgCount expression 1 (length argRs))
 
-      Just (BuiltinToFloat, depth) ->
-        withNewFrame (Just name) (depth + 1) $ case argRs of
-          [argR] -> do
-            argV <- readRef argR
+      Just (BuiltinLen, _) | [argR] <- argRs -> do
+        argV <- readRef argR
 
-            case argV of
-              Int x -> newRef (Float (fromIntegral x))
+        case argV of
+          Array rs -> newRef (Int (fromIntegral (length rs)))
 
-              _ -> do
-                argT <- getType argV
-                raise (InvalidType (head args) Type.Int argT)
+          _ -> do
+            argT <- getType argV
+            raise (InvalidType (head args) (Type.Array Type.Unknown) argT)
 
-          _ -> raise (InvalidArgCount expression 1 (length argRs))
+      Just (BuiltinLen, _) ->
+        raise (InvalidArgCount expression 1 (length argRs))
+
+      Just (BuiltinToInt, _) | [argR] <- argRs -> do
+        argV <- readRef argR
+
+        case argV of
+          Float x -> newRef (Int (round x))
+
+          _ -> do
+            argT <- getType argV
+            raise (InvalidType (head args) Type.Float argT)
+
+      Just (BuiltinToInt, _) ->
+        raise (InvalidArgCount expression 1 (length argRs))
+
+      Just (BuiltinToFloat, _) | [argR] <- argRs -> do
+        argV <- readRef argR
+
+        case argV of
+          Int x -> newRef (Float (fromIntegral x))
+
+          _ -> do
+            argT <- getType argV
+            raise (InvalidType (head args) Type.Int argT)
+
+      Just (BuiltinToFloat, _) ->
+        raise (InvalidArgCount expression 1 (length argRs))
 
       _ -> raise (UnknownFun name interval)
 
@@ -287,28 +311,6 @@ evalExpression expression = case expression of
       Int _ -> raise (IntegerOverflow expression)
 
       Float x -> newRef (Float (negate x))
-
-      _ -> do
-        operandT <- getType operandV
-        raise (InvalidUnary unary operandT)
-
-  UnaryExpression {unary, operand} | NotOperator {} <- unary -> do
-    operandR <- evalExpression operand
-    operandV <- readRef operandR
-
-    case operandV of
-      Bool x -> newRef (Bool (not x))
-
-      _ -> do
-        operandT <- getType operandV
-        raise (InvalidUnary unary operandT)
-
-  UnaryExpression {unary, operand} | LenOperator {} <- unary -> do
-    operandR <- evalExpression operand
-    operandV <- readRef operandR
-
-    case operandV of
-      Array rs -> newRef (Int (fromIntegral (length rs)))
 
       _ -> do
         operandT <- getType operandV
