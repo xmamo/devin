@@ -18,13 +18,11 @@ import Numeric
 import Data.Vector ((!), (!?))
 import qualified Data.Vector as Vector
 
-import Control.Monad.Extra hiding (allM)
-import Data.Foldable.Extra (allM)
+import Control.Monad.Extra
 
 import Devin.Error
 import Devin.Evaluator
 import Devin.Syntax
-import Devin.Type (Type, (<:))
 import qualified Devin.Type as Type
 
 
@@ -441,81 +439,53 @@ evalExpression expression = case expression of
         rightT <- getType rightV
         raise (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary = EqualOperator {}, right} -> do
+  BinaryExpression {left, binary, right} | EqualOperator {} <- binary -> do
     leftR <- evalExpression left
     rightR <- evalExpression right
-    x <- compareRefs leftR rightR
-    newRef (Bool x)
 
-  BinaryExpression {left, binary = NotEqualOperator {}, right} -> do
+    compareRefs leftR rightR >>= \case
+      Right ordering -> newRef (Bool (ordering == EQ))
+      Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
+
+  BinaryExpression {left, binary, right} | NotEqualOperator {} <- binary -> do
     leftR <- evalExpression left
     rightR <- evalExpression right
-    x <- compareRefs leftR rightR
-    newRef (Bool (not x))
+
+    compareRefs leftR rightR >>= \case
+      Right ordering -> newRef (Bool (ordering /= EQ))
+      Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | LessOperator {} <- binary -> do
     leftR <- evalExpression left
-    leftV <- readRef leftR
-
     rightR <- evalExpression right
-    rightV <- readRef rightR
 
-    case (leftV, rightV) of
-      (Int x, Int y) -> newRef (Bool (x < y))
-      (Float x, Float y) -> newRef (Bool (x < y))
-
-      (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
-        raise (InvalidBinary binary leftT rightT)
+    compareRefs leftR rightR >>= \case
+      Right ordering -> newRef (Bool (ordering < EQ))
+      Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | LessOrEqualOperator {} <- binary -> do
     leftR <- evalExpression left
-    leftV <- readRef leftR
-
     rightR <- evalExpression right
-    rightV <- readRef rightR
 
-    case (leftV, rightV) of
-      (Int x, Int y) -> newRef (Bool (x <= y))
-      (Float x, Float y) -> newRef (Bool (x <= y))
-
-      (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
-        raise (InvalidBinary binary leftT rightT)
+    compareRefs leftR rightR >>= \case
+      Right ordering -> newRef (Bool (ordering <= EQ))
+      Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | GreaterOperator {} <- binary -> do
     leftR <- evalExpression left
-    leftV <- readRef leftR
-
     rightR <- evalExpression right
-    rightV <- readRef rightR
 
-    case (leftV, rightV) of
-      (Int x, Int y) -> newRef (Bool (x > y))
-      (Float x, Float y) -> newRef (Bool (x > y))
-
-      (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
-        raise (InvalidBinary binary leftT rightT)
+    compareRefs leftR rightR >>= \case
+      Right ordering -> newRef (Bool (ordering > EQ))
+      Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | GreaterOrEqualOperator {} <- binary -> do
     leftR <- evalExpression left
-    leftV <- readRef leftR
-
     rightR <- evalExpression right
-    rightV <- readRef rightR
 
-    case (leftV, rightV) of
-      (Int x, Int y) -> newRef (Bool (x >= y))
-      (Float x, Float y) -> newRef (Bool (x >= y))
-
-      (_, _) -> do
-        leftT <- getType leftV
-        rightT <- getType rightV
-        raise (InvalidBinary binary leftT rightT)
+    compareRefs leftR rightR >>= \case
+      Right ordering -> newRef (Bool (ordering >= EQ))
+      Left (leftT, rightT) -> raise (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | AndOperator {} <- binary -> do
     leftR <- evalExpression left
@@ -684,23 +654,3 @@ evalExpression expression = case expression of
   where
     safeUnary op x = toIntegralSized (op (toInteger x))
     safeBinary op x y = toIntegralSized (toInteger x `op` toInteger y)
-
-
-getType :: Value -> Evaluator Type
-getType = \case
-  Unit -> pure Type.Unit
-  Bool _ -> pure Type.Bool
-  Int _ -> pure Type.Int
-  Float _ -> pure Type.Float
-
-  Array rs | Vector.null rs -> pure (Type.Array Type.Unknown)
-
-  Array rs -> do
-    r <- readRef (Vector.head rs)
-    t <- getType r
-
-    let f Type.Unknown = False
-        f t' = t' <: t
-
-    ok <- allM (\r -> f <$> (getType =<< readRef r)) rs
-    pure (Type.Array (if ok then t else Type.Unknown))

@@ -280,23 +280,25 @@ checkExpression expression = case expression of
       (Int, Int) -> pure Int
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary = EqualOperator {}, right} -> do
+  BinaryExpression {left, binary, right} | EqualOperator {} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
     case (leftT, rightT) of
       (Unknown, _) -> pure Unknown
       (_, Unknown) -> pure Unknown
-      _ -> pure Bool
+      (_, _) | Just _ <- merge leftT rightT -> pure Bool
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary = NotEqualOperator {}, right} -> do
+  BinaryExpression {left, binary, right} | NotEqualOperator {} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
     case (leftT, rightT) of
       (Unknown, _) -> pure Unknown
       (_, Unknown) -> pure Unknown
-      _ -> pure Bool
+      (_, _) | Just _ <- merge leftT rightT -> pure Bool
+      (_, _) -> report' (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | LessOperator {} <- binary -> do
     leftT <- checkExpression left
@@ -305,8 +307,7 @@ checkExpression expression = case expression of
     case (leftT, rightT) of
       (Unknown, _) -> pure Unknown
       (_, Unknown) -> pure Unknown
-      (Int, Int) -> pure Bool
-      (Float, Float) -> pure Bool
+      (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | LessOrEqualOperator {} <- binary -> do
@@ -316,8 +317,7 @@ checkExpression expression = case expression of
     case (leftT, rightT) of
       (Unknown, _) -> pure Unknown
       (_, Unknown) -> pure Unknown
-      (Int, Int) -> pure Bool
-      (Float, Float) -> pure Bool
+      (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | GreaterOperator {} <- binary -> do
@@ -327,8 +327,7 @@ checkExpression expression = case expression of
     case (leftT, rightT) of
       (Unknown, _) -> pure Unknown
       (_, Unknown) -> pure Unknown
-      (Int, Int) -> pure Bool
-      (Float, Float) -> pure Bool
+      (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | GreaterOrEqualOperator {} <- binary -> do
@@ -338,8 +337,7 @@ checkExpression expression = case expression of
     case (leftT, rightT) of
       (Unknown, _) -> pure Unknown
       (_, Unknown) -> pure Unknown
-      (Int, Int) -> pure Bool
-      (Float, Float) -> pure Bool
+      (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
   BinaryExpression {left, binary, right} | AndOperator {} <- binary -> do

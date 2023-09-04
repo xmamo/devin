@@ -16,6 +16,7 @@ module Devin.Evaluator (
   runEvaluatorStep,
   runEvaluator,
   makePredefinedState,
+  getType,
   cloneVal,
   compareVals,
   newRef,
@@ -41,10 +42,12 @@ import Data.Int
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as Vector
 
-import Control.Monad.Extra
+import Data.Foldable.Extra (allM)
 
 import Devin.Error
 import Devin.Syntax
+import Devin.Type (Type, (<:))
+import qualified Devin.Type as Type
 
 
 newtype Evaluator a = Evaluator (State -> IO (Result a, State))
@@ -155,6 +158,26 @@ makePredefinedState = liftIO $ do
   pure [Frame Nothing 0 [f4, f3, f2, f1] [v3, v2, v1]]
 
 
+getType :: MonadIO m => Value -> m Type
+getType = \case
+  Unit -> pure Type.Unit
+  Bool _ -> pure Type.Bool
+  Int _ -> pure Type.Int
+  Float _ -> pure Type.Float
+
+  Array rs | Vector.null rs -> pure (Type.Array Type.Unknown)
+
+  Array rs -> do
+    r <- readRef (Vector.head rs)
+    t <- getType r
+
+    let f Type.Unknown = False
+        f t' = t' <: t
+
+    ok <- allM (\r -> f <$> (getType =<< readRef r)) rs
+    pure (Type.Array (if ok then t else Type.Unknown))
+
+
 cloneVal :: MonadIO m => Value -> m Value
 cloneVal = \case
   Unit -> pure Unit
@@ -167,25 +190,34 @@ cloneVal = \case
     pure (Array rs')
 
 
-compareVals :: MonadIO m => Value -> Value -> m Bool
+compareVals :: MonadIO m => Value -> Value -> m (Either (Type, Type) Ordering)
 compareVals v1 v2 = case (v1, v2) of
-  (Unit, Unit) -> pure True
-  (Bool x, Bool y) -> pure (x == y)
-  (Int x, Int y) -> pure (x == y)
-  (Float x, Float y) -> pure (x == y)
+  (Unit, Unit) -> pure (Right EQ)
+  (Bool x, Bool y) -> pure (Right (compare x y))
+  (Int x, Int y) -> pure (Right (compare x y))
+  (Float x, Float y) -> pure (Right (compare x y))
 
-  (Array rs1, Array rs2) | n <- Vector.length rs1, Vector.length rs2 == n ->
-    go n 0
-
+  (Array rs1, Array rs2) -> go (Vector.length rs1) (Vector.length rs2) 0
     where
-      go n i | i >= n = pure True
+      go n1 n2 i | i >= n1 =
+        pure (Right (if i == n2 then EQ else LT))
 
-      go n i = do
+      go n1 n2 i | i >= n2 =
+        pure (Right (if i == n1 then EQ else GT))
+
+      go n1 n2 i = do
         x <- readRef (rs1 ! i)
         y <- readRef (rs2 ! i)
-        compareVals x y &&^ go n (i + 1)
 
-  (_, _) -> pure False
+        compareVals x y >>= \case
+          Right EQ -> go n1 n2 (i + 1)
+          Right ordering -> pure (Right ordering)
+          Left (t1, t2) -> pure (Left (t1, t2))
+
+  (_, _) -> do
+    t1 <- getType v1
+    t2 <- getType v2
+    pure (Left (t1, t2))
 
 
 newRef :: MonadIO m => Value -> m Reference
@@ -211,7 +243,7 @@ cloneRef r = do
   newRef v'
 
 
-compareRefs :: MonadIO m => Reference -> Reference -> m Bool
+compareRefs :: MonadIO m => Reference -> Reference -> m (Either (Type, Type) Ordering)
 compareRefs r1 r2 = do
   v1 <- readRef r1
   v2 <- readRef r2
