@@ -60,105 +60,111 @@ evalDefinition2 = \case
 
 
 evalStatement :: Statement -> Evaluator (Maybe Cell)
-evalStatement statement = case statement of
-  DefinitionStatement {definition} -> do
-    evalDefinition definition
-    pure Nothing
+evalStatement statement = do
+  yield statement
 
-  ExpressionStatement {value} -> do
-    evalExpression value
-    pure Nothing
+  case statement of
+    DefinitionStatement {definition} -> do
+      evalDefinition definition
+      pure Nothing
 
-  IfStatement {predicate, trueBranch} -> do
-    cell <- evalExpression predicate
-    val <- readCell cell
+    ExpressionStatement {value} -> do
+      evalExpression value
+      pure Nothing
 
-    case val of
-      Bool True -> withNewFrame Nothing 1 (evalStatement trueBranch)
-      Bool False -> pure Nothing
+    IfStatement {predicate, trueBranch} -> do
+      cell <- evalExpression predicate
+      val <- readCell cell
 
-      _ -> do
-        t <- getType val
-        raise (InvalidType predicate Type.Bool t)
+      case val of
+        Bool True -> withNewFrame Nothing 1 (evalStatement trueBranch)
+        Bool False -> pure Nothing
 
-  IfElseStatement {predicate, trueBranch, falseBranch} -> do
-    val <- evalExpression predicate
-    cell <- readCell val
+        _ -> do
+          t <- getType val
+          raise (InvalidType predicate Type.Bool t)
 
-    case cell of
-      Bool True -> withNewFrame Nothing 1 (evalStatement trueBranch)
-      Bool False -> withNewFrame Nothing 1 (evalStatement falseBranch)
+    IfElseStatement {predicate, trueBranch, falseBranch} -> do
+      val <- evalExpression predicate
+      cell <- readCell val
 
-      _ -> do
-        t <- getType cell
-        raise (InvalidType predicate Type.Bool t)
+      case cell of
+        Bool True -> withNewFrame Nothing 1 (evalStatement trueBranch)
+        Bool False -> withNewFrame Nothing 1 (evalStatement falseBranch)
 
-  WhileStatement {predicate, body} -> do
-    cell <- evalExpression predicate
-    val <- readCell cell
+        _ -> do
+          t <- getType cell
+          raise (InvalidType predicate Type.Bool t)
 
-    case val of
-      Bool False -> pure Nothing
+    WhileStatement {predicate, body} -> go
+      where
+        go = do
+          cell <- evalExpression predicate
+          val <- readCell cell
 
-      Bool True -> withNewFrame Nothing 1 (evalStatement body) >>= \case
-        Just cell -> pure (Just cell)
-        Nothing -> evalStatement statement
+          case val of
+            Bool False -> pure Nothing
 
-      _ -> do
-        t <- getType val
-        raise (InvalidType predicate Type.Bool t)
+            Bool True -> withNewFrame Nothing 1 (evalStatement body) >>= \case
+              Just cell -> pure (Just cell)
+              Nothing -> go
 
-  DoWhileStatement {body, predicate} ->
-    withNewFrame Nothing 1 (evalStatement body) >>= \case
-      Just cell -> pure (Just cell)
+            _ -> do
+              t <- getType val
+              raise (InvalidType predicate Type.Bool t)
 
-      Nothing -> do
-        cell <- evalExpression predicate
-        val <- readCell cell
+    DoWhileStatement {body, predicate} -> go
+      where
+        go =
+          withNewFrame Nothing 1 (evalStatement body) >>= \case
+            Just cell -> pure (Just cell)
 
-        case val of
-          Bool False -> pure Nothing
-          Bool True -> evalStatement statement
+            Nothing -> do
+              cell <- evalExpression predicate
+              val <- readCell cell
 
-          _ -> do
-            t <- getType val
-            raise (InvalidType predicate Type.Bool t)
+              case val of
+                Bool False -> pure Nothing
+                Bool True -> go
 
-  ReturnStatement {result = Just result} -> do
-    cell <- evalExpression result
-    pure (Just cell)
+                _ -> do
+                  t <- getType val
+                  raise (InvalidType predicate Type.Bool t)
 
-  ReturnStatement {result = Nothing} -> do
-    cell <- newCell Unit
-    pure (Just cell)
+    ReturnStatement {result = Just result} -> do
+      cell <- evalExpression result
+      pure (Just cell)
 
-  AssertStatement {predicate} -> do
-    cell <- evalExpression predicate
-    val <- readCell cell
+    ReturnStatement {result = Nothing} -> do
+      cell <- newCell Unit
+      pure (Just cell)
 
-    case val of
-      Bool False -> raise (AssertionFailed statement)
-      Bool True -> pure Nothing
+    AssertStatement {predicate} -> do
+      cell <- evalExpression predicate
+      val <- readCell cell
 
-      _ -> do
-        t <- getType val
-        raise (InvalidType predicate Type.Bool t)
+      case val of
+        Bool False -> raise (AssertionFailed statement)
+        Bool True -> pure Nothing
 
-  BreakpointStatement {} -> do
-    breakpoint statement
-    pure Nothing
+        _ -> do
+          t <- getType val
+          raise (InvalidType predicate Type.Bool t)
 
-  BlockStatement {statements} -> withNewFrame Nothing 1 $ do
-    for_ statements $ \case
-      DefinitionStatement {definition} -> evalDefinition1 definition
-      _ -> pure ()
+    BreakpointStatement {} -> do
+      pure Nothing
 
-    flip firstJustM statements $ \case
-      DefinitionStatement {definition} -> do
-        evalDefinition2 definition
-        pure Nothing
+    BlockStatement {statements} -> withNewFrame Nothing 1 $ do
+      for_ statements $ \case
+        DefinitionStatement {definition} -> evalDefinition1 definition
+        _ -> pure ()
 
-      statement -> evalStatement statement
+      flip firstJustM statements $ \case
+        DefinitionStatement {definition} -> do
+          evalDefinition2 definition
+          pure Nothing
+
+        statement -> evalStatement statement
 
 
 evalExpression :: Expression -> Evaluator Cell

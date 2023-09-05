@@ -1,7 +1,6 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -14,6 +13,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.Foldable
 import Data.IORef
+import Data.Maybe
 import Data.String
 import System.Exit
 
@@ -50,14 +50,13 @@ import Devin.Highlight.Syntax
 
 
 main :: IO ()
-main =
-  Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
-    Nothing -> exitFailure
+main = Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
+  Nothing -> exitFailure
 
-    Just application -> do
-      G.onApplicationActivate application (onActivate application)
-      status <- G.applicationRun application Nothing
-      when (status /= 0) (exitWith (ExitFailure (fromIntegral status)))
+  Just application -> do
+    G.onApplicationActivate application (onActivate application)
+    status <- G.applicationRun application Nothing
+    when (status /= 0) (exitWith (ExitFailure (fromIntegral status)))
 
 
 onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
@@ -117,15 +116,15 @@ onActivate application = do
   codeScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
   Gtk.containerAdd codeScrolledWindow codeTextView
 
-  syntaxTreeScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
-  Gtk.containerAdd syntaxTreeScrolledWindow syntaxTreeView
+  rightScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  Gtk.containerAdd rightScrolledWindow syntaxTreeView
 
   logScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
   Gtk.containerAdd logScrolledWindow logView
 
   horizontalPaned <- Gtk.panedNew Gtk.OrientationHorizontal
   Gtk.panedPack1 horizontalPaned codeScrolledWindow True False
-  Gtk.panedPack2 horizontalPaned syntaxTreeScrolledWindow True False
+  Gtk.panedPack2 horizontalPaned rightScrolledWindow True False
 
   verticalPaned <- Gtk.panedNew Gtk.OrientationVertical
   Gtk.panedPack1 verticalPaned horizontalPaned True False
@@ -136,29 +135,101 @@ onActivate application = do
   Gtk.windowSetTitlebar window (Just headerBar)
   Gtk.containerAdd window verticalPaned
 
-  -- Set up some stuff needed for later:
+  -- Set up the the tag table. This is needed for syntax highlighting.
 
   scheme <- GtkSource.bufferGetStyleScheme codeBuffer
   tags <- generateTags scheme
-
   tagTable <- Gtk.textBufferGetTagTable codeBuffer
   applyTags tags tagTable
 
+  -- Create and initialize:
+  --
+  --  * The mutable reference syntaxTreeRef, which stores the currently parsed
+  --    syntax tree (if any);
+  --
+  --  * The condition variable parseAndTypeCheckCond, to signal when parsing,
+  --    type checking, and syntax highlighting need to be performed again.
+
   syntaxTreeRef <- newIORef Nothing
-  evaluatorThreadIdRef <- newIORef =<< forkIO (pure ())
-  playButtonClickCallbackRef <- newIORef (pure ())
+  parseAndTypeCheckCond <- newEmptyMVar
+
+  -- Set up codeBuffer callbacks for "changed" and "notify::cursor-position"
+  -- signals. These take care of signaling parseAndTypeCheckCond and
+  -- highlighting matching braces, respectively.
+
+  Gtk.onTextBufferChanged codeBuffer $ do
+    Gtk.widgetSetSensitive playButton False
+    tryPutMVar parseAndTypeCheckCond ()
+    pure ()
+
+  G.onObjectNotify codeBuffer (Just "cursor-position") $ \_ -> do
+    (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+    Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
+
+    whenJustM (readIORef syntaxTreeRef) $ \syntaxTree -> do
+      insertMark <- Gtk.textBufferGetInsert codeBuffer
+      insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
+      highlightDevinBraces tags codeBuffer insertIter syntaxTree
+      pure ()
+
+  -- Create and initialize:
+  --
+  --  * The mutable reference evaluatorAndStateRef, which stores the current
+  --    evaluator and state to be used in the debugger (if any).
+  --
+  --  * The condition variable debuggerCond, to signal when to run the debugger.
+
+  evaluatorAndStateRef <- newIORef Nothing
+  debuggerCond <- newEmptyMVar
+
+  -- Set up playButton and stopButton callbacks for "clicked" signals.
+  --
+  -- The play button exhibits different behavior depending on context:
+  -- initially, its function is to start the debugging process; pressing it
+  -- again will advance debugging to the next breakpoint.
+
+  let debuggerSetup evaluator state = do
+        Gtk.forestStoreClear stateStore
+
+        Gtk.widgetSetSensitive playButton False
+        Gtk.widgetSetSensitive stopButton True
+        Gtk.textViewSetEditable codeTextView False
+        Gtk.containerRemove rightScrolledWindow syntaxTreeView
+        Gtk.containerAdd rightScrolledWindow stateView
+        Gtk.widgetShowAll rightScrolledWindow
+
+        writeIORef evaluatorAndStateRef (Just (evaluator, state))
+
+  let debuggerCleanup = do
+        (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+        Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
+
+        Gtk.widgetSetSensitive playButton True
+        Gtk.widgetSetSensitive stopButton False
+        Gtk.textViewSetEditable codeTextView True
+        Gtk.containerRemove rightScrolledWindow stateView
+        Gtk.containerAdd rightScrolledWindow syntaxTreeView
+        Gtk.widgetShowAll rightScrolledWindow
+
+        writeIORef evaluatorAndStateRef Nothing
+
+  Gtk.onButtonClicked playButton $ do
+    whenM (isNothing <$> readIORef evaluatorAndStateRef) $ do
+      Just syntaxTree <- readIORef syntaxTreeRef
+      let evaluator = evalDevin syntaxTree
+      state <- makePredefinedState
+      debuggerSetup evaluator state
+
+    putMVar debuggerCond ()
+
+  Gtk.onButtonClicked stopButton debuggerCleanup
 
   -- Start the parse and type check worker thread:
 
-  workerSemaphore <- newEmptyMVar
-
   forkIO $ forever $ do
-    takeMVar workerSemaphore
+    takeMVar parseAndTypeCheckCond
 
     text <- Gdk.postGUISync $ do
-      writeIORef syntaxTreeRef Nothing
-      Gtk.widgetSetSensitive playButton False
-
       (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
       Gtk.textBufferGetText codeBuffer startIter endIter True
 
@@ -173,6 +244,8 @@ onActivate application = do
         let messages = errorMessages parseError
 
         Gdk.postGUIASync $ do
+          writeIORef syntaxTreeRef Nothing
+
           -- Remove previous error highlighting, if any
           (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
           Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
@@ -189,11 +262,9 @@ onActivate application = do
           Gtk.forestStoreClear syntaxTreeStore
 
       -- Parser success:
-      Right (devin, comments) -> do
-        let Devin {definitions} = devin
-
+      Right (syntaxTree, comments) -> do
         Gdk.postGUIASync $ do
-          writeIORef syntaxTreeRef (Just devin)
+          writeIORef syntaxTreeRef (Just syntaxTree)
 
           -- Remove any previous highlighting
           (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
@@ -209,27 +280,27 @@ onActivate application = do
           Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
           -- Highlight syntax
-          highlightDevin tags codeBuffer devin
+          highlightDevin tags codeBuffer syntaxTree
           for_ comments (highlightInterval (commentTag tags) codeBuffer)
 
           -- Highlight matching braces
           insertMark <- Gtk.textBufferGetInsert codeBuffer
           insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
-          highlightDevinBraces tags codeBuffer insertIter devin
+          highlightDevinBraces tags codeBuffer insertIter syntaxTree
 
           -- Update the syntax tree preview
-          let syntaxTree = map definitionTree definitions
+          let forest = map definitionTree (definitions syntaxTree)
           rootPath <- Gtk.treePathNew
           Gtk.forestStoreClear syntaxTreeStore
-          Gtk.forestStoreInsertForest syntaxTreeStore rootPath -1 syntaxTree
+          Gtk.forestStoreInsertForest syntaxTreeStore rootPath -1 forest
           Gtk.treeViewExpandAll syntaxTreeView
 
-        -- Run the typer
-        let typer = checkDevin devin
+        -- Run the type checker
+        let typer = checkDevin syntaxTree
         let typerResult = runTyper typer predefinedEnv
 
         case typerResult of
-          -- Typer success:
+          -- Type checker success:
           ((), env, []) -> do
             let (hasMain, _, _) = runTyper checkHasMain env
 
@@ -242,7 +313,7 @@ onActivate application = do
                 Just (([], _), _) -> pure True
                 _ -> pure False
 
-          -- Typer failure:
+          -- Type checker failure:
           ((), _, errors) -> Gdk.postGUIASync $ do
             Gtk.seqStoreClear logStore
 
@@ -257,85 +328,64 @@ onActivate application = do
               let datum = (showLineColumn (line, column), Text.pack (display error))
               Gtk.seqStoreAppend logStore datum
 
-  -- Set up codeBuffer callback for "changed" signals.
-  -- The callback takes care of syntax highlighting.
+  -- Start the debugger worker thread:
 
-  Gtk.onTextBufferChanged codeBuffer $ do
-    tryPutMVar workerSemaphore ()
-    pure ()
+  let updateStateStore forest = do
+        rootPath <- Gtk.treePathNew
+        Gtk.forestStoreClear stateStore
+        Gtk.forestStoreInsertForest stateStore rootPath -1 forest
+        Gtk.treeViewExpandAll stateView
 
-  -- Set up codeBuffer callback for "notify::cursor-position" signals.
-  -- The callback takes care of highlighting matching braces.
+  forkIO $ forever $ do
+    takeMVar debuggerCond
+    evaluatorAndState <- Gdk.postGUISync (readIORef evaluatorAndStateRef)
 
-  G.onObjectNotify codeBuffer (Just "cursor-position") $ \_ -> do
-    (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-    Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
+    whenJust evaluatorAndState $ \(evaluator, state) -> do
+      (result, state') <- runEvaluatorStep evaluator state
 
-    whenJustM (readIORef syntaxTreeRef) $ \devin -> do
-      insertMark <- Gtk.textBufferGetInsert codeBuffer
-      insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
-      highlightDevinBraces tags codeBuffer insertIter devin
-      pure ()
+      case result of
+        Done _ ->
+          Gdk.postGUIASync debuggerCleanup
 
-  -- The play button exhibits different behavior depending on context:
-  --  1. Initially, its function is to start the evaluation process;
-  --  2. Pressing it again will advance evaluation to the next breakpoint.
-  -- initialPlayButtonCallback holds the action corresponding to (1).
-
-  let initialPlayButtonCallback = whenJustM (readIORef syntaxTreeRef) $ \devin -> do
-        Gtk.widgetSetSensitive playButton False
-        Gtk.widgetSetSensitive stopButton True
-        Gtk.textViewSetEditable codeTextView False
-        Gtk.containerRemove syntaxTreeScrolledWindow syntaxTreeView
-        Gtk.containerAdd syntaxTreeScrolledWindow stateView
-        Gtk.widgetShowAll syntaxTreeScrolledWindow
-
-        state <- makePredefinedState
-        evaluatorThreadId <- forkIO (runEvaluator (evalDevin devin) state)
-        atomicWriteIORef evaluatorThreadIdRef evaluatorThreadId
-
-      runEvaluator evaluator state = do
-        (result, state') <- runEvaluatorStep evaluator state
-
-        Gdk.postGUIASync $ do
+        Yield statement evaluator' | BreakpointStatement {} <- statement -> do
           forest <- stateForest state'
-          rootPath <- Gtk.treePathNew
-          Gtk.forestStoreClear stateStore
-          Gtk.forestStoreInsertForest stateStore rootPath -1 forest
-          Gtk.treeViewExpandAll stateView
 
-        case result of
-          Done _ -> Gdk.postGUIASync debugger_cleanup
+          Gdk.postGUIASync $ do
+            writeIORef evaluatorAndStateRef (Just (evaluator', state'))
 
-          Breakpoint statement evaluator' -> do
-            atomicWriteIORef playButtonClickCallbackRef $ do
-              Gdk.postGUIASync $ do
-                Gtk.widgetSetSensitive playButton False
+            (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+            Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
-                (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-                Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
+            highlightInterval (highlightTag tags) codeBuffer statement
 
-              evaluatorThreadId <- forkIO (runEvaluator evaluator' state')
-              atomicWriteIORef evaluatorThreadIdRef evaluatorThreadId
+            updateStateStore forest
 
-            Gdk.postGUIASync $ do
-              Gtk.widgetSetSensitive playButton True
-              highlightInterval (highlightTag tags) codeBuffer statement
+            Gtk.widgetSetSensitive playButton True
 
-          Error error -> Gdk.postGUIASync $ do
+        Yield _ evaluator' -> Gdk.postGUIASync $
+          whenM (isJust <$> readIORef evaluatorAndStateRef) $ do
+            writeIORef evaluatorAndStateRef (Just (evaluator', state'))
+            putMVar debuggerCond ()
+
+        Error error -> do
+          forest <- stateForest state'
+
+          Gdk.postGUIASync $ do
             startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
             endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
             Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
+            updateStateStore forest
+
             -- Display the error message.
-            -- gi-gtk doesn't provide bindings for gtk_message_dialog_new() and
-            -- related functions. To get around this limitation, we use
-            -- GtkBuilder to load the MessageDialog from an XML string. This is
-            -- ugly, but it works.
+            --
+            -- gi-gtk doesn't provide bindings for gtk_message_dialog_new(). To
+            -- get around this limitation, we use Gtk.Builder to load a
+            -- Gtk.MessageDialog from an XML string. This is ugly, but it works.
 
             (line, column) <- getLineColumn startIter
             let t = showsLineColumn (line, column) (' ' : display error)
-            let t' = "&lt;tt&gt;" ++ escapeXml (escapeXml t) ++ "&lt;/tt&gt;"
+            let t' = escapeXml ("<tt>" ++ escapeXml t ++ "</tt>")
 
             let string =
                   "<interface>\n\
@@ -353,35 +403,12 @@ onActivate application = do
             dialog <- Gtk.buildWithBuilder buildFn builder
             Gtk.windowSetTransientFor dialog (Just window)
             Gtk.dialogRun dialog
+
+            -- Cleanup:
+
             Gtk.widgetDestroy dialog
             Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
-            debugger_cleanup
-
-      debugger_cleanup = do
-        (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-        Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
-
-        Gtk.textViewSetEditable codeTextView True
-        Gtk.widgetSetSensitive playButton True
-        Gtk.widgetSetSensitive stopButton False
-        Gtk.containerRemove syntaxTreeScrolledWindow stateView
-        Gtk.containerAdd syntaxTreeScrolledWindow syntaxTreeView
-        Gtk.widgetShowAll syntaxTreeScrolledWindow
-
-        atomicWriteIORef playButtonClickCallbackRef initialPlayButtonCallback
-
-  -- Set up playButton and stopButton callbacks for "clicked" signals:
-
-  atomicWriteIORef playButtonClickCallbackRef initialPlayButtonCallback
-
-  Gtk.onButtonClicked stopButton $ do
-    evaluatorThreadId <- readIORef evaluatorThreadIdRef
-    killThread evaluatorThreadId
-    debugger_cleanup
-
-  Gtk.onButtonClicked playButton $ do
-    playButtonClickCallback <- readIORef playButtonClickCallbackRef
-    playButtonClickCallback
+            debuggerCleanup
 
   -- Display the UI:
 

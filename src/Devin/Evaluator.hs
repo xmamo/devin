@@ -29,7 +29,7 @@ module Devin.Evaluator (
   defineVar,
   lookupVar,
   withNewFrame,
-  breakpoint,
+  yield,
   raise
 ) where
 
@@ -56,7 +56,7 @@ newtype Evaluator a = Evaluator (State -> IO (Result a, State))
 
 data Result a
   = Done a
-  | Breakpoint Statement (Evaluator a)
+  | Yield Statement (Evaluator a)
   | Error Error
   deriving Functor
 
@@ -103,7 +103,7 @@ instance Applicative Evaluator where
 
     case result of
       Done x -> runEvaluatorStep (f x <$> my) state'
-      Breakpoint statement mx -> pure (Breakpoint statement (liftA2 f mx my), state')
+      Yield statement mx -> pure (Yield statement (liftA2 f mx my), state')
       Error error -> pure (Error error, state')
 
 
@@ -114,7 +114,7 @@ instance Monad Evaluator where
 
     case result of
       Done x -> runEvaluatorStep (f x) state'
-      Breakpoint statement mx -> pure (Breakpoint statement (f =<< mx), state')
+      Yield statement mx -> pure (Yield statement (f =<< mx), state')
       Error error -> pure (Error error, state')
 
 
@@ -140,7 +140,7 @@ runEvaluator mx state = do
 
   case result of
     Done x -> pure (Right x, state')
-    Breakpoint _ mx -> runEvaluator mx state'
+    Yield _ mx -> runEvaluator mx state'
     Error error -> pure (Left error, state')
 
 
@@ -303,9 +303,9 @@ withNewFrame label poffset mx = do
       pure (Done (), tail state)
 
 
-breakpoint :: Statement -> Evaluator ()
-breakpoint statement = Evaluator $ \state ->
-  pure (Breakpoint statement (pure ()), state)
+yield :: Statement -> Evaluator ()
+yield statement = Evaluator $ \state ->
+  pure (Yield statement (pure ()), state)
 
 
 raise :: Error -> Evaluator a
