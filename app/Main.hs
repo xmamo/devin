@@ -15,6 +15,7 @@ import Data.Foldable
 import Data.IORef
 import Data.Maybe
 import Data.String
+import System.Environment
 import System.Exit
 
 import Text.Parsec.Error
@@ -237,6 +238,9 @@ onActivate application = do
     let parser = liftA2 (,) Parsers.devin getState
     parserResult <- runParserT parser [] "" (0, text)
 
+    whenJustM (lookupEnv "DEVIN_PARSER_DELAY") $ \delay ->
+      threadDelay (round (1000000.0 * read delay))
+
     case parserResult of
       -- Parser failure:
       Left parseError -> do
@@ -299,6 +303,9 @@ onActivate application = do
         let typer = checkDevin syntaxTree
         let typerResult = runTyper typer predefinedEnv
 
+        whenJustM (lookupEnv "DEVIN_TYPER_DELAY") $ \delay ->
+          threadDelay (round (1000000.0 * read delay))
+
         case typerResult of
           -- Type checker success:
           ((), env, []) -> do
@@ -342,6 +349,9 @@ onActivate application = do
 
     whenJust evaluatorAndState $ \(evaluator, state) -> do
       (result, state') <- runEvaluatorStep evaluator state
+
+      whenJustM (lookupEnv "DEVIN_EVALUATOR_DELAY") $ \delay ->
+        threadDelay (round (1000000.0 * read delay))
 
       case result of
         Done _ ->
