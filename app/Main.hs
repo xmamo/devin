@@ -189,50 +189,42 @@ onActivate application = do
   -- initially, its function is to start the debugging process; pressing it
   -- again will advance debugging to the next breakpoint.
 
-  let debuggerSetup evaluator state = do
-        Gtk.forestStoreClear stateStore
-
-        Gtk.widgetSetSensitive playButton False
-        Gtk.widgetSetSensitive stopButton True
-        Gtk.textViewSetEditable codeTextView False
-        Gtk.containerRemove rightScrolledWindow syntaxTreeView
-        Gtk.containerAdd rightScrolledWindow stateView
-        Gtk.widgetShowAll rightScrolledWindow
-
-        writeIORef evaluatorAndStateRef (Just (evaluator, state))
-
-  let debuggerCleanup = do
-        (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-        Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
-
-        Gtk.widgetSetSensitive playButton True
-        Gtk.widgetSetSensitive stopButton False
-        Gtk.textViewSetEditable codeTextView True
-        Gtk.containerRemove rightScrolledWindow stateView
-        Gtk.containerAdd rightScrolledWindow syntaxTreeView
-        Gtk.widgetShowAll rightScrolledWindow
-
-        writeIORef evaluatorAndStateRef Nothing
-
   Gtk.onButtonClicked playButton $ do
+    Gtk.widgetSetSensitive playButton False
+    Gtk.widgetSetSensitive stopButton True
+
     whenM (isNothing <$> readIORef evaluatorAndStateRef) $ do
+      Gtk.textViewSetEditable codeTextView False
+      Gtk.containerRemove rightScrolledWindow syntaxTreeView
+      Gtk.containerAdd rightScrolledWindow stateView
+      Gtk.widgetShowAll rightScrolledWindow
+
       Just syntaxTree <- readIORef syntaxTreeRef
       let evaluator = evalDevin syntaxTree
       state <- makePredefinedState
-      debuggerSetup evaluator state
+      writeIORef evaluatorAndStateRef (Just (evaluator, state))
 
-    putMVar debuggerCond ()
+    tryPutMVar debuggerCond ()
+    pure ()
 
-  Gtk.onButtonClicked stopButton debuggerCleanup
+  Gtk.onButtonClicked stopButton $ do
+    Gtk.widgetSetSensitive playButton False
+    Gtk.widgetSetSensitive stopButton False
+    writeIORef evaluatorAndStateRef Nothing
+    tryPutMVar debuggerCond ()
+    pure ()
+
 
   -- Start the parse and type check worker thread:
 
   forkIO $ forever $ do
-    takeMVar parseAndTypeCheckCond
+    readMVar parseAndTypeCheckCond
 
     text <- Gdk.postGUISync $ do
       (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-      Gtk.textBufferGetText codeBuffer startIter endIter True
+      text <- Gtk.textIterGetText startIter endIter
+      takeMVar parseAndTypeCheckCond
+      pure text
 
     -- Run the parser
     let parser = liftA2 (,) Parsers.devin getState
@@ -337,88 +329,114 @@ onActivate application = do
 
   -- Start the debugger worker thread:
 
-  let updateStateStore forest = do
-        rootPath <- Gtk.treePathNew
-        Gtk.forestStoreClear stateStore
-        Gtk.forestStoreInsertForest stateStore rootPath -1 forest
-        Gtk.treeViewExpandAll stateView
-
   forkIO $ forever $ do
-    takeMVar debuggerCond
-    evaluatorAndState <- Gdk.postGUISync (readIORef evaluatorAndStateRef)
+    readMVar debuggerCond
 
-    whenJust evaluatorAndState $ \(evaluator, state) -> do
-      (result, state') <- runEvaluatorStep evaluator state
+    evaluatorAndState <- Gdk.postGUISync $ do
+      evaluatorAndState <- readIORef evaluatorAndStateRef
+      takeMVar debuggerCond
+      pure evaluatorAndState
 
-      whenJustM (lookupEnv "DEVIN_EVALUATOR_DELAY") $ \delay ->
-        threadDelay (round (1000000.0 * read delay))
+    case evaluatorAndState of
+      Nothing -> Gdk.postGUIASync $ do
+        (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+        Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
-      case result of
-        Done _ ->
-          Gdk.postGUIASync debuggerCleanup
+        Gtk.forestStoreClear stateStore
 
-        Yield statement evaluator' | BreakpointStatement {} <- statement -> do
-          forest <- stateForest state'
+        Gtk.widgetSetSensitive playButton True
+        Gtk.widgetSetSensitive stopButton False
+        Gtk.textViewSetEditable codeTextView True
+        Gtk.containerRemove rightScrolledWindow stateView
+        Gtk.containerAdd rightScrolledWindow syntaxTreeView
+        Gtk.widgetShowAll rightScrolledWindow
 
-          Gdk.postGUIASync $ do
-            writeIORef evaluatorAndStateRef (Just (evaluator', state'))
+      Just (evaluator, state) -> do
+        (result, state') <- runEvaluatorStep evaluator state
 
-            (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-            Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
+        whenJustM (lookupEnv "DEVIN_EVALUATOR_DELAY") $ \delay ->
+          threadDelay (round (1000000.0 * read delay))
 
-            highlightInterval (highlightTag tags) codeBuffer statement
+        case result of
+          Done _ -> Gdk.postGUIASync $ do
+            writeIORef evaluatorAndStateRef Nothing
+            tryPutMVar debuggerCond ()
+            pure ()
 
-            updateStateStore forest
+          Yield statement evaluator' | BreakpointStatement {} <- statement -> do
+            forest <- stateForest state'
 
-            Gtk.widgetSetSensitive playButton True
+            Gdk.postGUIASync $ do
+              (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+              Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
+              highlightInterval (highlightTag tags) codeBuffer statement
 
-        Yield _ evaluator' -> Gdk.postGUIASync $
-          whenM (isJust <$> readIORef evaluatorAndStateRef) $ do
-            writeIORef evaluatorAndStateRef (Just (evaluator', state'))
-            putMVar debuggerCond ()
+              rootPath <- Gtk.treePathNew
+              Gtk.forestStoreClear stateStore
+              Gtk.forestStoreInsertForest stateStore rootPath -1 forest
+              Gtk.treeViewExpandAll stateView
 
-        Error error -> do
-          forest <- stateForest state'
+              writeIORef evaluatorAndStateRef (Just (evaluator', state'))
+              Gtk.widgetSetSensitive playButton True
 
-          Gdk.postGUIASync $ do
-            startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
-            endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
-            Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
+          Yield _ evaluator' -> Gdk.postGUIASync $
+            whenM (isJust <$> readIORef evaluatorAndStateRef) $ do
+              writeIORef evaluatorAndStateRef (Just (evaluator', state'))
+              tryPutMVar debuggerCond ()
+              pure ()
 
-            updateStateStore forest
+          Error error -> do
+            forest <- stateForest state'
 
-            -- Display the error message.
-            --
-            -- gi-gtk doesn't provide bindings for gtk_message_dialog_new(). To
-            -- get around this limitation, we use Gtk.Builder to load a
-            -- Gtk.MessageDialog from an XML string. This is ugly, but it works.
+            Gdk.postGUIASync $ do
+              Gtk.widgetSetSensitive stopButton False
 
-            (line, column) <- getLineColumn startIter
-            let t = showsLineColumn (line, column) (' ' : display error)
-            let t' = escapeXml ("<tt>" ++ escapeXml t ++ "</tt>")
+              (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+              Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
-            let string =
-                  "<interface>\n\
-                  \  <object class=\"GtkMessageDialog\" id=\"dialog\">\n\
-                  \    <property name=\"title\">Error</property>\n\
-                  \    <property name=\"message-type\">error</property>\n\
-                  \    <property name=\"buttons\">close</property>\n\
-                  \    <property name=\"use-markup\">true</property>\n\
-                  \    <property name=\"text\">" ++ t' ++ "</property>\n\
-                  \  </object>\n\
-                  \</interface>\0"
+              startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
+              endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
+              Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
-            let buildFn = Gtk.getObject Gtk.MessageDialog "dialog"
-            builder <- Gtk.builderNewFromString (Text.pack string) -1
-            dialog <- Gtk.buildWithBuilder buildFn builder
-            Gtk.windowSetTransientFor dialog (Just window)
-            Gtk.dialogRun dialog
+              rootPath <- Gtk.treePathNew
+              Gtk.forestStoreClear stateStore
+              Gtk.forestStoreInsertForest stateStore rootPath -1 forest
+              Gtk.treeViewExpandAll stateView
 
-            -- Cleanup:
+              -- Display the error message.
+              --
+              -- gi-gtk doesn't provide bindings for gtk_message_dialog_new().
+              -- To get around this limitation, we use Gtk.Builder to load the
+              -- Gtk.MessageDialog from an XML string.
 
-            Gtk.widgetDestroy dialog
-            Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
-            debuggerCleanup
+              (line, column) <- getLineColumn startIter
+              let t = showsLineColumn (line, column) (' ' : display error)
+              let t' = escapeXml ("<tt>" ++ escapeXml t ++ "</tt>")
+
+              let string =
+                    "<interface>\n\
+                    \  <object class=\"GtkMessageDialog\" id=\"dialog\">\n\
+                    \    <property name=\"title\">Error</property>\n\
+                    \    <property name=\"message-type\">error</property>\n\
+                    \    <property name=\"buttons\">close</property>\n\
+                    \    <property name=\"use-markup\">true</property>\n\
+                    \    <property name=\"text\">" ++ t' ++ "</property>\n\
+                    \  </object>\n\
+                    \</interface>\0"
+
+              let buildFn = Gtk.getObject Gtk.MessageDialog "dialog"
+              builder <- Gtk.builderNewFromString (Text.pack string) -1
+              dialog <- Gtk.buildWithBuilder buildFn builder
+              Gtk.windowSetTransientFor dialog (Just window)
+              Gtk.dialogRun dialog
+
+              -- Cleanup:
+
+              Gtk.widgetDestroy dialog
+              Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
+              writeIORef evaluatorAndStateRef Nothing
+              tryPutMVar debuggerCond ()
+              pure ()
 
   -- Display the UI:
 
