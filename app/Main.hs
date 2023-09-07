@@ -143,20 +143,13 @@ onActivate application = do
   tagTable <- Gtk.textBufferGetTagTable codeBuffer
   applyTags tags tagTable
 
-  -- Create and initialize:
-  --
-  --  * The mutable reference syntaxTreeRef, which stores the currently parsed
-  --    syntax tree (if any);
-  --
-  --  * The condition variable parseAndTypeCheckCond, to signal when parsing,
-  --    type checking, and syntax highlighting need to be performed again.
+  -- Set up codeBuffer callbacks for "changed" and "notify::cursor-position"
+  -- signals. The former callback signals that parsing, type checking, and
+  -- syntax highlighting need to be performed again; the latter takes care of
+  -- highlighting matching braces.
 
   syntaxTreeRef <- newIORef Nothing
   parseAndTypeCheckCond <- newEmptyMVar
-
-  -- Set up codeBuffer callbacks for "changed" and "notify::cursor-position"
-  -- signals. These take care of signaling parseAndTypeCheckCond and
-  -- highlighting matching braces, respectively.
 
   Gtk.onTextBufferChanged codeBuffer $ do
     Gtk.widgetSetSensitive playButton False
@@ -173,21 +166,14 @@ onActivate application = do
       highlightDevinBraces tags codeBuffer insertIter syntaxTree
       pure ()
 
-  -- Create and initialize:
-  --
-  --  * The mutable reference evaluatorAndStateRef, which stores the current
-  --    evaluator and state to be used in the debugger (if any).
-  --
-  --  * The condition variable debuggerCond, to signal when to run the debugger.
-
-  evaluatorAndStateRef <- newIORef Nothing
-  debuggerCond <- newEmptyMVar
-
   -- Set up playButton and stopButton callbacks for "clicked" signals.
   --
   -- The play button exhibits different behavior depending on context:
   -- initially, its function is to start the debugging process; pressing it
   -- again will advance debugging to the next breakpoint.
+
+  evaluatorAndStateRef <- newIORef Nothing
+  debuggerCond <- newEmptyMVar
 
   Gtk.onButtonClicked playButton $ do
     Gtk.widgetSetSensitive playButton False
@@ -213,7 +199,6 @@ onActivate application = do
     writeIORef evaluatorAndStateRef Nothing
     tryPutMVar debuggerCond ()
     pure ()
-
 
   -- Start the parse and type check worker thread:
 
@@ -291,6 +276,9 @@ onActivate application = do
           Gtk.forestStoreInsertForest syntaxTreeStore rootPath -1 forest
           Gtk.treeViewExpandAll syntaxTreeView
 
+          -- Clear the log
+          Gtk.seqStoreClear logStore
+
         -- Run the type checker
         let typer = checkDevin syntaxTree
         let typerResult = runTyper typer predefinedEnv
@@ -303,9 +291,8 @@ onActivate application = do
           ((), env, []) -> do
             let (hasMain, _, _) = runTyper checkHasMain env
 
-            Gdk.postGUIASync $ do
+            Gdk.postGUIASync $
               Gtk.widgetSetSensitive playButton hasMain
-              Gtk.seqStoreClear logStore
 
             where
               checkHasMain = lookupFunSignature "main" >>= \case
@@ -313,19 +300,16 @@ onActivate application = do
                 _ -> pure False
 
           -- Type checker failure:
-          ((), _, errors) -> Gdk.postGUIASync $ do
-            Gtk.seqStoreClear logStore
+          ((), _, errors) -> Gdk.postGUIASync $ for_ errors $ \error -> do
+            -- Highlight the part of code which caused the failure
+            startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
+            endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
+            Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
-            for_ errors $ \error -> do
-              -- Highlight the part of code which caused the failure
-              startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
-              endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
-              Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
-
-              -- Append the error description to the log
-              (line, column) <- getLineColumn startIter
-              let datum = (showLineColumn (line, column), Text.pack (display error))
-              Gtk.seqStoreAppend logStore datum
+            -- Append the error description to the log
+            (line, column) <- getLineColumn startIter
+            let datum = (showLineColumn (line, column), Text.pack (display error))
+            Gtk.seqStoreAppend logStore datum
 
   -- Start the debugger worker thread:
 
@@ -410,8 +394,8 @@ onActivate application = do
               -- Gtk.MessageDialog from an XML string.
 
               (line, column) <- getLineColumn startIter
-              let t = showsLineColumn (line, column) (' ' : display error)
-              let t' = escapeXml ("<tt>" ++ escapeXml t ++ "</tt>")
+              let text = showsLineColumn (line, column) (' ' : display error)
+              let text' = escapeXml ("<tt>" ++ escapeXml text ++ "</tt>")
 
               let string =
                     "<interface>\n\
@@ -420,7 +404,7 @@ onActivate application = do
                     \    <property name=\"message-type\">error</property>\n\
                     \    <property name=\"buttons\">close</property>\n\
                     \    <property name=\"use-markup\">true</property>\n\
-                    \    <property name=\"text\">" ++ t' ++ "</property>\n\
+                    \    <property name=\"text\">" ++ text' ++ "</property>\n\
                     \  </object>\n\
                     \</interface>\0"
 
