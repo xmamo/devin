@@ -3,6 +3,7 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main (main) where
 
@@ -12,6 +13,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Foldable
+import Data.Int
 import Data.IORef
 import Data.Maybe
 import Data.String
@@ -33,7 +35,6 @@ import Devin.Syntax
 import Devin.Typer
 import Devin.Typers
 
-import Data.Text (Text)
 import qualified Data.Text as Text
 
 import qualified GI.GObject as G
@@ -64,21 +65,15 @@ onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
 onActivate application = do
   Gdk.setCurrentThreadAsGUIThread
 
-  let stopIconName = "media-playback-stop-symbolic"
-  let playIconName = "media-playback-start-symbolic"
-  let noTextTagTable = Nothing :: Maybe Gtk.TextTagTable
-  let noAdjustment = Nothing :: Maybe Gtk.Adjustment
-
-  syntaxTreeStore <- Gtk.forestStoreNew []
-  stateStore <- Gtk.forestStoreNew []
-  logStore <- Gtk.seqStoreNew []
+  let noTextTagTable = Nothing @Gtk.TextTagTable
+  let noAdjustment = Nothing @Gtk.Adjustment
 
   -- Build the UI:
 
-  stopButton <- Gtk.buttonNewFromIconName (Just stopIconName) 1
+  stopButton <- Gtk.buttonNewFromIconName (Just "media-playback-stop-symbolic") 1
   Gtk.widgetSetSensitive stopButton False
 
-  playButton <- Gtk.buttonNewFromIconName (Just playIconName) 1
+  playButton <- Gtk.buttonNewFromIconName (Just "media-playback-start-symbolic") 1
   Gtk.widgetSetSensitive playButton False
 
   headerBar <- Gtk.headerBarNew
@@ -97,22 +92,22 @@ onActivate application = do
   GtkSource.viewSetTabWidth codeTextView 4
   Gtk.textViewSetMonospace codeTextView True
 
+  syntaxTreeStore <- Gtk.forestStoreNew []
   syntaxTreeView <- Gtk.treeViewNewWithModel syntaxTreeStore
   Gtk.treeViewSetHeadersVisible syntaxTreeView False
   Gtk.treeViewSetEnableSearch syntaxTreeView False
   Gtk.treeViewSetGridLines syntaxTreeView Gtk.TreeViewGridLinesVertical
-  setUpTwoColumns syntaxTreeStore syntaxTreeView
 
+  stateStore <- Gtk.forestStoreNew []
   stateView <- Gtk.treeViewNewWithModel stateStore
   Gtk.treeViewSetHeadersVisible stateView False
   Gtk.treeViewSetEnableSearch stateView False
   Gtk.treeViewSetGridLines stateView Gtk.TreeViewGridLinesVertical
-  setUpTwoColumns stateStore stateView
 
+  logStore <- Gtk.seqStoreNew []
   logView <- Gtk.treeViewNewWithModel logStore
   Gtk.treeViewSetHeadersVisible logView False
   Gtk.treeViewSetEnableSearch logView False
-  setUpTwoColumns logStore logView
 
   codeScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
   Gtk.containerAdd codeScrolledWindow codeTextView
@@ -135,6 +130,29 @@ onActivate application = do
   Gtk.windowSetDefaultSize window 1024 576
   Gtk.windowSetTitlebar window (Just headerBar)
   Gtk.containerAdd window verticalPaned
+
+  -- Set up columns for syntaxTreeView, stateView, logView:
+
+  renderer <- Gtk.cellRendererTextNew
+  Gtk.setCellRendererTextFamily renderer "monospace"
+
+  treeViewAppendColumnWithDataFunction syntaxTreeView syntaxTreeStore renderer $
+    \row -> Gtk.setCellRendererTextText renderer (fst row)
+
+  treeViewAppendColumnWithDataFunction syntaxTreeView syntaxTreeStore renderer $
+    \row -> Gtk.setCellRendererTextText renderer (snd row)
+
+  treeViewAppendColumnWithDataFunction stateView stateStore renderer $
+    \row -> Gtk.setCellRendererTextText renderer (fst row)
+
+  treeViewAppendColumnWithDataFunction stateView stateStore renderer $
+    \row -> Gtk.setCellRendererTextText renderer (snd row)
+
+  treeViewAppendColumnWithDataFunction logView logStore renderer $
+    \row -> Gtk.setCellRendererTextText renderer (fst row)
+
+  treeViewAppendColumnWithDataFunction logView logStore renderer $
+    \row -> Gtk.setCellRendererTextText renderer (snd row)
 
   -- Set up the the tag table. This is needed for syntax highlighting.
 
@@ -427,20 +445,14 @@ onActivate application = do
   Gtk.widgetShowAll window
 
 
-setUpTwoColumns ::
-  (Gtk.IsTypedTreeModel model, Gtk.IsTreeModel (model (Text, Text)), Gtk.IsTreeView a, MonadIO m) =>
-  model (Text, Text) -> a -> m ()
-setUpTwoColumns model view = for_ [fst, snd] $ \f -> do
-  cellRenderer <- Gtk.cellRendererTextNew
-  Gtk.setCellRendererTextFamily cellRenderer "monospace"
-
-  viewColumn <- Gtk.treeViewColumnNew
-  Gtk.cellLayoutPackStart viewColumn cellRenderer True
-
-  Gtk.cellLayoutSetDataFunction viewColumn cellRenderer model $ \row ->
-    Gtk.setCellRendererTextText cellRenderer (f row)
-
-  Gtk.treeViewAppendColumn view viewColumn
+treeViewAppendColumnWithDataFunction ::
+  (Gtk.IsTreeView a, Gtk.IsTypedTreeModel model, Gtk.IsTreeModel (model row), Gtk.IsCellRenderer cell) =>
+  a -> model row -> cell -> (row -> IO ()) -> IO Int32
+treeViewAppendColumnWithDataFunction view model renderer f = do
+  column <- Gtk.treeViewColumnNew
+  Gtk.cellLayoutPackStart column renderer True
+  Gtk.cellLayoutSetDataFunction column renderer model f
+  Gtk.treeViewAppendColumn view column
 
 
 getLineColumn :: (Num a, MonadIO m) => Gtk.TextIter -> m (a, a)
