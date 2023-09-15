@@ -70,7 +70,8 @@ executable devin
     Devin.Debug.Syntax,
     Devin.Highlight,
     Devin.Highlight.Braces,
-    Devin.Highlight.Syntax
+    Devin.Highlight.Syntax,
+    Devin.Levenshtein
 
   build-depends:
     base,
