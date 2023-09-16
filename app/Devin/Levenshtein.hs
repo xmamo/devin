@@ -1,20 +1,24 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE InstanceSigs #-}
 
 module Devin.Levenshtein (
   Edit (..),
+  TreeEdit (..),
   levenshtein,
   distance,
-  edits
+  diff,
+  treeDiff,
+  forestDiff
 ) where
 
 import Data.Data
-import Data.Functor.Classes
 import Data.List.NonEmpty (NonEmpty ((:|)), (<|))
 import qualified Data.List.NonEmpty as NonEmpty
 
+import Data.Tree
+
 import Data.List.Extra
+
 
 data Edit a
   = Copy a
@@ -24,13 +28,13 @@ data Edit a
   deriving (Eq, Foldable, Traversable, Functor, Show, Read, Data)
 
 
-instance Eq1 Edit where
-  liftEq :: (a -> b -> Bool) -> Edit a -> Edit b -> Bool
-  liftEq eq (Copy x) (Copy y) = x `eq` y
-  liftEq eq (Insert x) (Insert y) = x `eq` y
-  liftEq eq (Delete x) (Insert y) = x `eq` y
-  liftEq eq (Replace x1 x2) (Replace y1 y2) = liftEq eq [x1, x2] [y1, y2]
-  liftEq _ _ _ = False
+data TreeEdit a
+  = TreeCopy (Tree a)
+  | TreeInsert (Tree a)
+  | TreeDelete (Tree a)
+  | TreeReplace (Tree a) (Tree a)
+  | TreeUpdate (Tree a) [TreeEdit a]
+  deriving (Eq, Foldable, Traversable, Functor, Show, Read, Data)
 
 
 levenshtein :: (Eq a, Real b) => [a] -> [a] -> (b, [Edit a])
@@ -64,5 +68,20 @@ distance :: (Eq a, Real b) => [a] -> [a] -> b
 distance xs ys = fst (levenshtein xs ys)
 
 
-edits :: (Eq a) => [a] -> [a] -> [Edit a]
-edits xs ys = snd (levenshtein xs ys)
+diff :: Eq a => [a] -> [a] -> [Edit a]
+diff xs ys = snd (levenshtein xs ys)
+
+
+treeDiff :: Eq a => Tree a -> Tree a -> TreeEdit a
+treeDiff tree1 tree2
+  | rootLabel tree1 /= rootLabel tree2 = TreeReplace tree1 tree2
+  | otherwise = TreeUpdate tree1 (forestDiff (subForest tree1) (subForest tree2))
+
+
+forestDiff :: Eq a => Forest a -> Forest a -> [TreeEdit a]
+forestDiff forest1 forest2 = map f (diff forest1 forest2)
+  where
+    f (Copy tree) = TreeCopy tree
+    f (Insert tree) = TreeInsert tree
+    f (Delete tree) = TreeDelete tree
+    f (Replace tree1 tree2) = treeDiff tree1 tree2
