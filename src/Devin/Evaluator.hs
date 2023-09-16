@@ -36,18 +36,18 @@ module Devin.Evaluator (
 import Control.Applicative
 import Control.Monad.IO.Class
 import Data.Data
-import Data.IORef
 import Data.Int
+import Data.IORef
 
-import Data.Vector (Vector, (!))
 import qualified Data.Vector as Vector
+import Data.Vector (Vector, (!))
 
 import Data.Foldable.Extra (allM)
 
 import Devin.Error
 import Devin.Syntax
-import Devin.Type (Type, (<:))
 import qualified Devin.Type as Type
+import Devin.Type (Type, (<:))
 
 
 newtype Evaluator a = Evaluator (State -> IO (Result a, State))

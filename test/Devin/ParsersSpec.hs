@@ -4,26 +4,25 @@
 
 module Devin.ParsersSpec (spec) where
 
-import Devin.Parsec
-import Devin.Parsers (Parser)
-import qualified Devin.Parsers as Parsers
-import Devin.Syntax
-
 import Test.Hspec
+
+import Devin.Parsec
+import Devin.Parsers
+import Devin.Syntax
 
 
 spec :: Spec
 spec = do
   describe "expression" $ do
     it "should accept fragment 1" $
-      shouldParse Parsers.expression "1 += 2 " BinaryExpression {
+      shouldParse expression "1 += 2 " BinaryExpression {
         left = IntegerExpression 1 (0, 1),
         binary = AddAssignOperator (2, 4),
         right = IntegerExpression 2 (5, 6)
       }
 
     it "should accept fragment 2" $
-      shouldParse Parsers.expression "1+ 2*3 -(1) " BinaryExpression {
+      shouldParse expression "1+ 2*3 -(1) " BinaryExpression {
         left = BinaryExpression {
           left = IntegerExpression 1 (0, 1),
 
@@ -46,7 +45,7 @@ spec = do
       }
 
     it "should accept fragment 3" $
-      shouldParse Parsers.expression "a+ -2.1= f (x, y ,z ) *=88 " BinaryExpression {
+      shouldParse expression "a+ -2.1= f (x, y ,z ) *=88 " BinaryExpression {
         left = VarExpression "a" (0, 1),
 
         binary = AddOperator (1, 2),
@@ -85,7 +84,7 @@ spec = do
 
   describe "binaryOperator" $
     it "should accept fragment 4" $
-      shouldParse Parsers.binaryOperator "+ " (AddOperator (0, 1))
+      shouldParse binaryOperator "+ " (AddOperator (0, 1))
 
 
 shouldParse :: (Eq a, Show a) => Parser String a -> String -> a -> Expectation

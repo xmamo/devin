@@ -437,7 +437,7 @@ syntax mf = do
 keyword :: Stream s m Char => String -> ParserT s m Token
 keyword literal = flip label ("keyword “" ++ literal ++ "”") $ syntax $ do
   (name, state) <- lookAhead (liftA2 (,) identifier getParserState)
-  
+
   if name == literal then do
     setParserState state
     pure Token

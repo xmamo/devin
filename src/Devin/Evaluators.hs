@@ -15,15 +15,15 @@ import Data.Foldable
 import Data.Traversable
 import Numeric
 
-import Data.Vector ((!), (!?))
 import qualified Data.Vector as Vector
+import Data.Vector ((!), (!?))
 
 import Control.Monad.Extra
 
 import Devin.Error
 import Devin.Evaluator
-import Devin.Syntax
 import qualified Devin.Type as Type
+import Devin.Syntax
 
 
 evalDevin :: Devin -> Evaluator ()

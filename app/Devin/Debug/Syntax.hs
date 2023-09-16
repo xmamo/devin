@@ -14,11 +14,10 @@ module Devin.Debug.Syntax (
   tokenTree
 ) where
 
-import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Tree
 
-import Data.Tree (Tree)
-import qualified Data.Tree as Tree
+import qualified Data.Text as Text
+import Data.Text (Text)
 
 import Devin.Syntax
 import Devin.Utils
@@ -26,13 +25,13 @@ import Devin.Utils
 
 devinTree :: Devin -> Tree (Text, Text)
 devinTree Devin {definitions} =
-  Tree.Node ("Devin", "") (map definitionTree definitions)
+  Node ("Devin", "") (map definitionTree definitions)
 
 
 definitionTree :: Definition -> Tree (Text, Text)
 definitionTree = \case
   VarDefinition {varKeyword, varId, equalSign, value, semicolon} ->
-    Tree.Node ("VarDefinition", "") [
+    Node ("VarDefinition", "") [
       tokenTree "var" varKeyword,
       symbolIdTree varId,
       tokenTree "=" equalSign,
@@ -41,7 +40,7 @@ definitionTree = \case
     ]
 
   FunDefinition {defKeyword, funId, open, params, commas, close, returnInfo, body} ->
-    Tree.Node ("FunDefinition", "") $ concat [
+    Node ("FunDefinition", "") $ concat [
       [tokenTree "def" defKeyword],
       [symbolIdTree funId],
       [tokenTree "(" open],
@@ -67,23 +66,23 @@ definitionTree = \case
 statementTree :: Statement -> Tree (Text, Text)
 statementTree = \case
   DefinitionStatement {definition} ->
-    Tree.Node ("DefinitionStatement", "") [definitionTree definition]
+    Node ("DefinitionStatement", "") [definitionTree definition]
 
   ExpressionStatement {value, semicolon} ->
-    Tree.Node ("ExpressionStatement", "") [
+    Node ("ExpressionStatement", "") [
       expressionTree value,
       tokenTree ";" semicolon
     ]
 
   IfStatement {ifKeyword, predicate, trueBranch} ->
-    Tree.Node ("IfStatement", "") [
+    Node ("IfStatement", "") [
       tokenTree "if" ifKeyword,
       expressionTree predicate,
       statementTree trueBranch
     ]
 
   IfElseStatement {ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} ->
-    Tree.Node ("IfElseStatement", "") [
+    Node ("IfElseStatement", "") [
       tokenTree "if" ifKeyword,
       expressionTree predicate,
       statementTree trueBranch,
@@ -92,14 +91,14 @@ statementTree = \case
     ]
 
   WhileStatement {whileKeyword, predicate, body} ->
-    Tree.Node ("WhileStatement", "") [
+    Node ("WhileStatement", "") [
       tokenTree "while" whileKeyword,
       expressionTree predicate,
       statementTree body
     ]
 
   DoWhileStatement {doKeyword, body, whileKeyword, predicate, semicolon} ->
-    Tree.Node ("DoWhileStatement", "") [
+    Node ("DoWhileStatement", "") [
       tokenTree "do" doKeyword,
       statementTree body,
       tokenTree "while" whileKeyword,
@@ -108,33 +107,33 @@ statementTree = \case
     ]
 
   ReturnStatement {returnKeyword, result = Just result, semicolon} ->
-    Tree.Node ("ReturnStatement", "") [
+    Node ("ReturnStatement", "") [
       tokenTree "return" returnKeyword,
       expressionTree result,
       tokenTree ";" semicolon
     ]
 
   AssertStatement {assertKeyword, predicate, semicolon} ->
-    Tree.Node ("AssertStatement", "") [
+    Node ("AssertStatement", "") [
       tokenTree "assert" assertKeyword,
       expressionTree predicate,
       tokenTree ";" semicolon
     ]
 
   ReturnStatement {returnKeyword, result = Nothing, semicolon} ->
-    Tree.Node ("ReturnStatement", "") [
+    Node ("ReturnStatement", "") [
       tokenTree "return" returnKeyword,
       tokenTree ";" semicolon
     ]
 
   BreakpointStatement {breakpointKeyword, semicolon} ->
-    Tree.Node ("BreakpointStatement", "") [
+    Node ("BreakpointStatement", "") [
       tokenTree "breakpoint" breakpointKeyword,
       tokenTree ";" semicolon
     ]
 
   BlockStatement {open, statements, close} ->
-    Tree.Node ("BlockStatement", "") $ concat [
+    Node ("BlockStatement", "") $ concat [
       [tokenTree "{" open],
       map statementTree statements,
       [tokenTree "}" close]
@@ -144,16 +143,16 @@ statementTree = \case
 expressionTree :: Expression -> Tree (Text, Text)
 expressionTree = \case
   IntegerExpression {integer} ->
-    Tree.Node ("IntegerExpression", Text.pack (show integer)) []
+    Node ("IntegerExpression", Text.pack (show integer)) []
 
   RationalExpression {rational} ->
-    Tree.Node ("RationalExpression", Text.pack (showRatio rational)) []
+    Node ("RationalExpression", Text.pack (showRatio rational)) []
 
   VarExpression {varName} ->
-    Tree.Node ("VarExpression", Text.pack varName) []
+    Node ("VarExpression", Text.pack varName) []
 
   ArrayExpression {open, elems = es, commas = cs, close} ->
-    Tree.Node ("ArrayExpression", "") $ concat [
+    Node ("ArrayExpression", "") $ concat [
       [tokenTree "[" open],
       go es cs,
       [tokenTree "]" close]
@@ -165,7 +164,7 @@ expressionTree = \case
       go (e : es) (c : cs) = expressionTree e : tokenTree "," c : go es cs
 
   AccessExpression {array, open, index, close} ->
-    Tree.Node ("AccessExpression", "") [
+    Node ("AccessExpression", "") [
       expressionTree array,
       tokenTree "[" open,
       expressionTree index,
@@ -173,7 +172,7 @@ expressionTree = \case
     ]
 
   CallExpression {funId, open, args = as, commas = cs, close} ->
-    Tree.Node ("CallExpression", "") $ concat [
+    Node ("CallExpression", "") $ concat [
       [symbolIdTree funId, tokenTree "(" open],
       go as cs,
       [tokenTree ")" close]
@@ -185,20 +184,20 @@ expressionTree = \case
       go (a : as) (c : cs) = expressionTree a : tokenTree "," c : go as cs
 
   UnaryExpression {unary, operand} ->
-    Tree.Node ("UnaryExpression", "") [
+    Node ("UnaryExpression", "") [
       unaryOperatorTree unary,
       expressionTree operand
     ]
 
   BinaryExpression {left, binary, right} ->
-    Tree.Node ("BinaryExpression", "") [
+    Node ("BinaryExpression", "") [
       expressionTree left,
       binaryOperatorTree binary,
       expressionTree right
     ]
 
   ParenthesizedExpression {open, inner, close} ->
-    Tree.Node ("ParenthesizedExpression", "") [
+    Node ("ParenthesizedExpression", "") [
       tokenTree "(" open,
       expressionTree inner,
       tokenTree ")" close
@@ -206,45 +205,45 @@ expressionTree = \case
 
 
 unaryOperatorTree :: UnaryOperator -> Tree (Text, Text)
-unaryOperatorTree PlusOperator {} = Tree.Node ("PlusOperator", "+") []
-unaryOperatorTree MinusOperator {} = Tree.Node ("MinusOperator", "-") []
+unaryOperatorTree PlusOperator {} = Node ("PlusOperator", "+") []
+unaryOperatorTree MinusOperator {} = Node ("MinusOperator", "-") []
 
 
 binaryOperatorTree :: BinaryOperator -> Tree (Text, Text)
 binaryOperatorTree = \case
-  AddOperator {} -> Tree.Node ("AddOperator", "+") []
-  SubtractOperator {} -> Tree.Node ("SubtractOperator", "-") []
-  MultiplyOperator {} -> Tree.Node ("MultiplyOperator", "*") []
-  DivideOperator {} -> Tree.Node ("DivideOperator", "/") []
-  ModuloOperator {} -> Tree.Node ("ModuloOperator", "%") []
-  EqualOperator {} -> Tree.Node ("EqualOperator", "==") []
-  NotEqualOperator {} -> Tree.Node ("NotEqualOperator", "!=") []
-  LessOperator {} -> Tree.Node ("LessOperator", "<") []
-  LessOrEqualOperator {} -> Tree.Node ("LessOrEqualOperator", "<=") []
-  GreaterOperator {} -> Tree.Node ("GreaterOperator", ">") []
-  GreaterOrEqualOperator {} -> Tree.Node ("GreaterOrEqualOperator", ">=") []
-  AndOperator {} -> Tree.Node ("AndOperator", "and") []
-  OrOperator {} -> Tree.Node ("OrOperator", "or") []
-  XorOperator {} -> Tree.Node ("XorOperator", "xor") []
-  PlainAssignOperator {} -> Tree.Node ("PlainAssignOperator", "=") []
-  AddAssignOperator {} -> Tree.Node ("AddAssignOperator", "+=") []
-  SubtractAssignOperator {} -> Tree.Node ("SubtractAssignOperator", "-=") []
-  MultiplyAssignOperator {} -> Tree.Node ("MultiplyAssignOperator", "*=") []
-  DivideAssignOperator {} -> Tree.Node ("DivideAssignOperator", "/=") []
-  ModuloAssignOperator {} -> Tree.Node ("ModuloAssignOperator", "%=") []
+  AddOperator {} -> Node ("AddOperator", "+") []
+  SubtractOperator {} -> Node ("SubtractOperator", "-") []
+  MultiplyOperator {} -> Node ("MultiplyOperator", "*") []
+  DivideOperator {} -> Node ("DivideOperator", "/") []
+  ModuloOperator {} -> Node ("ModuloOperator", "%") []
+  EqualOperator {} -> Node ("EqualOperator", "==") []
+  NotEqualOperator {} -> Node ("NotEqualOperator", "!=") []
+  LessOperator {} -> Node ("LessOperator", "<") []
+  LessOrEqualOperator {} -> Node ("LessOrEqualOperator", "<=") []
+  GreaterOperator {} -> Node ("GreaterOperator", ">") []
+  GreaterOrEqualOperator {} -> Node ("GreaterOrEqualOperator", ">=") []
+  AndOperator {} -> Node ("AndOperator", "and") []
+  OrOperator {} -> Node ("OrOperator", "or") []
+  XorOperator {} -> Node ("XorOperator", "xor") []
+  PlainAssignOperator {} -> Node ("PlainAssignOperator", "=") []
+  AddAssignOperator {} -> Node ("AddAssignOperator", "+=") []
+  SubtractAssignOperator {} -> Node ("SubtractAssignOperator", "-=") []
+  MultiplyAssignOperator {} -> Node ("MultiplyAssignOperator", "*=") []
+  DivideAssignOperator {} -> Node ("DivideAssignOperator", "/=") []
+  ModuloAssignOperator {} -> Node ("ModuloAssignOperator", "%=") []
 
 
 symbolIdTree :: SymbolId -> Tree (Text, Text)
-symbolIdTree SymbolId {name} = Tree.Node ("SymbolId", Text.pack name) []
+symbolIdTree SymbolId {name} = Node ("SymbolId", Text.pack name) []
 
 
 typeIdTree :: TypeId -> Tree (Text, Text)
 typeIdTree = \case
   PlainTypeId {name} ->
-    Tree.Node ("PlainTypeId", Text.pack name) []
+    Node ("PlainTypeId", Text.pack name) []
 
   ArrayTypeId {open, innerTypeId, close} ->
-    Tree.Node ("ArrayTypeId", "") [
+    Node ("ArrayTypeId", "") [
       tokenTree "[" open,
       typeIdTree innerTypeId,
       tokenTree "]" close
@@ -252,4 +251,4 @@ typeIdTree = \case
 
 
 tokenTree :: String -> Token -> Tree (Text, Text)
-tokenTree label Token {} = Tree.Node ("Token", Text.pack label) []
+tokenTree label Token {} = Node ("Token", Text.pack label) []

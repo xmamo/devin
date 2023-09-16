@@ -15,10 +15,10 @@ import Control.Monad.IO.Class
 
 import Control.Monad.Extra
 
+import qualified GI.Gtk as Gtk
+
 import Devin.Interval
 import Devin.Syntax
-
-import qualified Data.GI.Gtk as Gtk
 
 import Devin.Highlight
 

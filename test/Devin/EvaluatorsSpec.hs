@@ -3,13 +3,13 @@
 
 module Devin.EvaluatorsSpec (spec) where
 
+import Test.Hspec
+
 import Devin.Display
 import Devin.Evaluator
 import Devin.Evaluators
 import Devin.Parsec
-import qualified Devin.Parsers as Parsers
-
-import Test.Hspec
+import Devin.Parsers
 
 
 spec :: Spec
@@ -219,12 +219,12 @@ spec = do
 
 
 executionShouldSucceed :: String -> Expectation
-executionShouldSucceed source = case runParser Parsers.devin [] "" (0, source) of
+executionShouldSucceed source = case runParser devin [] "" (0, source) of
   Left parseError -> expectationFailure (show parseError)
 
-  Right devin -> do
+  Right syntaxTree -> do
     state <- makePredefinedState
 
-    runEvaluator (evalDevin devin) state >>= \case
+    runEvaluator (evalDevin syntaxTree) state >>= \case
       (Left error, _) -> expectationFailure (display error)
       (Right _, _) -> pure ()

@@ -20,29 +20,33 @@ import Data.String
 import System.Environment
 import System.Exit
 
+import qualified Data.Text as Text
+
 import Text.Parsec.Error
 
 import Control.Monad.Extra
 import Data.List.Extra
+
+import qualified GI.GObject as G
+import qualified GI.Gio as G
+import qualified GI.Gtk as Gtk
+import qualified GI.GtkSource as GtkSource
+import Data.GI.Gtk.BuildFn
+import Data.GI.Gtk.ModelView.CellLayout
+import Data.GI.Gtk.ModelView.ForestStore
+import Data.GI.Gtk.ModelView.SeqStore
+import Data.GI.Gtk.ModelView.Types
+import Data.GI.Gtk.Threading
 
 import Devin.Display
 import Devin.Evaluator
 import Devin.Evaluators
 import Devin.Interval
 import Devin.Parsec hiding (Error)
-import qualified Devin.Parsers as Parsers
+import Devin.Parsers
 import Devin.Syntax
 import Devin.Typer
 import Devin.Typers
-
-import qualified Data.Text as Text
-
-import qualified GI.GObject as G
-import qualified GI.Gio as G
-import qualified Data.GI.Gtk.Threading as Gdk
-import qualified Data.GI.Gtk as Gtk
-import qualified Data.GI.Gtk.BuildFn as Gtk
-import qualified GI.GtkSource as GtkSource
 
 import Devin.Debug.Evaluator
 import Devin.Debug.Syntax
@@ -63,7 +67,7 @@ main = Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
 
 onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
 onActivate application = do
-  Gdk.setCurrentThreadAsGUIThread
+  setCurrentThreadAsGUIThread
 
   let noTextTagTable = Nothing @Gtk.TextTagTable
   let noAdjustment = Nothing @Gtk.Adjustment
@@ -92,19 +96,19 @@ onActivate application = do
   GtkSource.viewSetTabWidth codeTextView 4
   Gtk.textViewSetMonospace codeTextView True
 
-  syntaxTreeStore <- Gtk.forestStoreNew []
+  syntaxTreeStore <- forestStoreNew []
   syntaxTreeView <- Gtk.treeViewNewWithModel syntaxTreeStore
   Gtk.treeViewSetHeadersVisible syntaxTreeView False
   Gtk.treeViewSetEnableSearch syntaxTreeView False
   Gtk.treeViewSetGridLines syntaxTreeView Gtk.TreeViewGridLinesVertical
 
-  stateStore <- Gtk.forestStoreNew []
+  stateStore <- forestStoreNew []
   stateView <- Gtk.treeViewNewWithModel stateStore
   Gtk.treeViewSetHeadersVisible stateView False
   Gtk.treeViewSetEnableSearch stateView False
   Gtk.treeViewSetGridLines stateView Gtk.TreeViewGridLinesVertical
 
-  logStore <- Gtk.seqStoreNew []
+  logStore <- seqStoreNew []
   logView <- Gtk.treeViewNewWithModel logStore
   Gtk.treeViewSetHeadersVisible logView False
   Gtk.treeViewSetEnableSearch logView False
@@ -223,14 +227,14 @@ onActivate application = do
   forkIO $ forever $ do
     readMVar parseAndTypeCheckCond
 
-    text <- Gdk.postGUISync $ do
+    text <- postGUISync $ do
       (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
       text <- Gtk.textIterGetText startIter endIter
       takeMVar parseAndTypeCheckCond
       pure text
 
     -- Run the parser
-    let parser = liftA2 (,) Parsers.devin getState
+    let parser = liftA2 (,) devin getState
     parserResult <- runParserT parser [] "" (0, text)
 
     whenJustM (lookupEnv "DEVIN_PARSER_DELAY") $ \delay ->
@@ -242,7 +246,7 @@ onActivate application = do
         let offset = toOffset (errorPos parseError) text
         let messages = errorMessages parseError
 
-        Gdk.postGUIASync $ do
+        postGUIASync $ do
           writeIORef syntaxTreeRef Nothing
 
           -- Remove previous error highlighting, if any
@@ -256,13 +260,13 @@ onActivate application = do
           -- Update the error log; clear the syntax tree preview
           (line, column) <- getLineColumn startIter
           let datum = (showLineColumn (line, column), showMessages messages)
-          Gtk.seqStoreClear logStore
-          Gtk.seqStoreAppend logStore datum
-          Gtk.forestStoreClear syntaxTreeStore
+          seqStoreClear logStore
+          seqStoreAppend logStore datum
+          forestStoreClear syntaxTreeStore
 
       -- Parser success:
       Right (syntaxTree, comments) -> do
-        Gdk.postGUIASync $ do
+        postGUIASync $ do
           writeIORef syntaxTreeRef (Just syntaxTree)
 
           -- Remove any previous highlighting
@@ -290,12 +294,12 @@ onActivate application = do
           -- Update the syntax tree preview
           let forest = map definitionTree (definitions syntaxTree)
           rootPath <- Gtk.treePathNew
-          Gtk.forestStoreClear syntaxTreeStore
-          Gtk.forestStoreInsertForest syntaxTreeStore rootPath -1 forest
+          forestStoreClear syntaxTreeStore
+          forestStoreInsertForest syntaxTreeStore rootPath -1 forest
           Gtk.treeViewExpandAll syntaxTreeView
 
           -- Clear the log
-          Gtk.seqStoreClear logStore
+          seqStoreClear logStore
 
         -- Run the type checker
         let typer = checkDevin syntaxTree
@@ -309,7 +313,7 @@ onActivate application = do
           ((), env, []) -> do
             let (hasMain, _, _) = runTyper checkHasMain env
 
-            Gdk.postGUIASync $
+            postGUIASync $
               Gtk.widgetSetSensitive playButton hasMain
 
             where
@@ -318,7 +322,7 @@ onActivate application = do
                 _ -> pure False
 
           -- Type checker failure:
-          ((), _, errors) -> Gdk.postGUIASync $ for_ errors $ \error -> do
+          ((), _, errors) -> postGUIASync $ for_ errors $ \error -> do
             -- Highlight the part of code which caused the failure
             startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
             endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
@@ -327,24 +331,24 @@ onActivate application = do
             -- Append the error description to the log
             (line, column) <- getLineColumn startIter
             let datum = (showLineColumn (line, column), Text.pack (display error))
-            Gtk.seqStoreAppend logStore datum
+            seqStoreAppend logStore datum
 
   -- Start the debugger worker thread:
 
   forkIO $ forever $ do
     readMVar debuggerCond
 
-    evaluatorAndState <- Gdk.postGUISync $ do
+    evaluatorAndState <- postGUISync $ do
       evaluatorAndState <- readIORef evaluatorAndStateRef
       takeMVar debuggerCond
       pure evaluatorAndState
 
     case evaluatorAndState of
-      Nothing -> Gdk.postGUIASync $ do
+      Nothing -> postGUIASync $ do
         (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
         Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
-        Gtk.forestStoreClear stateStore
+        forestStoreClear stateStore
 
         Gtk.widgetSetSensitive playButton True
         Gtk.widgetSetSensitive stopButton False
@@ -360,7 +364,7 @@ onActivate application = do
           threadDelay (round (1000000.0 * read delay))
 
         case result of
-          Done _ -> Gdk.postGUIASync $ do
+          Done _ -> postGUIASync $ do
             writeIORef evaluatorAndStateRef Nothing
             tryPutMVar debuggerCond ()
             pure ()
@@ -368,20 +372,20 @@ onActivate application = do
           Yield statement evaluator' | BreakpointStatement {} <- statement -> do
             forest <- stateForest state'
 
-            Gdk.postGUIASync $ do
+            postGUIASync $ do
               (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
               Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
               highlightInterval (highlightTag tags) codeBuffer statement
 
               rootPath <- Gtk.treePathNew
-              Gtk.forestStoreClear stateStore
-              Gtk.forestStoreInsertForest stateStore rootPath -1 forest
+              forestStoreClear stateStore
+              forestStoreInsertForest stateStore rootPath -1 forest
               Gtk.treeViewExpandAll stateView
 
               writeIORef evaluatorAndStateRef (Just (evaluator', state'))
               Gtk.widgetSetSensitive playButton True
 
-          Yield _ evaluator' -> Gdk.postGUIASync $
+          Yield _ evaluator' -> postGUIASync $
             whenM (isJust <$> readIORef evaluatorAndStateRef) $ do
               writeIORef evaluatorAndStateRef (Just (evaluator', state'))
               tryPutMVar debuggerCond ()
@@ -390,7 +394,7 @@ onActivate application = do
           Error error -> do
             forest <- stateForest state'
 
-            Gdk.postGUIASync $ do
+            postGUIASync $ do
               Gtk.widgetSetSensitive stopButton False
 
               (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
@@ -401,8 +405,8 @@ onActivate application = do
               Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
               rootPath <- Gtk.treePathNew
-              Gtk.forestStoreClear stateStore
-              Gtk.forestStoreInsertForest stateStore rootPath -1 forest
+              forestStoreClear stateStore
+              forestStoreInsertForest stateStore rootPath -1 forest
               Gtk.treeViewExpandAll stateView
 
               -- Display the error message.
@@ -426,9 +430,9 @@ onActivate application = do
                     \  </object>\n\
                     \</interface>\0"
 
-              let buildFn = Gtk.getObject Gtk.MessageDialog "dialog"
+              let buildFn = getObject Gtk.MessageDialog "dialog"
               builder <- Gtk.builderNewFromString (Text.pack string) -1
-              dialog <- Gtk.buildWithBuilder buildFn builder
+              dialog <- buildWithBuilder buildFn builder
               Gtk.windowSetTransientFor dialog (Just window)
               Gtk.dialogRun dialog
 
@@ -446,12 +450,12 @@ onActivate application = do
 
 
 treeViewAppendColumnWithDataFunction ::
-  (Gtk.IsTreeView a, Gtk.IsTypedTreeModel model, Gtk.IsTreeModel (model row), Gtk.IsCellRenderer cell) =>
+  (Gtk.IsTreeView a, IsTypedTreeModel model, Gtk.IsTreeModel (model row), Gtk.IsCellRenderer cell) =>
   a -> model row -> cell -> (row -> IO ()) -> IO Int32
 treeViewAppendColumnWithDataFunction view model renderer f = do
   column <- Gtk.treeViewColumnNew
   Gtk.cellLayoutPackStart column renderer True
-  Gtk.cellLayoutSetDataFunction column renderer model f
+  cellLayoutSetDataFunction column renderer model f
   Gtk.treeViewAppendColumn view column
 
 

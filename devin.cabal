@@ -14,7 +14,6 @@ common common
     -Wextra
     -Wno-name-shadowing
     -Wno-type-defaults
-    -Wno-unused-do-bind
 
 library
   import: common
@@ -35,10 +34,11 @@ library
     Devin.Utils
 
   build-depends:
+    -- Haskell Platform, extra
     base,
-    extra,
+    vector,
     parsec,
-    vector
+    extra,
 
 test-suite devin-test
   import: common
@@ -52,10 +52,13 @@ test-suite devin-test
     Devin.TypersSpec
 
   build-depends:
+    -- Haskell Platform
     base,
-    devin,
+    parsec,
+
+    -- Others
     hspec,
-    parsec
+    devin
 
   build-tool-depends:
     hspec-discover:hspec-discover
@@ -74,20 +77,26 @@ executable devin
     Devin.Levenshtein
 
   build-depends:
+    -- Haskell Platform, extra
     base,
     containers,
-    devin,
-    extra,
-    haskell-gi-overloading == 0.0,
-    gi-gobject,
-    gi-glib,
-    gi-gio,
-    gi-gdk,
-    gi-gtk-hs,
-    gi-gtksource,
-    parsec,
     text,
-    vector
+    vector,
+    parsec,
+    extra,
+
+    -- haskell-gi
+    haskell-gi-overloading == 0.0,
+    -- gi-glib,
+    gi-gobject,
+    gi-gio >= 2.0.30,
+    gi-gdk,
+    gi-gtk < 4,
+    gi-gtksource,
+    gi-gtk-hs,
+
+    -- Others
+    devin
 
   ghc-options:
     -threaded

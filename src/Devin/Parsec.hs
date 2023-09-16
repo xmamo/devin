@@ -9,7 +9,6 @@
 
 module Devin.Parsec (
   module Text.Parsec,
-  module Text.Parsec.Pos,
   getOffset,
   toOffset,
   toOffsetT
