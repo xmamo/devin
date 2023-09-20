@@ -99,6 +99,11 @@ onActivate application = do
   GtkSource.viewSetTabWidth codeTextView 4
   Gtk.textViewSetMonospace codeTextView True
 
+  blankView <- Gtk.treeViewNew
+  Gtk.treeViewSetHeadersVisible blankView False
+  Gtk.treeViewSetEnableSearch blankView False
+  Gtk.treeViewSetGridLines blankView Gtk.TreeViewGridLinesVertical
+
   syntaxTreeModel <- forestStoreNew []
   syntaxTreeView <- Gtk.treeViewNewWithModel syntaxTreeModel
   Gtk.treeViewSetHeadersVisible syntaxTreeView False
@@ -120,7 +125,7 @@ onActivate application = do
   Gtk.containerAdd codeScrolledWindow codeTextView
 
   rightScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
-  Gtk.containerAdd rightScrolledWindow syntaxTreeView
+  Gtk.containerAdd rightScrolledWindow blankView
 
   logScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
   Gtk.containerAdd logScrolledWindow logView
@@ -195,7 +200,7 @@ onActivate application = do
   -- initially, its function is to start the debugging process; pressing it
   -- again will advance the debugger to the next breakpoint.
   --
-  -- During debugging, the window is switched to a different state where the
+  -- While debugging, the window is switched to a different state where the
   -- syntax tree preview is replaced by the evaluator state.
 
   evaluatorAndStateRef <- newIORef Nothing
@@ -207,9 +212,10 @@ onActivate application = do
 
     whenM (isNothing <$> readIORef evaluatorAndStateRef) $ do
       Gtk.textViewSetEditable codeTextView False
-      Gtk.containerRemove rightScrolledWindow syntaxTreeView
+      Just widget <- Gtk.binGetChild rightScrolledWindow
+      Gtk.containerRemove rightScrolledWindow widget
       Gtk.containerAdd rightScrolledWindow stateView
-      Gtk.widgetShowAll rightScrolledWindow
+      Gtk.widgetShowAll stateView
 
       Just syntaxTree <- readIORef syntaxTreeRef
       let evaluator = evalDevin syntaxTree
@@ -262,12 +268,19 @@ onActivate application = do
           startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
           Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
+          -- Hide the syntax tree preview
+          Just widget <- Gtk.binGetChild rightScrolledWindow
+          Gtk.containerRemove rightScrolledWindow widget
+          Gtk.containerAdd rightScrolledWindow blankView
+          Gtk.widgetShowAll blankView
+
           -- Update the error log
           list <- seqStoreToList logModel
           (line, column) <- getLineColumn startIter
           let list' = [(showLineColumn (line, column), showMessages messages)]
           let edits = diff list list'
-          patchSeq logModel edits
+          patchSeqStore logModel edits
+          Gtk.treeViewColumnsAutosize logView
 
       -- Parser success:
       Right (syntaxTree, comments) -> do
@@ -294,10 +307,18 @@ onActivate application = do
           let forest' = map definitionTree (definitions syntaxTree)
           let edits = forestDiff forest forest'
           let expandPredicate (label, _) = not (Text.isSuffixOf "Expression" label)
-          patchForest syntaxTreeView syntaxTreeModel edits expandPredicate
+          patchForestStore syntaxTreeModel edits syntaxTreeView expandPredicate
+          Gtk.treeViewColumnsAutosize syntaxTreeView
+
+          -- Show the syntax tree preview
+          Just widget <- Gtk.binGetChild rightScrolledWindow
+          Gtk.containerRemove rightScrolledWindow widget
+          Gtk.containerAdd rightScrolledWindow syntaxTreeView
+          Gtk.widgetShowAll syntaxTreeView
 
           -- Clear the error log
           seqStoreClear logModel
+          Gtk.treeViewColumnsAutosize logView
 
         -- Run the type checker
         let typer = checkDevin syntaxTree
@@ -327,6 +348,7 @@ onActivate application = do
             (line, column) <- getLineColumn startIter
             let datum = (showLineColumn (line, column), Text.pack (display error))
             seqStoreAppend logModel datum
+            Gtk.treeViewColumnsAutosize logView
 
   -- Start worker thread responsible for Devin code evaluation:
 
@@ -351,9 +373,9 @@ onActivate application = do
         Gtk.widgetSetSensitive playButton True
         Gtk.widgetSetSensitive stopButton False
         Gtk.textViewSetEditable codeTextView True
-        Gtk.containerRemove rightScrolledWindow stateView
+        Just widget <- Gtk.binGetChild rightScrolledWindow
+        Gtk.containerRemove rightScrolledWindow widget
         Gtk.containerAdd rightScrolledWindow syntaxTreeView
-        Gtk.widgetShowAll rightScrolledWindow
 
       Just (evaluator, state) -> do
         -- Evaluate a single statement
@@ -381,7 +403,8 @@ onActivate application = do
               -- Update the evaluator state preview
               forest <- forestStoreGetForest stateModel
               let edits = forestDiff forest forest'
-              patchForest stateView stateModel edits (const True)
+              patchForestStore stateModel edits stateView (const True)
+              Gtk.treeViewColumnsAutosize stateView
 
               -- Enable the play button to resume execution
               writeIORef evaluatorAndStateRef (Just (evaluator', state'))
@@ -413,7 +436,8 @@ onActivate application = do
               -- Update the evaluator state preview
               forest <- forestStoreGetForest stateModel
               let edits = forestDiff forest forest'
-              patchForest stateView stateModel edits (const True)
+              patchForestStore stateModel edits stateView (const True)
+              Gtk.treeViewColumnsAutosize stateView
 
               -- Display the error message.
               --
@@ -465,6 +489,81 @@ appendColumnWithDataFunction view model renderer f = do
   Gtk.treeViewAppendColumn view column
 
 
+patchSeqStore :: MonadIO m => SeqStore a -> [Edit a] -> m ()
+patchSeqStore model = flip foldM_ 0 $ \i edit -> case edit of
+  Copy _ _ ->
+    pure (i + 1)
+
+  Insert x -> do
+    seqStoreInsert model i x
+    pure (i + 1)
+
+  Delete _ -> do
+    seqStoreRemove model i
+    pure i
+
+  Replace _ x -> do
+    seqStoreInsert model i x
+    seqStoreRemove model (i + 1)
+    pure (i + 1)
+
+
+patchForestStore ::
+  Gtk.IsTreeView b =>
+  ForestStore a -> [TreeEdit a] -> b -> (a -> Bool) -> IO ()
+patchForestStore model edits view expandPredicate = do
+  path <- Gtk.treePathNew
+  go path 0 edits
+
+  where
+    go _ _ [] =
+      pure ()
+
+    go path i (TreeCopy _ _ : edits) =
+      go path (i + 1) edits
+
+    go path i (TreeInsert tree : edits) = do
+      forestStoreInsertTree model path i tree
+      Gtk.treePathAppendIndex path (fromIntegral i)
+      expand path
+      Gtk.treePathUp path
+      go path (i + 1) edits
+
+    go path i (TreeDelete _ : edits) = do
+      Gtk.treePathAppendIndex path (fromIntegral i)
+      forestStoreRemove model path
+      Gtk.treePathUp path
+      go path i edits
+
+    go path i (TreeReplace _ tree : edits) = do
+      forestStoreInsertTree model path i tree
+      Gtk.treePathAppendIndex path (fromIntegral i)
+      expand path
+      Gtk.treePathNext path
+      forestStoreRemove model path
+      Gtk.treePathUp path
+      go path (i + 1) edits
+
+    go path i (TreeUpdate _ edits' : edits) = do
+      Gtk.treePathAppendIndex path (fromIntegral i)
+      go path 0 edits'
+      Gtk.treePathUp path
+      go path (i + 1) edits
+
+    expand path = do
+      tree <- forestStoreGetTree model path
+
+      when (expandPredicate (rootLabel tree)) $ void $ do
+        Gtk.treeViewExpandRow view path False
+        Gtk.treePathDown path
+
+        for_ (subForest tree) $ \_ -> do
+          expand path
+          Gtk.treePathNext path
+
+        Gtk.treePathUp path
+
+
 getLineColumn :: (Num a, MonadIO m) => Gtk.TextIter -> m (a, a)
 getLineColumn iter = do
   line <- getLine iter
@@ -493,89 +592,13 @@ getColumn iter = do
       pure (Left (column + 1))
 
 
-patchSeq :: MonadIO m => SeqStore a -> [Edit a] -> m ()
-patchSeq model = foldM_ f 0
-  where
-    f i (Copy _ _) =
-      pure (i + 1)
-
-    f i (Insert x) = do
-      seqStoreInsert model i x
-      pure (i + 1)
-
-    f i (Delete _) = do
-      seqStoreRemove model i
-      pure i
-
-    f i (Replace _ x) = do
-      seqStoreRemove model i
-      seqStoreInsert model i x
-      pure (i + 1)
-
-
-patchForest ::
-  (Gtk.IsTreeView a, Show b) =>
-  a -> ForestStore b -> [TreeEdit b] -> (b -> Bool) -> IO ()
-patchForest view model edits expandPredicate = do
-  path <- Gtk.treePathNew
-  go path 0 edits
-
-  where
-    go _ _ [] =
-      pure ()
-
-    go path i (TreeCopy _ _ : edits) =
-      go path (i + 1) edits
-
-    go path i (TreeInsert tree : edits) = do
-      forestStoreInsertTree model path i tree
-      Gtk.treePathAppendIndex path (fromIntegral i)
-      expand path
-      Gtk.treePathUp path
-      go path (i + 1) edits
-
-    go path i (TreeDelete _ : edits) = do
-      Gtk.treePathAppendIndex path (fromIntegral i)
-      forestStoreRemove model path
-      Gtk.treePathUp path
-      go path i edits
-
-    go path i (TreeReplace _ tree : edits) = do
-      forestStoreInsertTree model path i tree
-      Gtk.treePathAppendIndex path (fromIntegral (i + 1))
-      forestStoreRemove model path
-      Gtk.treePathPrev path
-      expand path
-      Gtk.treePathUp path
-      go path (i + 1) edits
-
-    go path i (TreeUpdate _ edits' : edits) = do
-      Gtk.treePathAppendIndex path (fromIntegral i)
-      go path 0 edits'
-      Gtk.treePathUp path
-      go path (i + 1) edits
-
-    expand path = do
-      tree <- forestStoreGetTree model path
-
-      when (expandPredicate (rootLabel tree)) $ void $ do
-        Gtk.treeViewExpandRow view path False
-        Gtk.treePathDown path
-
-        for_ (subForest tree) $ \_ -> do
-          expand path
-          Gtk.treePathNext path
-
-        Gtk.treePathUp path
-
-
-showLineColumn :: (Num a, Show a, IsString b) => (a, a) -> b
-showLineColumn (line, column) = fromString (showsLineColumn (line, column) "")
-
-
-showsLineColumn :: (Num a, Show a) => (a, a) -> ShowS
+showsLineColumn :: Show a => (a, a) -> ShowS
 showsLineColumn (line, column) =
   showChar '[' . shows line . showChar ':' . shows column . showChar ']'
+
+
+showLineColumn :: (Show a, IsString b) => (a, a) -> b
+showLineColumn (line, column) = fromString (showsLineColumn (line, column) "")
 
 
 showMessages :: IsString a => [Message] -> a
