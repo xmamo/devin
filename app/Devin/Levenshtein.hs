@@ -1,22 +1,23 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Devin.Levenshtein (
   Edit (..),
   TreeEdit (..),
-  levenshteinWith,
+  levenshteinBy,
   levenshteinOn,
   levenshtein,
-  distanceWith,
+  distanceBy,
   distanceOn,
   distance,
   diffWith,
   diffOn,
   diff,
-  treeDiffWith,
+  treeDiffBy,
   treeDiffOn,
   treeDiff,
-  forestDiffWith,
+  forestDiffBy,
   forestDiffOn,
   forestDiff
 ) where
@@ -48,8 +49,8 @@ data TreeEdit a
   deriving (Eq, Foldable, Traversable, Functor, Show, Read, Data)
 
 
-levenshteinWith :: Real b => (a -> a -> Bool) -> [a] -> [a] -> (b, [Edit a])
-levenshteinWith eq xs ys =
+levenshteinBy :: Real b => (a -> a -> Bool) -> [a] -> [a] -> (b, [Edit a])
+levenshteinBy eq xs ys =
   let f (cost, edits) y = (cost + 1, Insert y : edits)
       row0 = NonEmpty.scanl f (0, []) ys
       (cost, edits) = NonEmpty.last (foldl nextRow row0 xs)
@@ -62,7 +63,7 @@ levenshteinWith eq xs ys =
           let cell = nextCell wCell nwCell nCell x y
            in wCell <| go cell (nCell :| cells) ys
 
-        go wCell _ _ = wCell :| []
+        go wCell _ _ = NonEmpty.singleton wCell
 
     nextCell (wCost, wEdits) (nwCost, nwEdits) (nCost, nEdits) x y =
       if x `eq` y then
@@ -76,27 +77,27 @@ levenshteinWith eq xs ys =
 
 
 levenshteinOn :: (Eq b, Real c) => (a -> b) -> [a] -> [a] -> (c, [Edit a])
-levenshteinOn f = levenshteinWith ((==) `on` f)
+levenshteinOn f = levenshteinBy ((==) `on` f)
 
 
 levenshtein :: (Eq a, Real b) => [a] -> [a] -> (b, [Edit a])
-levenshtein = levenshteinWith (==)
+levenshtein = levenshteinOn id
 
 
-distanceWith :: Real b => (a -> a -> Bool) -> [a] -> [a] -> b
-distanceWith eq xs ys = fst (levenshteinWith eq xs ys)
+distanceBy :: Real b => (a -> a -> Bool) -> [a] -> [a] -> b
+distanceBy eq xs ys = fst (levenshteinBy eq xs ys)
 
 
 distanceOn :: (Eq b, Real c) => (a -> b) -> [a] -> [a] -> c
-distanceOn f = distanceWith ((==) `on` f)
+distanceOn f = distanceBy ((==) `on` f)
 
 
 distance :: (Eq a, Real b) => [a] -> [a] -> b
-distance = distanceWith (==)
+distance = distanceOn id
 
 
 diffWith :: (a -> a -> Bool) -> [a] -> [a] -> [Edit a]
-diffWith eq xs ys = snd (levenshteinWith eq xs ys)
+diffWith eq xs ys = snd (levenshteinBy eq xs ys)
 
 
 diffOn :: Eq b => (a -> b) -> [a] -> [a] -> [Edit a]
@@ -104,44 +105,43 @@ diffOn f = diffWith ((==) `on` f)
 
 
 diff :: Eq a => [a] -> [a] -> [Edit a]
-diff = diffWith (==)
+diff = diffOn id
 
 
-treeDiffWith :: (a -> a -> Bool) -> Tree a -> Tree a -> TreeEdit a
-treeDiffWith eq tree1 tree2
+treeDiffBy :: (a -> a -> Bool) -> Tree a -> Tree a -> TreeEdit a
+treeDiffBy eq tree1 tree2
   | rootLabel tree1 `eq` rootLabel tree2 = treeDiffHelper eq tree1 tree2
   | otherwise = TreeReplace tree1 tree2
 
 
 treeDiffOn :: Eq b => (a -> b) -> Tree a -> Tree a -> TreeEdit a
-treeDiffOn f = treeDiffWith ((==) `on` f)
+treeDiffOn f = treeDiffBy ((==) `on` f)
 
 
 treeDiff :: Eq a => Tree a -> Tree a -> TreeEdit a
-treeDiff = treeDiffWith (==)
+treeDiff = treeDiffOn id
 
 
-forestDiffWith :: (a -> a -> Bool) -> Forest a -> Forest a -> [TreeEdit a]
-forestDiffWith eq forest1 forest2 =
-  map f (diffWith (eq `on` rootLabel) forest1 forest2)
-  where
-    f (Copy tree1 tree2) = treeDiffHelper eq tree1 tree2
-    f (Insert tree2) = TreeInsert tree2
-    f (Delete tree1) = TreeDelete tree1
-    f (Replace tree1 tree2) = TreeReplace tree1 tree2
+forestDiffBy :: (a -> a -> Bool) -> Forest a -> Forest a -> [TreeEdit a]
+forestDiffBy eq forest1 forest2 =
+  flip map (diffWith (eq `on` rootLabel) forest1 forest2) $ \case
+    Copy tree1 tree2 -> treeDiffHelper eq tree1 tree2
+    Insert tree2 -> TreeInsert tree2
+    Delete tree1 -> TreeDelete tree1
+    Replace tree1 tree2 -> TreeReplace tree1 tree2
 
 
 forestDiffOn :: Eq b => (a -> b) -> Forest a -> Forest a -> [TreeEdit a]
-forestDiffOn f = forestDiffWith ((==) `on` f)
+forestDiffOn f = forestDiffBy ((==) `on` f)
 
 
 forestDiff :: Eq a => Forest a -> Forest a -> [TreeEdit a]
-forestDiff = forestDiffWith (==)
+forestDiff = forestDiffOn id
 
 
 treeDiffHelper :: (a -> a -> Bool) -> Tree a -> Tree a -> TreeEdit a
 treeDiffHelper eq tree1 tree2 =
-  let edits = forestDiffWith eq (subForest tree1) (subForest tree2)
+  let edits = forestDiffBy eq (subForest tree1) (subForest tree2)
    in if all isCopy edits then TreeCopy tree1 tree2 else TreeUpdate tree1 edits
   where
     isCopy (TreeCopy _ _) = True

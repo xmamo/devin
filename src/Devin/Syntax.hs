@@ -21,10 +21,10 @@ import Data.Data
 
 import Devin.Display
 import Devin.Interval
-import Devin.Utils
+import Devin.Ratio
 
 
-data Devin = Devin {definitions :: [Definition], interval :: (Int, Int)}
+newtype Devin = Devin {definitions :: [Definition]}
   deriving (Eq, Show, Read, Data)
 
 
@@ -215,15 +215,6 @@ data TypeId
 
 newtype Token = Token {interval :: (Int, Int)}
   deriving (Eq, Show, Read, Data)
-
-
-instance Interval Devin where
-  start :: Num a => Devin -> a
-  start Devin {interval} = start interval
-
-
-  end :: Num a => Devin -> a
-  end Devin {interval} = end interval
 
 
 instance Interval Definition where

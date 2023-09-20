@@ -34,7 +34,7 @@ type Parser s a = Parsec (Int, s) [Token] a
 
 
 devin :: Stream s m Char => ParserT s m Devin
-devin = syntax $ do
+devin = do
   definitions <- s *> many (definition <* s) <* eof
   pure (Devin definitions)
 

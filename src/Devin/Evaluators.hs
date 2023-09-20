@@ -27,12 +27,11 @@ import Devin.Syntax
 
 
 evalDevin :: Devin -> Evaluator ()
-evalDevin Devin {definitions} = do
+evalDevin Devin {definitions} = void $ do
   for_ definitions evalDefinition1
   for_ definitions evalDefinition2
   Just (UserDefined FunDefinition {params = [], body}, depth) <- lookupFun "main"
   withNewFrame (Just "main") (depth + 1) (evalStatement body)
-  pure ()
 
 
 evalDefinition :: Definition -> Evaluator ()

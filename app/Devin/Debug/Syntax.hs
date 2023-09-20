@@ -19,8 +19,8 @@ import Data.Tree
 import qualified Data.Text as Text
 import Data.Text (Text)
 
+import Devin.Ratio
 import Devin.Syntax
-import Devin.Utils
 
 
 devinTree :: Devin -> Tree (Text, Text)
@@ -64,7 +64,7 @@ definitionTree = \case
 
 
 statementTree :: Statement -> Tree (Text, Text)
-statementTree = \case
+statementTree statement = case statement of
   DefinitionStatement {definition} ->
     Node ("DefinitionStatement", "") [definitionTree definition]
 
@@ -113,16 +113,16 @@ statementTree = \case
       tokenTree ";" semicolon
     ]
 
+  ReturnStatement {returnKeyword, result = Nothing, semicolon} ->
+    Node ("ReturnStatement", "") [
+      tokenTree "return" returnKeyword,
+      tokenTree ";" semicolon
+    ]
+
   AssertStatement {assertKeyword, predicate, semicolon} ->
     Node ("AssertStatement", "") [
       tokenTree "assert" assertKeyword,
       expressionTree predicate,
-      tokenTree ";" semicolon
-    ]
-
-  ReturnStatement {returnKeyword, result = Nothing, semicolon} ->
-    Node ("ReturnStatement", "") [
-      tokenTree "return" returnKeyword,
       tokenTree ";" semicolon
     ]
 
@@ -251,4 +251,4 @@ typeIdTree = \case
 
 
 tokenTree :: String -> Token -> Tree (Text, Text)
-tokenTree label Token {} = Node ("Token", Text.pack label) []
+tokenTree lexeme Token {} = Node ("Token", Text.pack lexeme) []

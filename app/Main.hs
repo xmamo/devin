@@ -20,6 +20,8 @@ import Data.String
 import System.Environment
 import System.Exit
 
+import Data.Tree
+
 import qualified Data.Text as Text
 
 import Text.Parsec.Error
@@ -27,11 +29,11 @@ import Text.Parsec.Error
 import Control.Monad.Extra
 import Data.List.Extra
 
+import Data.GI.Base.GObject
 import qualified GI.GObject as G
 import qualified GI.Gio as G
 import qualified GI.Gtk as Gtk
 import qualified GI.GtkSource as GtkSource
-import Data.GI.Gtk.BuildFn
 import Data.GI.Gtk.ModelView.CellLayout
 import Data.GI.Gtk.ModelView.ForestStore
 import Data.GI.Gtk.ModelView.SeqStore
@@ -51,8 +53,9 @@ import Devin.Typers
 import Devin.Debug.Evaluator
 import Devin.Debug.Syntax
 import Devin.Highlight
-import Devin.Highlight.Braces
+import Devin.Highlight.Brackets
 import Devin.Highlight.Syntax
+import Devin.Levenshtein
 
 
 main :: IO ()
@@ -96,20 +99,20 @@ onActivate application = do
   GtkSource.viewSetTabWidth codeTextView 4
   Gtk.textViewSetMonospace codeTextView True
 
-  syntaxTreeStore <- forestStoreNew []
-  syntaxTreeView <- Gtk.treeViewNewWithModel syntaxTreeStore
+  syntaxTreeModel <- forestStoreNew []
+  syntaxTreeView <- Gtk.treeViewNewWithModel syntaxTreeModel
   Gtk.treeViewSetHeadersVisible syntaxTreeView False
   Gtk.treeViewSetEnableSearch syntaxTreeView False
   Gtk.treeViewSetGridLines syntaxTreeView Gtk.TreeViewGridLinesVertical
 
-  stateStore <- forestStoreNew []
-  stateView <- Gtk.treeViewNewWithModel stateStore
+  stateModel <- forestStoreNew []
+  stateView <- Gtk.treeViewNewWithModel stateModel
   Gtk.treeViewSetHeadersVisible stateView False
   Gtk.treeViewSetEnableSearch stateView False
   Gtk.treeViewSetGridLines stateView Gtk.TreeViewGridLinesVertical
 
-  logStore <- seqStoreNew []
-  logView <- Gtk.treeViewNewWithModel logStore
+  logModel <- seqStoreNew []
+  logView <- Gtk.treeViewNewWithModel logModel
   Gtk.treeViewSetHeadersVisible logView False
   Gtk.treeViewSetEnableSearch logView False
 
@@ -140,23 +143,23 @@ onActivate application = do
   renderer <- Gtk.cellRendererTextNew
   Gtk.setCellRendererTextFamily renderer "monospace"
 
-  treeViewAppendColumnWithDataFunction syntaxTreeView syntaxTreeStore renderer $
-    \row -> Gtk.setCellRendererTextText renderer (fst row)
+  appendColumnWithDataFunction syntaxTreeView syntaxTreeModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (fst row)
 
-  treeViewAppendColumnWithDataFunction syntaxTreeView syntaxTreeStore renderer $
-    \row -> Gtk.setCellRendererTextText renderer (snd row)
+  appendColumnWithDataFunction syntaxTreeView syntaxTreeModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (snd row)
 
-  treeViewAppendColumnWithDataFunction stateView stateStore renderer $
-    \row -> Gtk.setCellRendererTextText renderer (fst row)
+  appendColumnWithDataFunction stateView stateModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (fst row)
 
-  treeViewAppendColumnWithDataFunction stateView stateStore renderer $
-    \row -> Gtk.setCellRendererTextText renderer (snd row)
+  appendColumnWithDataFunction stateView stateModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (snd row)
 
-  treeViewAppendColumnWithDataFunction logView logStore renderer $
-    \row -> Gtk.setCellRendererTextText renderer (fst row)
+  appendColumnWithDataFunction logView logModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (fst row)
 
-  treeViewAppendColumnWithDataFunction logView logStore renderer $
-    \row -> Gtk.setCellRendererTextText renderer (snd row)
+  appendColumnWithDataFunction logView logModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (snd row)
 
   -- Set up the the tag table. This is needed for syntax highlighting.
 
@@ -173,31 +176,32 @@ onActivate application = do
   syntaxTreeRef <- newIORef Nothing
   parseAndTypeCheckCond <- newEmptyMVar
 
-  Gtk.onTextBufferChanged codeBuffer $ do
+  Gtk.onTextBufferChanged codeBuffer $ void $ do
     Gtk.widgetSetSensitive playButton False
     tryPutMVar parseAndTypeCheckCond ()
-    pure ()
 
   G.onObjectNotify codeBuffer (Just "cursor-position") $ \_ -> do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
 
-    whenJustM (readIORef syntaxTreeRef) $ \syntaxTree -> do
+    whenJustM (readIORef syntaxTreeRef) $ \syntaxTree -> void $ do
       insertMark <- Gtk.textBufferGetInsert codeBuffer
       insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
-      highlightDevinBraces tags codeBuffer insertIter syntaxTree
-      pure ()
+      highlightDevinBrackets codeBuffer tags insertIter syntaxTree
 
   -- Set up playButton and stopButton callbacks for "clicked" signals.
   --
   -- The play button exhibits different behavior depending on context:
   -- initially, its function is to start the debugging process; pressing it
-  -- again will advance debugging to the next breakpoint.
+  -- again will advance the debugger to the next breakpoint.
+  --
+  -- During debugging, the window is switched to a different state where the
+  -- syntax tree preview is replaced by the evaluator state.
 
   evaluatorAndStateRef <- newIORef Nothing
   debuggerCond <- newEmptyMVar
 
-  Gtk.onButtonClicked playButton $ do
+  Gtk.onButtonClicked playButton $ void $ do
     Gtk.widgetSetSensitive playButton False
     Gtk.widgetSetSensitive stopButton True
 
@@ -213,16 +217,15 @@ onActivate application = do
       writeIORef evaluatorAndStateRef (Just (evaluator, state))
 
     tryPutMVar debuggerCond ()
-    pure ()
 
-  Gtk.onButtonClicked stopButton $ do
+  Gtk.onButtonClicked stopButton $ void $ do
     Gtk.widgetSetSensitive playButton False
     Gtk.widgetSetSensitive stopButton False
     writeIORef evaluatorAndStateRef Nothing
     tryPutMVar debuggerCond ()
-    pure ()
 
-  -- Start the parse and type check worker thread:
+  -- Start the worker thread responsible for parsing, type checking, and
+  -- performing syntax highlighting:
 
   forkIO $ forever $ do
     readMVar parseAndTypeCheckCond
@@ -249,57 +252,52 @@ onActivate application = do
         postGUIASync $ do
           writeIORef syntaxTreeRef Nothing
 
-          -- Remove previous error highlighting, if any
+          -- Clear any previous highlighting
           (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+          clearSyntaxHighlighting codeBuffer tags startIter endIter
+          clearBracketsHighlighting codeBuffer tags startIter endIter
           Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
           -- Highlight as error, starting from the parseError offset
           startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
           Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
-          -- Update the error log; clear the syntax tree preview
+          -- Update the error log
+          list <- seqStoreToList logModel
           (line, column) <- getLineColumn startIter
-          let datum = (showLineColumn (line, column), showMessages messages)
-          seqStoreClear logStore
-          seqStoreAppend logStore datum
-          forestStoreClear syntaxTreeStore
+          let list' = [(showLineColumn (line, column), showMessages messages)]
+          let edits = diff list list'
+          patchSeq logModel edits
 
       -- Parser success:
       Right (syntaxTree, comments) -> do
         postGUIASync $ do
           writeIORef syntaxTreeRef (Just syntaxTree)
 
-          -- Remove any previous highlighting
+          -- Clear any previous highlighting
           (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-          Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (keywordTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (varIdTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (funIdTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (typeTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (numberTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (operatorTag tags) startIter endIter
-          Gtk.textBufferRemoveTag codeBuffer (commentTag tags) startIter endIter
+          clearSyntaxHighlighting codeBuffer tags startIter endIter
+          clearBracketsHighlighting codeBuffer tags startIter endIter
           Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
 
           -- Highlight syntax
-          highlightDevin tags codeBuffer syntaxTree
+          highlightDevin codeBuffer tags syntaxTree
           for_ comments (highlightInterval (commentTag tags) codeBuffer)
 
           -- Highlight matching braces
           insertMark <- Gtk.textBufferGetInsert codeBuffer
           insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
-          highlightDevinBraces tags codeBuffer insertIter syntaxTree
+          highlightDevinBrackets codeBuffer tags insertIter syntaxTree
 
           -- Update the syntax tree preview
-          let forest = map definitionTree (definitions syntaxTree)
-          rootPath <- Gtk.treePathNew
-          forestStoreClear syntaxTreeStore
-          forestStoreInsertForest syntaxTreeStore rootPath -1 forest
-          Gtk.treeViewExpandAll syntaxTreeView
+          forest <- forestStoreGetForest syntaxTreeModel
+          let forest' = map definitionTree (definitions syntaxTree)
+          let edits = forestDiff forest forest'
+          let expandPredicate (label, _) = not (Text.isSuffixOf "Expression" label)
+          patchForest syntaxTreeView syntaxTreeModel edits expandPredicate
 
-          -- Clear the log
-          seqStoreClear logStore
+          -- Clear the error log
+          seqStoreClear logModel
 
         -- Run the type checker
         let typer = checkDevin syntaxTree
@@ -312,10 +310,7 @@ onActivate application = do
           -- Type checker success:
           ((), env, []) -> do
             let (hasMain, _, _) = runTyper checkHasMain env
-
-            postGUIASync $
-              Gtk.widgetSetSensitive playButton hasMain
-
+            postGUIASync (Gtk.widgetSetSensitive playButton hasMain)
             where
               checkHasMain = lookupFunSignature "main" >>= \case
                 Just (([], _), _) -> pure True
@@ -331,9 +326,9 @@ onActivate application = do
             -- Append the error description to the log
             (line, column) <- getLineColumn startIter
             let datum = (showLineColumn (line, column), Text.pack (display error))
-            seqStoreAppend logStore datum
+            seqStoreAppend logModel datum
 
-  -- Start the debugger worker thread:
+  -- Start worker thread responsible for Devin code evaluation:
 
   forkIO $ forever $ do
     readMVar debuggerCond
@@ -345,11 +340,14 @@ onActivate application = do
 
     case evaluatorAndState of
       Nothing -> postGUIASync $ do
+        -- Clear any previous highlighting
         (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
         Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
-        forestStoreClear stateStore
+        -- Clear the evaluator state preview
+        forestStoreClear stateModel
 
+        -- Revert back to the initial window state
         Gtk.widgetSetSensitive playButton True
         Gtk.widgetSetSensitive stopButton False
         Gtk.textViewSetEditable codeTextView True
@@ -358,101 +356,109 @@ onActivate application = do
         Gtk.widgetShowAll rightScrolledWindow
 
       Just (evaluator, state) -> do
+        -- Evaluate a single statement
         (result, state') <- runEvaluatorStep evaluator state
 
         whenJustM (lookupEnv "DEVIN_EVALUATOR_DELAY") $ \delay ->
           threadDelay (round (1000000.0 * read delay))
 
         case result of
-          Done _ -> postGUIASync $ do
+          -- Evaluator done:
+          Done _ -> postGUIASync $ void $ do
             writeIORef evaluatorAndStateRef Nothing
             tryPutMVar debuggerCond ()
-            pure ()
 
+          -- Evaluator yield (breakpoint statement):
           Yield statement evaluator' | BreakpointStatement {} <- statement -> do
-            forest <- stateForest state'
+            forest' <- stateForest state'
 
             postGUIASync $ do
+              -- Highlight the breakpoint statement
               (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
               Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
               highlightInterval (highlightTag tags) codeBuffer statement
 
-              rootPath <- Gtk.treePathNew
-              forestStoreClear stateStore
-              forestStoreInsertForest stateStore rootPath -1 forest
-              Gtk.treeViewExpandAll stateView
+              -- Update the evaluator state preview
+              forest <- forestStoreGetForest stateModel
+              let edits = forestDiff forest forest'
+              patchForest stateView stateModel edits (const True)
 
+              -- Enable the play button to resume execution
               writeIORef evaluatorAndStateRef (Just (evaluator', state'))
               Gtk.widgetSetSensitive playButton True
 
+          -- Evaluator yield (any other statement):
           Yield _ evaluator' -> postGUIASync $
-            whenM (isJust <$> readIORef evaluatorAndStateRef) $ do
+            whenM (isJust <$> readIORef evaluatorAndStateRef) $ void $ do
               writeIORef evaluatorAndStateRef (Just (evaluator', state'))
               tryPutMVar debuggerCond ()
-              pure ()
 
+          -- Evaluator error:
           Error error -> do
-            forest <- stateForest state'
+            forest' <- stateForest state'
 
-            postGUIASync $ do
+            postGUIASync $ void $ do
+              -- Disable the stop button
               Gtk.widgetSetSensitive stopButton False
 
+              -- Clear any previous highlighting
               (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
               Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
+              -- Highlight the segment of code which caused the error
               startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
               endIter <- Gtk.textBufferGetIterAtOffset codeBuffer (end error)
               Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
-              rootPath <- Gtk.treePathNew
-              forestStoreClear stateStore
-              forestStoreInsertForest stateStore rootPath -1 forest
-              Gtk.treeViewExpandAll stateView
+              -- Update the evaluator state preview
+              forest <- forestStoreGetForest stateModel
+              let edits = forestDiff forest forest'
+              patchForest stateView stateModel edits (const True)
 
               -- Display the error message.
               --
               -- gi-gtk doesn't provide bindings for gtk_message_dialog_new().
-              -- To get around this limitation, we use Gtk.Builder to load the
-              -- Gtk.MessageDialog from an XML string.
+              -- To get around this, we use new' from haskell-gi-base.
 
               (line, column) <- getLineColumn startIter
-              let text = showsLineColumn (line, column) (' ' : display error)
-              let text' = escapeXml ("<tt>" ++ escapeXml text ++ "</tt>")
+              let string = showsLineColumn (line, column) (' ' : display error)
+              let text = Text.pack ("<tt>" ++ escapeHTML string ++ "</tt>")
 
-              let string =
-                    "<interface>\n\
-                    \  <object class=\"GtkMessageDialog\" id=\"dialog\">\n\
-                    \    <property name=\"title\">Error</property>\n\
-                    \    <property name=\"message-type\">error</property>\n\
-                    \    <property name=\"buttons\">close</property>\n\
-                    \    <property name=\"use-markup\">true</property>\n\
-                    \    <property name=\"text\">" ++ text' ++ "</property>\n\
-                    \  </object>\n\
-                    \</interface>\0"
+              headerBar <- Gtk.headerBarNew
+              Gtk.headerBarSetTitle headerBar (Just "Error")
+              Gtk.headerBarSetShowCloseButton headerBar True
 
-              let buildFn = getObject Gtk.MessageDialog "dialog"
-              builder <- Gtk.builderNewFromString (Text.pack string) -1
-              dialog <- buildWithBuilder buildFn builder
+              dialog <- new' Gtk.MessageDialog
+                [
+                  Gtk.constructMessageDialogMessageType Gtk.MessageTypeError,
+                  Gtk.constructMessageDialogButtons Gtk.ButtonsTypeClose,
+                  Gtk.constructMessageDialogText text,
+                  Gtk.constructMessageDialogUseMarkup True
+                ]
+
+              Gtk.windowSetTitlebar dialog (Just headerBar)
               Gtk.windowSetTransientFor dialog (Just window)
+              Gtk.widgetShowAll dialog
               Gtk.dialogRun dialog
 
-              -- Cleanup:
+              -- Prepare for cleanup. Since debuggerCond is signalled, the
+              -- debugger worker thread should proceed by reverting back to the
+              -- initial window state.
 
               Gtk.widgetDestroy dialog
               Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
               writeIORef evaluatorAndStateRef Nothing
               tryPutMVar debuggerCond ()
-              pure ()
 
   -- Display the UI:
 
   Gtk.widgetShowAll window
 
 
-treeViewAppendColumnWithDataFunction ::
+appendColumnWithDataFunction ::
   (Gtk.IsTreeView a, IsTypedTreeModel model, Gtk.IsTreeModel (model row), Gtk.IsCellRenderer cell) =>
   a -> model row -> cell -> (row -> IO ()) -> IO Int32
-treeViewAppendColumnWithDataFunction view model renderer f = do
+appendColumnWithDataFunction view model renderer f = do
   column <- Gtk.treeViewColumnNew
   Gtk.cellLayoutPackStart column renderer True
   cellLayoutSetDataFunction column renderer model f
@@ -487,6 +493,82 @@ getColumn iter = do
       pure (Left (column + 1))
 
 
+patchSeq :: MonadIO m => SeqStore a -> [Edit a] -> m ()
+patchSeq model = foldM_ f 0
+  where
+    f i (Copy _ _) =
+      pure (i + 1)
+
+    f i (Insert x) = do
+      seqStoreInsert model i x
+      pure (i + 1)
+
+    f i (Delete _) = do
+      seqStoreRemove model i
+      pure i
+
+    f i (Replace _ x) = do
+      seqStoreRemove model i
+      seqStoreInsert model i x
+      pure (i + 1)
+
+
+patchForest ::
+  (Gtk.IsTreeView a, Show b) =>
+  a -> ForestStore b -> [TreeEdit b] -> (b -> Bool) -> IO ()
+patchForest view model edits expandPredicate = do
+  path <- Gtk.treePathNew
+  go path 0 edits
+
+  where
+    go _ _ [] =
+      pure ()
+
+    go path i (TreeCopy _ _ : edits) =
+      go path (i + 1) edits
+
+    go path i (TreeInsert tree : edits) = do
+      forestStoreInsertTree model path i tree
+      Gtk.treePathAppendIndex path (fromIntegral i)
+      expand path
+      Gtk.treePathUp path
+      go path (i + 1) edits
+
+    go path i (TreeDelete _ : edits) = do
+      Gtk.treePathAppendIndex path (fromIntegral i)
+      forestStoreRemove model path
+      Gtk.treePathUp path
+      go path i edits
+
+    go path i (TreeReplace _ tree : edits) = do
+      forestStoreInsertTree model path i tree
+      Gtk.treePathAppendIndex path (fromIntegral (i + 1))
+      forestStoreRemove model path
+      Gtk.treePathPrev path
+      expand path
+      Gtk.treePathUp path
+      go path (i + 1) edits
+
+    go path i (TreeUpdate _ edits' : edits) = do
+      Gtk.treePathAppendIndex path (fromIntegral i)
+      go path 0 edits'
+      Gtk.treePathUp path
+      go path (i + 1) edits
+
+    expand path = do
+      tree <- forestStoreGetTree model path
+
+      when (expandPredicate (rootLabel tree)) $ void $ do
+        Gtk.treeViewExpandRow view path False
+        Gtk.treePathDown path
+
+        for_ (subForest tree) $ \_ -> do
+          expand path
+          Gtk.treePathNext path
+
+        Gtk.treePathUp path
+
+
 showLineColumn :: (Num a, Show a, IsString b) => (a, a) -> b
 showLineColumn (line, column) = fromString (showsLineColumn (line, column) "")
 
@@ -512,12 +594,3 @@ showMessages messages =
     f (Expect _) = True
     f (Message _) = True
     f _ = False
-
-
-escapeXml :: String -> String
-escapeXml s =
-  let s' = replace "&" "&amp;" s
-      s'' = replace "\0" "&#0;" s'
-      s''' = replace "<" "&lt;" s''
-      s'''' = replace ">" "&gt;" s'''
-   in s''''

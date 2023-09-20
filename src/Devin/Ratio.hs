@@ -1,4 +1,5 @@
-module Devin.Utils (
+module Devin.Ratio (
+  module Data.Ratio,
   showsRatio,
   showRatio
 ) where

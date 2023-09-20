@@ -14,6 +14,7 @@ common common
     -Wextra
     -Wno-name-shadowing
     -Wno-type-defaults
+    -Wno-unused-do-bind
 
 library
   import: common
@@ -27,11 +28,11 @@ library
     Devin.Interval,
     Devin.Parsec,
     Devin.Parsers,
+    Devin.Ratio,
     Devin.Syntax,
     Devin.Type,
     Devin.Typer,
-    Devin.Typers,
-    Devin.Utils
+    Devin.Typers
 
   build-depends:
     -- Haskell Platform, extra
@@ -72,7 +73,7 @@ executable devin
     Devin.Debug.Evaluator,
     Devin.Debug.Syntax,
     Devin.Highlight,
-    Devin.Highlight.Braces,
+    Devin.Highlight.Brackets,
     Devin.Highlight.Syntax,
     Devin.Levenshtein
 
@@ -87,7 +88,7 @@ executable devin
 
     -- haskell-gi
     haskell-gi-overloading == 0.0,
-    -- gi-glib,
+    haskell-gi-base,
     gi-gobject,
     gi-gio >= 2.0.30,
     gi-gdk,
