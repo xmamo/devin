@@ -213,7 +213,6 @@ onActivate application = do
       Just widget <- Gtk.binGetChild rightScrolledWindow
       Gtk.containerRemove rightScrolledWindow widget
       Gtk.containerAdd rightScrolledWindow stateView
-      Gtk.widgetShowAll stateView
 
       Just syntaxTree <- readIORef syntaxTreeRef
       let evaluator = evalDevin syntaxTree
@@ -286,7 +285,6 @@ onActivate application = do
           Just widget <- Gtk.binGetChild rightScrolledWindow
           Gtk.containerRemove rightScrolledWindow widget
           Gtk.containerAdd rightScrolledWindow blankView
-          Gtk.widgetShowAll blankView
 
           -- Update the error log
           patchSeqStore logModel edits
@@ -320,16 +318,15 @@ onActivate application = do
           insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
           highlightDevinBrackets codeBuffer tags insertIter syntaxTree
 
-          -- Update the syntax tree preview
-          let expandPredicate (label, _) = not (Text.isSuffixOf "Expression" label)
-          patchForestStore syntaxTreeModel edits syntaxTreeView expandPredicate
-          Gtk.treeViewColumnsAutosize syntaxTreeView
-
           -- Show the syntax tree preview
           Just widget <- Gtk.binGetChild rightScrolledWindow
           Gtk.containerRemove rightScrolledWindow widget
           Gtk.containerAdd rightScrolledWindow syntaxTreeView
-          Gtk.widgetShowAll syntaxTreeView
+
+          -- Update the syntax tree preview
+          let expandPredicate (label, _) = not (Text.isSuffixOf "Expression" label)
+          patchForestStore syntaxTreeModel edits syntaxTreeView expandPredicate
+          Gtk.treeViewColumnsAutosize syntaxTreeView
 
           -- Clear the error log
           seqStoreClear logModel
@@ -500,6 +497,8 @@ onActivate application = do
 
   -- Display the UI:
 
+  Gtk.widgetShowAll syntaxTreeView
+  Gtk.widgetShowAll stateView
   Gtk.widgetShowAll window
 
 
