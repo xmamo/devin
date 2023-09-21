@@ -105,6 +105,7 @@ funDefinition = do
 statement :: Stream s m Char => ParserT s m Statement
 statement = choice
   [
+    try expressionStatement,
     definitionStatement,
     ifStatement,
     whileStatement,
@@ -112,20 +113,19 @@ statement = choice
     returnStatement,
     assertStatement,
     breakpointStatement,
-    expressionStatement,
     blockStatement
   ]
 
 
-expressionStatement :: Stream s m Char => ParserT s m Statement
-expressionStatement = do
-  value <- expression
-  semicolon <- s *> token ";"
-  pure (ExpressionStatement value semicolon)
-
-
 definitionStatement :: Stream s m Char => ParserT s m Statement
 definitionStatement = DefinitionStatement <$> definition
+
+
+expressionStatement :: Stream s m Char => ParserT s m Statement
+expressionStatement = do
+  value <- expression6 True
+  semicolon <- s *> token ";"
+  pure (ExpressionStatement value semicolon)
 
 
 ifStatement :: Stream s m Char => ParserT s m Statement
@@ -243,7 +243,7 @@ expression4 = chainl1 expression5 $ do
 
 
 expression5 :: Stream s m Char => ParserT s m Expression
-expression5 = chainl1 expression6 $ do
+expression5 = chainl1 (expression6 False) $ do
   binary <- try $ between s s $ syntax $ choice
     [
       text "*" $> MultiplyOperator,
@@ -254,15 +254,15 @@ expression5 = chainl1 expression6 $ do
   pure (\left right -> BinaryExpression left binary right)
 
 
-expression6 :: Stream s m Char => ParserT s m Expression
-expression6 = do
+expression6 :: Stream s m Char => Bool -> ParserT s m Expression
+expression6 requireSideEffects = do
   term <- choice
     [
+      callOrVarExpression,
       rationalExpression,
       integerExpression,
       arrayExpression,
       unaryExpression,
-      callOrVarExpression,
       parenthesizedExpression
     ]
 
@@ -274,12 +274,21 @@ expression6 = do
       close <- s *> token "]"
       pure (Left (AccessExpression term open index close))
 
-  optionMaybe (try (s *> assignOperator)) >>= \case
-    Nothing -> pure left
+  let leftIsCall = case left of
+        CallExpression {} -> True
+        _ -> False
 
-    Just binary -> do
-      right <- s *> expression
-      pure (BinaryExpression left binary right)
+  if not requireSideEffects || leftIsCall then
+    optionMaybe (try (s *> assignOperator)) >>= \case
+      Nothing -> pure left
+
+      Just binary -> do
+        right <- s *> expression
+        pure (BinaryExpression left binary right)
+  else do
+    binary <- s *> assignOperator
+    right <- s *> expression
+    pure (BinaryExpression left binary right)
 
   where
     assignOperator = syntax $ choice
@@ -348,7 +357,7 @@ callOrVarExpression = do
 unaryExpression :: Stream s m Char => ParserT s m Expression
 unaryExpression = do
   unary <- unaryOperator
-  operand <- s *> expression6
+  operand <- s *> expression6 False
   pure (UnaryExpression unary operand)
 
 
@@ -435,14 +444,10 @@ syntax mf = do
 
 
 keyword :: Stream s m Char => String -> ParserT s m Token
-keyword literal = flip label ("keyword “" ++ literal ++ "”") $ syntax $ do
-  (name, state) <- lookAhead (liftA2 (,) identifier getParserState)
-
-  if name == literal then do
-    setParserState state
-    pure Token
-  else
-    parserZero
+keyword literal = flip label ("keyword “" ++ literal ++ "”") $ try $ syntax $ do
+  string literal
+  notFollowedBy (satisfy (isIdentifierContinue . generalCategory))
+  pure Token
 
 
 token :: Stream s m Char => String -> ParserT s m Token
@@ -458,25 +463,28 @@ text literal = try (string literal) <?> ("“" ++ literal ++ "”")
 -- Regular expression: [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
 identifier :: Stream s m Char => ParserT s m String
 identifier = flip label "identifier" $ do
-  start <- satisfy (isStart . generalCategory)
-  continue <- many (satisfy (isContinue . generalCategory))
+  start <- satisfy (isIdentifierStart . generalCategory)
+  continue <- many (satisfy (isIdentifierContinue . generalCategory))
   pure (start : continue)
-
-  where
-    isStart UppercaseLetter = True
-    isStart LowercaseLetter = True
-    isStart TitlecaseLetter = True
-    isStart ModifierLetter = True
-    isStart OtherLetter = True
-    isStart LetterNumber = True
-    isStart ConnectorPunctuation = True
-    isStart _ = False
-
-    isContinue NonSpacingMark = True
-    isContinue SpacingCombiningMark = True
-    isContinue DecimalNumber = True
-    isContinue category = isStart category
 
 
 s :: Stream s m Char => ParserT s m ()
 s = skipMany (skipMany1 (space <?> "") <|> void (comment <?> ""))
+
+
+isIdentifierStart :: GeneralCategory -> Bool
+isIdentifierStart UppercaseLetter = True
+isIdentifierStart LowercaseLetter = True
+isIdentifierStart TitlecaseLetter = True
+isIdentifierStart ModifierLetter = True
+isIdentifierStart OtherLetter = True
+isIdentifierStart LetterNumber = True
+isIdentifierStart ConnectorPunctuation = True
+isIdentifierStart _ = False
+
+
+isIdentifierContinue :: GeneralCategory -> Bool
+isIdentifierContinue NonSpacingMark = True
+isIdentifierContinue SpacingCombiningMark = True
+isIdentifierContinue DecimalNumber = True
+isIdentifierContinue category = isIdentifierStart category
