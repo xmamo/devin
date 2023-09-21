@@ -1,4 +1,5 @@
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NegativeLiterals #-}
@@ -63,13 +64,13 @@ main = Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
   Nothing -> exitFailure
 
   Just application -> do
-    G.onApplicationActivate application (onActivate application)
+    G.onApplicationActivate application onActivate
     status <- G.applicationRun application Nothing
     when (status /= 0) (exitWith (ExitFailure (fromIntegral status)))
 
 
-onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
-onActivate application = do
+onActivate :: (Gtk.IsApplication a, ?self :: a) => G.ApplicationActivateCallback
+onActivate = do
   let noTextTagTable = Nothing @Gtk.TextTagTable
   let noAdjustment = Nothing @Gtk.Adjustment
 
@@ -136,10 +137,17 @@ onActivate application = do
   Gtk.panedPack1 verticalPaned horizontalPaned True False
   Gtk.panedPack2 verticalPaned logScrolledWindow False False
 
-  window <- Gtk.applicationWindowNew application
+  window <- Gtk.applicationWindowNew ?self
   Gtk.windowSetDefaultSize window 1024 576
   Gtk.windowSetTitlebar window (Just headerBar)
   Gtk.containerAdd window verticalPaned
+
+  -- Set up the the tag table. This is needed for syntax highlighting.
+
+  scheme <- GtkSource.bufferGetStyleScheme codeBuffer
+  tags <- generateTags scheme
+  tagTable <- Gtk.textBufferGetTagTable codeBuffer
+  applyTags tags tagTable
 
   -- Set up columns for syntaxTreeView, stateView, logView:
 
@@ -164,13 +172,6 @@ onActivate application = do
   appendColumnWithDataFunction logView logModel renderer $ \row ->
     Gtk.setCellRendererTextText renderer (snd row)
 
-  -- Set up the the tag table. This is needed for syntax highlighting.
-
-  scheme <- GtkSource.bufferGetStyleScheme codeBuffer
-  tags <- generateTags scheme
-  tagTable <- Gtk.textBufferGetTagTable codeBuffer
-  applyTags tags tagTable
-
   -- Set up codeBuffer callbacks for "changed" and "notify::cursor-position"
   -- signals. The former callback signals that parsing, type checking, and
   -- syntax highlighting need to be performed again; the latter takes care of
@@ -183,14 +184,14 @@ onActivate application = do
     Gtk.widgetSetSensitive playButton False
     tryPutMVar parseAndTypeCheckCond ()
 
-  G.onObjectNotify codeBuffer (Just "cursor-position") $ \_ -> do
-    (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-    Gtk.textBufferRemoveTag codeBuffer (bracketTag tags) startIter endIter
+  G.onObjectNotify codeBuffer (Just "cursor-position") $ const $ do
+    (startIter, endIter) <- Gtk.textBufferGetBounds ?self
+    Gtk.textBufferRemoveTag ?self (bracketTag tags) startIter endIter
 
     whenJustM (readIORef syntaxTreeRef) $ \syntaxTree -> void $ do
-      insertMark <- Gtk.textBufferGetInsert codeBuffer
-      insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
-      highlightDevinBrackets codeBuffer tags insertIter syntaxTree
+      insertMark <- Gtk.textBufferGetInsert ?self
+      insertIter <- Gtk.textBufferGetIterAtMark ?self insertMark
+      highlightDevinBrackets ?self tags insertIter syntaxTree
 
   -- Set up playButton and stopButton callbacks for "clicked" signals.
   --
@@ -580,7 +581,7 @@ patchForestStore model edits view expandPredicate = do
         Gtk.treeViewExpandRow view path False
         Gtk.treePathDown path
 
-        for_ (subForest tree) $ \_ -> do
+        for_ (subForest tree) $ const $ do
           expand path
           Gtk.treePathNext path
 
