@@ -69,8 +69,8 @@ predefinedEnv =
 
       f1 = ("not", ([Bool], Bool))
       f2 = ("len", ([Array Unknown], Int))
-      f3 = ("toInt", ([Float], Int))
-      f4 = ("toFloat", ([Int], Float))
+      f3 = ("intToFloat", ([Int], Float))
+      f4 = ("floatToInt", ([Float], Int))
 
       v1 = ("true", Bool)
       v2 = ("false", Bool)

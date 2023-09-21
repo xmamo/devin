@@ -265,20 +265,7 @@ evalExpression expression = case expression of
       Just (BuiltinLen, _) ->
         raise (InvalidArgCount expression 1 (length argCells))
 
-      Just (BuiltinToInt, _) | [cell] <- argCells -> do
-        val <- readCell cell
-
-        case val of
-          Float x -> newCell (Int (round x))
-
-          _ -> do
-            argT <- getType val
-            raise (InvalidType (head args) Type.Float argT)
-
-      Just (BuiltinToInt, _) ->
-        raise (InvalidArgCount expression 1 (length argCells))
-
-      Just (BuiltinToFloat, _) | [cell] <- argCells -> do
+      Just (BuiltinIntToFloat, _) | [cell] <- argCells -> do
         val <- readCell cell
 
         case val of
@@ -288,7 +275,20 @@ evalExpression expression = case expression of
             argT <- getType val
             raise (InvalidType (head args) Type.Int argT)
 
-      Just (BuiltinToFloat, _) ->
+      Just (BuiltinIntToFloat, _) ->
+        raise (InvalidArgCount expression 1 (length argCells))
+
+      Just (BuiltinFloatToInt, _) | [cell] <- argCells -> do
+        val <- readCell cell
+
+        case val of
+          Float x -> newCell (Int (round x))
+
+          _ -> do
+            argT <- getType val
+            raise (InvalidType (head args) Type.Float argT)
+
+      Just (BuiltinFloatToInt, _) ->
         raise (InvalidArgCount expression 1 (length argCells))
 
       _ -> raise (UnknownFun name interval)

@@ -76,8 +76,8 @@ data Function
   = UserDefined Definition
   | BuiltinNot
   | BuiltinLen
-  | BuiltinToInt
-  | BuiltinToFloat
+  | BuiltinIntToFloat
+  | BuiltinFloatToInt
   deriving (Eq, Show, Read, Data)
 
 
@@ -148,8 +148,8 @@ makePredefinedState :: MonadIO m => m State
 makePredefinedState = liftIO $ do
   let f1 = ("not", BuiltinNot)
   let f2 = ("len", BuiltinLen)
-  let f3 = ("toInt", BuiltinToInt)
-  let f4 = ("toFloat", BuiltinToFloat)
+  let f3 = ("intToFloat", BuiltinIntToFloat)
+  let f4 = ("floatToInt", BuiltinFloatToInt)
 
   v1 <- (,) "true" <$> newCell (Bool True)
   v2 <- (,) "false" <$> newCell (Bool False)
