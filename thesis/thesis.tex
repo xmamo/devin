@@ -122,7 +122,7 @@
 
   \currentpdfbookmark{\contentsname}{contents}
   \tableofcontents
-  \addtocontents{toc}{\vspace{-5pt}}
+  % \addtocontents{toc}{\vspace{-5pt}}
 
   \mainmatter
 
@@ -1369,13 +1369,6 @@
   achieve good performance, such as when implementing an algorithm which makes
   use of dynamic programming.
 
-  As an example, consider the function to compute the Levenshtein distance
-  between two strings; that is, the minimum number of single-character edits
-  (insertions, deletions or substitutions) required to change one string into
-  the other. The complexity of a na\"ive recursive implementation is
-  exponential: it is exactly in cases like these that using well-known iterative
-  algotithms which employ mutation is beneficial.
-
   \section{Importing and creating modules}
 
   In the previous section, I used import declarations to gain access to
@@ -1391,6 +1384,8 @@
   Haskell's compiler implicitly imports the module named \lstinline@Prelude@;
   thus, most of the functions and types described in earlier sections come from
   \lstinline@base@'s \lstinline@Prelude@ module.
+
+  \newpage
 
   Entities exported by modules can be brought into scope via qualified or
   unqualified import declarations. Let's consider the \lstinline@Data.List@
@@ -1452,12 +1447,10 @@
   \lstinline@Triangle2D@ module exporting types and functions to operate on
   triangles defined on the Euclidean plane:
 
+  \newpage
+
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    module Triangle2D (
-      Triangle (..),
-      perimeter,
-      area
-    ) where
+    module Triangle2D (Triangle (..), perimeter, area) where
 
     import Data.List
 
@@ -1514,17 +1507,21 @@
   \lstinline@Prelude@ and \lstinline@permutations :: [a] -> [[a]]@ from
   \lstinline@Data.List@ are used.
 
+  \newpage
+
   \section{Aside: desugaring type classes}
 
   Before moving on to the next chapter, I want to mention an interesting aspect
   most Haskell textbooks fail to mention: that is, how type classes may be
   implemented by the compiler.
 
-  Type classes are, of course, an abstraction supported by Haskell at its core.
-  As such, this section discusses \emph{one} possible implementation strategy.
-  Even if this strategy would turn out not be used by compilers, this model
-  gives profound understanding on how type classes work and which problems they
-  solve.
+  Type classes are an abstraction provided by Haskell at its core. As such, this
+  section discusses \emph{one} possible implementation strategy; of course, type
+  classes may be implemented differently---depending on the compiler. Still, the
+  model described in this section aims to provide a deeper understanding on how
+  type classes work and which problems they solve, even if, just like the
+  extistance and distinction between the stack and the heap, it is an
+  implementation detail.
 
   Let's examine one application of the \lstinline@Eq@ type class again: looking
   up for key in an association lists. Remember, the \lstinline@Eq@ class and
@@ -1553,7 +1550,10 @@
   the \lstinline@Eq@ type class desugars into a record of functions:
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
-    data Eq a = Eq {(==), (/=) :: a -> a -> Bool}
+    data Eq a = Eq {
+      (==) :: a -> a -> Bool,
+      (/=) :: a -> a -> Bool
+    }
 
     lookup :: Eq a -> a -> [(a, b)] -> Maybe b
     lookup _ _ [] = Nothing
@@ -1564,6 +1564,8 @@
   If type classes become record types, it follows that type class instances
   become record values. An \lstinline@Eq@ instance for the algebraic data type
   \lstinline@Grade@ of \autoref{section:user-defined-types} can be defined as:
+
+  \newpage
 
   \begin{lstlisting}[gobble=4,basicstyle=\ttfamily\small]
     gradeEqInstance :: Eq Grade
@@ -5388,6 +5390,12 @@
     [basicstyle=\ttfamily\footnotesize,aboveskip=0pt,belowskip=\baselineskip]
     {../src/Devin/Parsers.hs}
 
+  \section{\texttt{src/Devin/Ratio.hs}}
+
+  \lstinputlisting
+    [basicstyle=\ttfamily\footnotesize,aboveskip=0pt,belowskip=\baselineskip]
+    {../src/Devin/Ratio.hs}
+
   \section{\texttt{src/Devin/Syntax.hs}}
 
   \lstinputlisting
@@ -5411,12 +5419,6 @@
   \lstinputlisting
     [basicstyle=\ttfamily\footnotesize,aboveskip=0pt,belowskip=\baselineskip]
     {../src/Devin/Typers.hs}
-
-  \section{\texttt{src/Devin/Utils.hs}}
-
-  \lstinputlisting
-    [basicstyle=\ttfamily\footnotesize,aboveskip=0pt,belowskip=\baselineskip]
-    {../src/Devin/Utils.hs}
 
   \section{\texttt{test/Main.hs}}
 
@@ -5467,17 +5469,23 @@
     [basicstyle=\ttfamily\footnotesize,aboveskip=0pt,belowskip=\baselineskip]
     {../app/Devin/Highlight.hs}
 
-  \section{\texttt{app/Devin/Highlight/Braces.hs}}
+  \section{\texttt{app/Devin/Highlight/Brackets.hs}}
 
   \lstinputlisting
     [basicstyle=\ttfamily\footnotesize,aboveskip=0pt,belowskip=\baselineskip]
-    {../app/Devin/Highlight/Braces.hs}
+    {../app/Devin/Highlight/Brackets.hs}
 
   \section{\texttt{app/Devin/Highlight/Syntax.hs}}
 
   \lstinputlisting
     [basicstyle=\ttfamily\footnotesize,aboveskip=0pt,belowskip=\baselineskip]
     {../app/Devin/Highlight/Syntax.hs}
+
+  \section{\texttt{app/Devin/Levenshtein.hs}}
+
+  \lstinputlisting
+    [basicstyle=\ttfamily\footnotesize,aboveskip=0pt,belowskip=\baselineskip]
+    {../app/Devin/Levenshtein.hs}
 
   \newpage
 
