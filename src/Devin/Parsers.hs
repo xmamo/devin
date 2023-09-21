@@ -444,11 +444,15 @@ syntax mf = do
 
 
 keyword :: Stream s m Char => String -> ParserT s m Token
-keyword literal = flip label ("keyword “" ++ literal ++ "”") $ try $ syntax $ do
-  string literal
-  notFollowedBy (satisfy (isIdentifierContinue . generalCategory))
-  pure Token
+keyword literal = flip label ("keyword “" ++ literal ++ "”") $ syntax $ do
+  (name, state) <- try $ lookAhead $ do
+    name <- identifier
+    state <- getParserState
+    pure (name, state)
 
+  guard (name == literal)
+  setParserState state
+  pure Token
 
 token :: Stream s m Char => String -> ParserT s m Token
 token literal = syntax $ do
@@ -463,28 +467,25 @@ text literal = try (string literal) <?> ("“" ++ literal ++ "”")
 -- Regular expression: [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*
 identifier :: Stream s m Char => ParserT s m String
 identifier = flip label "identifier" $ do
-  start <- satisfy (isIdentifierStart . generalCategory)
-  continue <- many (satisfy (isIdentifierContinue . generalCategory))
+  start <- satisfy (isStart . generalCategory)
+  continue <- many (satisfy (isContinue . generalCategory))
   pure (start : continue)
+
+  where
+    isStart UppercaseLetter = True
+    isStart LowercaseLetter = True
+    isStart TitlecaseLetter = True
+    isStart ModifierLetter = True
+    isStart OtherLetter = True
+    isStart LetterNumber = True
+    isStart ConnectorPunctuation = True
+    isStart _ = False
+
+    isContinue NonSpacingMark = True
+    isContinue SpacingCombiningMark = True
+    isContinue DecimalNumber = True
+    isContinue category = isStart category
 
 
 s :: Stream s m Char => ParserT s m ()
 s = skipMany (skipMany1 (space <?> "") <|> void (comment <?> ""))
-
-
-isIdentifierStart :: GeneralCategory -> Bool
-isIdentifierStart UppercaseLetter = True
-isIdentifierStart LowercaseLetter = True
-isIdentifierStart TitlecaseLetter = True
-isIdentifierStart ModifierLetter = True
-isIdentifierStart OtherLetter = True
-isIdentifierStart LetterNumber = True
-isIdentifierStart ConnectorPunctuation = True
-isIdentifierStart _ = False
-
-
-isIdentifierContinue :: GeneralCategory -> Bool
-isIdentifierContinue NonSpacingMark = True
-isIdentifierContinue SpacingCombiningMark = True
-isIdentifierContinue DecimalNumber = True
-isIdentifierContinue category = isIdentifierStart category
