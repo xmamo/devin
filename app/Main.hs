@@ -70,8 +70,6 @@ main = Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
 
 onActivate :: Gtk.IsApplication a => a -> G.ApplicationActivateCallback
 onActivate application = do
-  setCurrentThreadAsGUIThread
-
   let noTextTagTable = Nothing @Gtk.TextTagTable
   let noAdjustment = Nothing @Gtk.Adjustment
 
@@ -233,14 +231,20 @@ onActivate application = do
   -- Start the worker thread responsible for parsing, type checking, and
   -- performing syntax highlighting:
 
+  var1 <- newEmptyMVar
+  var2 <- newEmptyMVar
+  var3 <- newEmptyMVar
+
   forkIO $ forever $ do
     readMVar parseAndTypeCheckCond
 
-    text <- postGUISync $ do
+    postGUIASync $ do
       (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
       text <- Gtk.textIterGetText startIter endIter
       takeMVar parseAndTypeCheckCond
-      pure text
+      putMVar var1 text
+
+    text <- takeMVar var1
 
     -- Run the parser
     let parser = liftA2 (,) devin getState
@@ -254,6 +258,16 @@ onActivate application = do
       Left parseError -> do
         let offset = toOffset (errorPos parseError) text
         let messages = errorMessages parseError
+
+        postGUIASync $ do
+          list <- seqStoreToList logModel
+          startIter <- Gtk.textBufferGetIterAtOffset codeBuffer offset
+          (line, column) <- getLineColumn startIter
+          putMVar var2 (list, (line, column))
+
+        (list, (line, column)) <- takeMVar var2
+        let list' = [(showLineColumn (line, column), showMessages messages)]
+        let edits = diff list list'
 
         postGUIASync $ do
           writeIORef syntaxTreeRef Nothing
@@ -275,15 +289,19 @@ onActivate application = do
           Gtk.widgetShowAll blankView
 
           -- Update the error log
-          list <- seqStoreToList logModel
-          (line, column) <- getLineColumn startIter
-          let list' = [(showLineColumn (line, column), showMessages messages)]
-          let edits = diff list list'
           patchSeqStore logModel edits
           Gtk.treeViewColumnsAutosize logView
 
       -- Parser success:
       Right (syntaxTree, comments) -> do
+        postGUIASync $ do
+          forest <- forestStoreGetForest syntaxTreeModel
+          putMVar var3 forest
+
+        forest <- takeMVar var3
+        let forest' = map definitionTree (definitions syntaxTree)
+        let edits = forestDiff forest forest'
+
         postGUIASync $ do
           writeIORef syntaxTreeRef (Just syntaxTree)
 
@@ -303,9 +321,6 @@ onActivate application = do
           highlightDevinBrackets codeBuffer tags insertIter syntaxTree
 
           -- Update the syntax tree preview
-          forest <- forestStoreGetForest syntaxTreeModel
-          let forest' = map definitionTree (definitions syntaxTree)
-          let edits = forestDiff forest forest'
           let expandPredicate (label, _) = not (Text.isSuffixOf "Expression" label)
           patchForestStore syntaxTreeModel edits syntaxTreeView expandPredicate
           Gtk.treeViewColumnsAutosize syntaxTreeView
@@ -352,13 +367,18 @@ onActivate application = do
 
   -- Start worker thread responsible for Devin code evaluation:
 
+  var1 <- newEmptyMVar
+  var2 <- newEmptyMVar
+
   forkIO $ forever $ do
     readMVar debuggerCond
 
-    evaluatorAndState <- postGUISync $ do
+    postGUIASync $ do
       evaluatorAndState <- readIORef evaluatorAndStateRef
       takeMVar debuggerCond
-      pure evaluatorAndState
+      putMVar var1 evaluatorAndState
+
+    evaluatorAndState <- takeMVar var1
 
     case evaluatorAndState of
       Nothing -> postGUIASync $ do
@@ -392,7 +412,13 @@ onActivate application = do
 
           -- Evaluator yield (breakpoint statement):
           Yield statement evaluator' | BreakpointStatement {} <- statement -> do
+            postGUIASync $ do
+              forest <- forestStoreGetForest stateModel
+              putMVar var2 forest
+
+            forest <- takeMVar var2
             forest' <- stateForest state'
+            let edits = forestDiff forest forest'
 
             postGUIASync $ do
               -- Highlight the breakpoint statement
@@ -401,8 +427,6 @@ onActivate application = do
               highlightInterval (highlightTag tags) codeBuffer statement
 
               -- Update the evaluator state preview
-              forest <- forestStoreGetForest stateModel
-              let edits = forestDiff forest forest'
               patchForestStore stateModel edits stateView (const True)
               Gtk.treeViewColumnsAutosize stateView
 
