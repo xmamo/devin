@@ -1961,7 +1961,7 @@
       \hline
 
       Negation &
-      \lstinline[mathescape]@not $p$@ &
+      \lstinline[mathescape]@not($p$)@ &
       \lstinline[mathescape]@!$p$@ &
       $\lnot p$ \\
 
@@ -1992,7 +1992,9 @@
   modulo operator.
 
   Binary arithmetic operations require both operands to be of the same numeric
-  type: there are no implicit type conversions.
+  type: type conversions have to be performed explicitly via
+  \lstinline[mathescape]@intToFloat($n$)@ and
+  \lstinline[mathescape]@floatToInt($x$)@.
 
   Division (operator \lstinline@/@) behaves differently depending on the types
   of the operands. In any case, the result of arithmetic operations has the same
@@ -2148,7 +2150,7 @@
     $n$-th element of the array. Like in most programming languages, the first
     element of the array has index $0$.
 
-    \item \emph{Length information}: \lstinline[mathescape]@len $a$@. The
+    \item \emph{Length information}: \lstinline[mathescape]@len($a$)@. The
     expression returns the number of elements contained in the array $a$.
 
     \item \emph{Concatenation}: \lstinline[mathescape]@$a$ + $b$@. The
@@ -2184,8 +2186,8 @@
     caption={Devin's scoping rules visualized}
   ]
     def rotateRight(ref array) -> Unit {
-        if len array > 0 {
-            var i = len array - 1;
+        if len(array) > 0 {
+            var i = len(array) - 1;
             var t = array[i];
 
             while i > 0 {
