@@ -9,7 +9,6 @@
 module Main (main) where
 
 import Prelude hiding (getLine)
-import Control.Applicative
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
@@ -247,8 +246,7 @@ onActivate = do
     text <- takeMVar var1
 
     -- Run the parser
-    let parser = liftA2 (,) devin getState
-    parserResult <- runParserT parser [] "" (0, text)
+    parserResult <- parseT devin "" (0, text)
 
     whenJustM (lookupEnv "DEVIN_PARSER_DELAY") $ \delay ->
       threadDelay (round (1000000.0 * read delay))
@@ -256,7 +254,7 @@ onActivate = do
     case parserResult of
       -- Parser failure:
       Left parseError -> do
-        let offset = toOffset (errorPos parseError) text
+        offset <- toOffsetT (errorPos parseError) text
         let messages = errorMessages parseError
 
         postGUIASync $ do
@@ -334,8 +332,7 @@ onActivate = do
           Gtk.treeViewColumnsAutosize logView
 
         -- Run the type checker
-        let typer = checkDevin syntaxTree
-        let typerResult = runTyper typer predefinedEnv
+        let typerResult = runTyper (checkDevin syntaxTree) predefinedEnv
 
         whenJustM (lookupEnv "DEVIN_TYPER_DELAY") $ \delay ->
           threadDelay (round (1000000.0 * read delay))

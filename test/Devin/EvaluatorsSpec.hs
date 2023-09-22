@@ -8,7 +8,6 @@ import Test.Hspec
 import Devin.Display
 import Devin.Evaluator
 import Devin.Evaluators
-import Devin.Parsec
 import Devin.Parsers
 
 
@@ -219,10 +218,10 @@ spec = do
 
 
 executionShouldSucceed :: String -> Expectation
-executionShouldSucceed source = case runParser devin [] "" (0, source) of
+executionShouldSucceed source = case parse devin "" (0, source) of
   Left parseError -> expectationFailure (show parseError)
 
-  Right syntaxTree -> do
+  Right (syntaxTree, _) -> do
     state <- makePredefinedState
 
     runEvaluator (evalDevin syntaxTree) state >>= \case

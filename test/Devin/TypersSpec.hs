@@ -7,7 +7,6 @@ import Data.List
 import Test.Hspec
 
 import Devin.Display
-import Devin.Parsec
 import Devin.Parsers
 import Devin.Typer
 import Devin.Typers
@@ -71,18 +70,18 @@ spec = do
 
 
 typeCheckingShouldSucceed :: String -> Expectation
-typeCheckingShouldSucceed source = case runParser devin [] "" (0, source) of
+typeCheckingShouldSucceed source = case parse devin "" (0, source) of
   Left parseError -> expectationFailure (show parseError)
 
-  Right syntaxTree -> case runTyper (checkDevin syntaxTree) predefinedEnv of
+  Right (syntaxTree, _) -> case runTyper (checkDevin syntaxTree) predefinedEnv of
     (_, _, []) -> pure ()
     (_, _, errors) -> expectationFailure (intercalate "\n" (map display errors))
 
 
 typeCheckingShouldFail :: String -> Expectation
-typeCheckingShouldFail source = case runParser devin [] "" (0, source) of
+typeCheckingShouldFail source = case parse devin "" (0, source) of
   Left parseError -> expectationFailure (show parseError)
 
-  Right syntaxTree -> case runTyper (checkDevin syntaxTree) predefinedEnv of
+  Right (syntaxTree, _) -> case runTyper (checkDevin syntaxTree) predefinedEnv of
     (_, _, []) -> expectationFailure "Expected type checking to fail, but it succeeded"
     (_, _, _) -> pure ()

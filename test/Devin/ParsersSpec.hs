@@ -6,7 +6,6 @@ module Devin.ParsersSpec (spec) where
 
 import Test.Hspec
 
-import Devin.Parsec
 import Devin.Parsers
 import Devin.Syntax
 
@@ -88,6 +87,6 @@ spec = do
 
 
 shouldParse :: (Eq a, Show a) => Parser String a -> String -> a -> Expectation
-shouldParse parser source x = case runParser parser [] "" (0, source) of
+shouldParse parser source x = case parse parser "" (0, source) of
   Left parseError -> expectationFailure (show parseError)
-  Right x' -> x' `shouldBe` x
+  Right (x', _) -> x' `shouldBe` x

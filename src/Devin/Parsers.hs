@@ -5,8 +5,10 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 module Devin.Parsers (
-  ParserT,
   Parser,
+  ParserT,
+  parse,
+  parseT,
   devin,
   definition,
   statement,
@@ -22,15 +24,30 @@ import Control.Applicative hiding ((<|>), many)
 import Control.Monad
 import Data.Char
 import Data.Functor
+import Data.Functor.Identity
 
 import Control.Monad.Extra
 
-import Devin.Parsec hiding (token)
+import Devin.Parsec hiding (State, parse, token)
 import Devin.Syntax hiding (definition)
 
 
-type ParserT s m a = ParsecT (Int, s) [Token] m a
-type Parser s a = Parsec (Int, s) [Token] a
+type Parser s a = ParserT s Identity a
+type ParserT s m a = ParsecT (Int, s) State m a
+newtype State = State { unState :: [Token] -> [Token] }
+
+
+parse ::
+  Stream s Identity t =>
+  Parser s a -> SourceName -> (Int, s) -> Either ParseError (a, [Token])
+parse mx sourceName stream = runIdentity (parseT mx sourceName stream)
+
+
+parseT ::
+  Stream s m t =>
+  ParserT s m a -> SourceName -> (Int, s) -> m (Either ParseError (a, [Token]))
+parseT mx =
+  runParserT (liftA2 (,) mx ((\state -> unState state []) <$> getState)) (State id)
 
 
 devin :: Stream s m Char => ParserT s m Devin
@@ -431,7 +448,7 @@ comment = flip label "comment" $ do
     skipMany (noneOf "\n\v\r\x85\x2028\x2029")
     pure Token
 
-  modifyState (++ [token])
+  modifyState (\state -> State (unState state . (token :)))
   pure token
 
 

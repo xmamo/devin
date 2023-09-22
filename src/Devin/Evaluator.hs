@@ -6,7 +6,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 module Devin.Evaluator (
-  Evaluator (..),
+  Evaluator,
   Result (..),
   State,
   Frame (..),

@@ -11,8 +11,8 @@
 module Devin.Parsec (
   module Text.Parsec,
   getOffset,
-  toOffset,
-  toOffsetT
+  toOffsetT,
+  toOffset
 ) where
 
 import Data.Functor.Identity
@@ -34,10 +34,6 @@ getOffset = do
   pure offset
 
 
-toOffset :: (Num a, Stream s Identity Char) => SourcePos -> s -> a
-toOffset sourcePos stream = runIdentity (toOffsetT sourcePos stream)
-
-
 toOffsetT :: (Num a, Stream s m Char) => SourcePos -> s -> m a
 toOffsetT sourcePos stream = go 0 (initialPos "") stream
   where
@@ -46,3 +42,7 @@ toOffsetT sourcePos stream = go 0 (initialPos "") stream
     go result sourcePos' stream = uncons stream >>= \case
       Just (c, rest) -> go (result + 1) (updatePosChar sourcePos' c) rest
       Nothing -> pure result
+
+
+toOffset :: (Num a, Stream s Identity Char) => SourcePos -> s -> a
+toOffset sourcePos stream = runIdentity (toOffsetT sourcePos stream)

@@ -51,13 +51,13 @@ data TreeEdit a
 
 levenshteinBy :: Real b => (a -> a -> Bool) -> [a] -> [a] -> (b, [Edit a])
 levenshteinBy eq xs ys =
-  let f (cost, edits) y = (cost + 1, Insert y : edits)
-      row0 = NonEmpty.scanl f (0, []) ys
-      (cost, edits) = NonEmpty.last (foldl nextRow row0 xs)
-   in (cost, reverse edits)
+  let f (cost, editDL) y = (cost + 1, editDL . (Insert y :))
+      row0 = NonEmpty.scanl f (0, id) ys
+      (cost, editDL) = NonEmpty.last (foldl nextRow row0 xs)
+   in (cost, editDL [])
   where
-    nextRow ((cost, edits) :| cells) x =
-      go (cost + 1, Delete x : edits) ((cost, edits) :| cells) ys
+    nextRow ((cost, editDL) :| cells) x =
+      go (cost + 1, editDL . (Delete x :)) ((cost, editDL) :| cells) ys
       where
         go wCell (nwCell :| nCell : cells) (y : ys) =
           let cell = nextCell wCell nwCell nCell x y
@@ -65,14 +65,14 @@ levenshteinBy eq xs ys =
 
         go wCell _ _ = NonEmpty.singleton wCell
 
-    nextCell (wCost, wEdits) (nwCost, nwEdits) (nCost, nEdits) x y =
+    nextCell (wCost, wEditDL) (nwCost, nwEditDL) (nCost, nEditDL) x y =
       if x `eq` y then
-        (nwCost, Copy x y : nwEdits)
+        (nwCost, nwEditDL . (Copy x y :))
       else
         minimumOn fst [
-          (wCost + 1, Insert y : wEdits),
-          (nCost + 1, Delete x : nEdits),
-          (nwCost + 1, Replace x y : nwEdits)
+          (wCost + 1, wEditDL . (Insert y :)),
+          (nCost + 1, nEditDL . (Delete x :)),
+          (nwCost + 1, nwEditDL . (Replace x y :))
         ]
 
 

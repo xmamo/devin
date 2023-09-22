@@ -5,10 +5,11 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 module Devin.Typer (
-  Typer (..),
+  Typer,
   Environment,
   Scope (..),
   predefinedEnv,
+  runTyper,
   defineType,
   lookupType,
   defineFunSignature,
@@ -26,7 +27,8 @@ import Devin.Error
 import Devin.Type
 
 
-newtype Typer a = Typer { runTyper :: Environment -> (a, Environment, [Error]) }
+newtype Typer a =
+  Typer { unTyper :: Environment -> (a, Environment, [Error] -> [Error]) }
   deriving Functor
 
 
@@ -42,22 +44,22 @@ data Scope = Scope {
 
 instance Applicative Typer where
   pure :: a -> Typer a
-  pure x = Typer (\env -> (x, env, []))
+  pure x = Typer (\env -> (x, env, id))
 
 
   liftA2 :: (a -> b -> c) -> Typer a -> Typer b -> Typer c
   liftA2 f mx my = Typer $ \env ->
-    let (x, env', errors1) = runTyper mx env
-        (y, env'', errors2) = runTyper my env'
-     in (f x y, env'', errors1 ++ errors2)
+    let (x, env', errorDL1) = unTyper mx env
+        (y, env'', errorDL2) = unTyper my env'
+     in (f x y, env'', errorDL1 . errorDL2)
 
 
 instance Monad Typer where
   (>>=) :: Typer a -> (a -> Typer b) -> Typer b
   mx >>= f = Typer $ \env ->
-    let (x, env', errors1) = runTyper mx env
-        (y, env'', errors2) = runTyper (f x) env'
-     in (y, env'', errors1 ++ errors2)
+    let (x, env', errorDL1) = unTyper mx env
+        (y, env'', errorDL2) = unTyper (f x) env'
+     in (y, env'', errorDL1 . errorDL2)
 
 
 predefinedEnv :: Environment
@@ -79,17 +81,23 @@ predefinedEnv =
    in [Scope [t4, t3, t2, t1] [f4, f3, f2, f1] [v3, v2, v1]]
 
 
+runTyper :: Typer a -> Environment -> (a, Environment, [Error])
+runTyper mx env =
+  let (x, env', errorDL) = unTyper mx env
+   in (x, env', errorDL [])
+
+
 defineType :: String -> Type -> Typer Type
 defineType name t = Typer $ \case
-  [] -> (t, [Scope [(name, t)] [] []], [])
+  [] -> (t, [Scope [(name, t)] [] []], id)
 
   scope : scopes ->
     let types' = (name, t) : types scope
-     in (t, scope{types = types'} : scopes, [])
+     in (t, scope{types = types'} : scopes, id)
 
 
 lookupType :: String -> Typer (Maybe (Type, Int))
-lookupType name = Typer (\env -> (go 0 env, env, []))
+lookupType name = Typer (\env -> (go 0 env, env, id))
   where
     go _ [] = Nothing
 
@@ -100,15 +108,15 @@ lookupType name = Typer (\env -> (go 0 env, env, []))
 
 defineFunSignature :: String -> ([Type], Type) -> Typer ()
 defineFunSignature name signature = Typer $ \case
-  [] -> ((), [Scope [] [(name, signature)] []], [])
+  [] -> ((), [Scope [] [(name, signature)] []], id)
 
   scope : scopes ->
     let funs' = (name, signature) : funs scope
-     in ((), scope{funs = funs'} : scopes, [])
+     in ((), scope{funs = funs'} : scopes, id)
 
 
 lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
-lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
+lookupFunSignature name = Typer (\env -> (go 0 env, env, id))
   where
     go _ [] = Nothing
 
@@ -119,15 +127,15 @@ lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
 
 defineVarType :: String -> Type -> Typer ()
 defineVarType name t = Typer $ \case
-  [] -> ((), [Scope [] [] [(name, t)]], [])
+  [] -> ((), [Scope [] [] [(name, t)]], id)
 
   scope : scopes ->
     let vars' = (name, t) : vars scope
-     in ((), scope{vars = vars'} : scopes, [])
+     in ((), scope{vars = vars'} : scopes, id)
 
 
 lookupVarType :: String -> Typer (Maybe (Type, Int))
-lookupVarType name = Typer (\env -> (go 0 env, env, []))
+lookupVarType name = Typer (\env -> (go 0 env, env, id))
   where
     go _ [] = Nothing
 
@@ -138,9 +146,9 @@ lookupVarType name = Typer (\env -> (go 0 env, env, []))
 
 withNewScope :: Typer a -> Typer a
 withNewScope mx = Typer $ \env ->
-  let (x, env', errors) = runTyper mx (Scope [] [] [] : env)
+  let (x, env', errors) = unTyper mx (Scope [] [] [] : env)
    in (x, tail env', errors)
 
 
 report :: Error -> Typer ()
-report error = Typer (\env -> ((), env, [error]))
+report error = Typer (\env -> ((), env, (error :)))
