@@ -27,8 +27,8 @@ import Devin.Error
 import Devin.Type
 
 
-newtype Typer a =
-  Typer { unTyper :: Environment -> (a, Environment, [Error] -> [Error]) }
+newtype Typer a
+  = Typer { unTyper :: Environment -> (a, Environment, [Error] -> [Error]) }
   deriving Functor
 
 

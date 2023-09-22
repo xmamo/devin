@@ -24,7 +24,7 @@ import Devin.Interval
 import Devin.Ratio
 
 
-newtype Devin = Devin {definitions :: [Definition]}
+newtype Devin = Devin { definitions :: [Definition] }
   deriving (Eq, Show, Read, Data)
 
 
@@ -174,46 +174,46 @@ data Expression where
 
 
 data UnaryOperator
-  = PlusOperator {interval :: (Int, Int)}
-  | MinusOperator {interval :: (Int, Int)}
+  = PlusOperator { interval :: (Int, Int) }
+  | MinusOperator { interval :: (Int, Int) }
   deriving (Eq, Show, Read, Data)
 
 
 data BinaryOperator
-  = AddOperator {interval :: (Int, Int)}
-  | SubtractOperator {interval :: (Int, Int)}
-  | MultiplyOperator {interval :: (Int, Int)}
-  | DivideOperator {interval :: (Int, Int)}
-  | ModuloOperator {interval :: (Int, Int)}
-  | EqualOperator {interval :: (Int, Int)}
-  | NotEqualOperator {interval :: (Int, Int)}
-  | LessOperator {interval :: (Int, Int)}
-  | LessOrEqualOperator {interval :: (Int, Int)}
-  | GreaterOperator {interval :: (Int, Int)}
-  | GreaterOrEqualOperator {interval :: (Int, Int)}
-  | AndOperator {interval :: (Int, Int)}
-  | OrOperator {interval :: (Int, Int)}
-  | XorOperator {interval :: (Int, Int)}
-  | PlainAssignOperator {interval :: (Int, Int)}
-  | AddAssignOperator {interval :: (Int, Int)}
-  | SubtractAssignOperator {interval :: (Int, Int)}
-  | MultiplyAssignOperator {interval :: (Int, Int)}
-  | DivideAssignOperator {interval :: (Int, Int)}
-  | ModuloAssignOperator {interval :: (Int, Int)}
+  = AddOperator { interval :: (Int, Int) }
+  | SubtractOperator { interval :: (Int, Int) }
+  | MultiplyOperator { interval :: (Int, Int) }
+  | DivideOperator { interval :: (Int, Int) }
+  | ModuloOperator { interval :: (Int, Int) }
+  | EqualOperator { interval :: (Int, Int) }
+  | NotEqualOperator { interval :: (Int, Int) }
+  | LessOperator { interval :: (Int, Int) }
+  | LessOrEqualOperator { interval :: (Int, Int) }
+  | GreaterOperator { interval :: (Int, Int) }
+  | GreaterOrEqualOperator { interval :: (Int, Int) }
+  | AndOperator { interval :: (Int, Int) }
+  | OrOperator { interval :: (Int, Int) }
+  | XorOperator { interval :: (Int, Int) }
+  | PlainAssignOperator { interval :: (Int, Int) }
+  | AddAssignOperator { interval :: (Int, Int) }
+  | SubtractAssignOperator { interval :: (Int, Int) }
+  | MultiplyAssignOperator { interval :: (Int, Int) }
+  | DivideAssignOperator { interval :: (Int, Int) }
+  | ModuloAssignOperator { interval :: (Int, Int) }
   deriving (Eq, Show, Read, Data)
 
 
-data SymbolId = SymbolId {name :: String, interval :: (Int, Int)}
+data SymbolId = SymbolId { name :: String, interval :: (Int, Int) }
   deriving (Eq, Show, Read, Data)
 
 
 data TypeId
-  = PlainTypeId {name :: String, interval :: (Int, Int)}
-  | ArrayTypeId {open :: Token, innerTypeId :: TypeId, close :: Token}
+  = PlainTypeId { name :: String, interval :: (Int, Int) }
+  | ArrayTypeId { open :: Token, innerTypeId :: TypeId, close :: Token }
   deriving (Eq, Show, Read, Data)
 
 
-newtype Token = Token {interval :: (Int, Int)}
+newtype Token = Token { interval :: (Int, Int) }
   deriving (Eq, Show, Read, Data)
 
 
