@@ -26,7 +26,7 @@ import Devin.Error
 import Devin.Type
 
 
-newtype Typer a = Typer {runTyper :: Environment -> (a, Environment, [Error])}
+newtype Typer a = Typer { runTyper :: Environment -> (a, Environment, [Error]) }
   deriving Functor
 
 
@@ -85,7 +85,7 @@ defineType name t = Typer $ \case
 
   scope : scopes ->
     let types' = (name, t) : types scope
-     in (t, scope {types = types'} : scopes, [])
+     in (t, scope{types = types'} : scopes, [])
 
 
 lookupType :: String -> Typer (Maybe (Type, Int))
@@ -93,7 +93,7 @@ lookupType name = Typer (\env -> (go 0 env, env, []))
   where
     go _ [] = Nothing
 
-    go depth (Scope {types} : scopes) = case lookup name types of
+    go depth (Scope{types} : scopes) = case lookup name types of
       Just t -> Just (t, depth)
       Nothing -> go (depth + 1) scopes
 
@@ -104,7 +104,7 @@ defineFunSignature name signature = Typer $ \case
 
   scope : scopes ->
     let funs' = (name, signature) : funs scope
-     in ((), scope {funs = funs'} : scopes, [])
+     in ((), scope{funs = funs'} : scopes, [])
 
 
 lookupFunSignature :: String -> Typer (Maybe (([Type], Type), Int))
@@ -112,7 +112,7 @@ lookupFunSignature name = Typer (\env -> (go 0 env, env, []))
   where
     go _ [] = Nothing
 
-    go depth (Scope {funs} : scopes) = case lookup name funs of
+    go depth (Scope{funs} : scopes) = case lookup name funs of
       Just signature -> Just (signature, depth)
       Nothing -> go (depth + 1) scopes
 
@@ -123,7 +123,7 @@ defineVarType name t = Typer $ \case
 
   scope : scopes ->
     let vars' = (name, t) : vars scope
-     in ((), scope {vars = vars'} : scopes, [])
+     in ((), scope{vars = vars'} : scopes, [])
 
 
 lookupVarType :: String -> Typer (Maybe (Type, Int))
@@ -131,7 +131,7 @@ lookupVarType name = Typer (\env -> (go 0 env, env, []))
   where
     go _ [] = Nothing
 
-    go depth (Scope {vars} : scopes) = case lookup name vars of
+    go depth (Scope{vars} : scopes) = case lookup name vars of
       Just t -> Just (t, depth)
       Nothing -> go (depth + 1) scopes
 

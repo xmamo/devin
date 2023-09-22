@@ -256,7 +256,7 @@ defineFun name fun = Evaluator $ \case
 
   frame : frames -> do
     let funs' = (name, fun) : funs frame
-    pure (Done (), frame {funs = funs'} : frames)
+    pure (Done (), frame{funs = funs'} : frames)
 
 
 lookupFun :: String -> Evaluator (Maybe (Function, Int))
@@ -264,7 +264,7 @@ lookupFun name = Evaluator (\state -> pure (Done (go 0 state), state))
   where
     go _ [] = Nothing
 
-    go depth (Frame {poffset, funs} : frames) = case lookup name funs of
+    go depth (Frame{poffset, funs} : frames) = case lookup name funs of
       Just fun -> Just (fun, depth)
       Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
 
@@ -275,7 +275,7 @@ defineVar name cell = Evaluator $ \case
 
   frame : frames -> do
     let vars' = (name, cell) : vars frame
-    pure (Done (), frame {vars = vars'} : frames)
+    pure (Done (), frame{vars = vars'} : frames)
 
 
 lookupVar :: String -> Evaluator (Maybe (Cell, Int))
@@ -283,7 +283,7 @@ lookupVar name = Evaluator (\state -> pure (Done (go 0 state), state))
   where
     go _ [] = Nothing
 
-    go depth (Frame {poffset, vars} : frames) = case lookup name vars of
+    go depth (Frame{poffset, vars} : frames) = case lookup name vars of
       Just cell -> Just (cell, depth)
       Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
 

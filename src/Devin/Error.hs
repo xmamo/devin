@@ -90,59 +90,59 @@ data Error where
 
 instance Interval Error where
   start :: Num a => Error -> a
-  start UnknownVar {interval} = start interval
-  start UnknownFun {interval} = start interval
-  start UnknownType {interval} = start interval
-  start InvalidUnary {unary} = start unary
-  start InvalidBinary {binary} = start binary
-  start InvalidType {expression} = start expression
-  start MissingReturnValue {statement} = start statement
-  start MissingReturnStatement {funId} = start funId
-  start IntegerOverflow {expression} = start expression
-  start DivisionByZero {expression} = start expression
-  start IndexOutOfBounds {expression} = start expression
-  start InvalidArgCount {expression} = start expression
-  start AssertionFailed {statement} = start statement
+  start UnknownVar{interval} = start interval
+  start UnknownFun{interval} = start interval
+  start UnknownType{interval} = start interval
+  start InvalidUnary{unary} = start unary
+  start InvalidBinary{binary} = start binary
+  start InvalidType{expression} = start expression
+  start MissingReturnValue{statement} = start statement
+  start MissingReturnStatement{funId} = start funId
+  start IntegerOverflow{expression} = start expression
+  start DivisionByZero{expression} = start expression
+  start IndexOutOfBounds{expression} = start expression
+  start InvalidArgCount{expression} = start expression
+  start AssertionFailed{statement} = start statement
 
 
   end :: Num a => Error -> a
-  end UnknownVar {interval} = end interval
-  end UnknownFun {interval} = end interval
-  end UnknownType {interval} = end interval
-  end InvalidUnary {unary} = end unary
-  end InvalidBinary {binary} = end binary
-  end InvalidType {expression} = end expression
-  end MissingReturnValue {statement} = end statement
-  end MissingReturnStatement {funId} = end funId
-  end IntegerOverflow {expression} = end expression
-  end DivisionByZero {expression} = end expression
-  end IndexOutOfBounds {expression} = end expression
-  end InvalidArgCount {expression} = end expression
-  end AssertionFailed {statement} = end statement
+  end UnknownVar{interval} = end interval
+  end UnknownFun{interval} = end interval
+  end UnknownType{interval} = end interval
+  end InvalidUnary{unary} = end unary
+  end InvalidBinary{binary} = end binary
+  end InvalidType{expression} = end expression
+  end MissingReturnValue{statement} = end statement
+  end MissingReturnStatement{funId} = end funId
+  end IntegerOverflow{expression} = end expression
+  end DivisionByZero{expression} = end expression
+  end IndexOutOfBounds{expression} = end expression
+  end InvalidArgCount{expression} = end expression
+  end AssertionFailed{statement} = end statement
 
 
 instance Display Error where
   displays :: Error -> ShowS
   displays = \case
-    UnknownVar {varName} ->
+    UnknownVar{varName} ->
       showString "Unknown variable: " .
       showString varName
 
-    UnknownFun {funName} ->
+    UnknownFun{funName} ->
       showString "Unknown function: " .
       showString funName
 
-    UnknownType {typeName} ->
+    UnknownType{typeName} ->
       showString "Unknown type: " .
       showString typeName
 
-    InvalidUnary {unary, operandT} ->
+    InvalidUnary{unary, operandT} ->
       showString "Can’t apply “" .
       displays unary .
       showString "” to " .
       displays operandT
 
-    InvalidBinary {binary, leftT, rightT} ->
+    InvalidBinary{binary, leftT, rightT} ->
       showString "Can’t apply “" .
       displays binary .
       showString "” to " .
@@ -150,37 +150,37 @@ instance Display Error where
       showString " and " .
       displays rightT
 
-    InvalidType {expectedT, actualT} ->
+    InvalidType{expectedT, actualT} ->
       showString "Invalid type: expected " .
       displays expectedT .
       showString ", but got " .
       displays actualT
 
-    MissingReturnValue {} ->
+    MissingReturnValue{} ->
       showString "Missing return value"
 
-    MissingReturnStatement {} ->
+    MissingReturnStatement{} ->
       showString "Missing return statement"
 
-    IntegerOverflow {} ->
+    IntegerOverflow{} ->
       showString "Integer overflow"
 
-    DivisionByZero {} ->
+    DivisionByZero{} ->
       showString "Division by zero"
 
-    IndexOutOfBounds {value} ->
+    IndexOutOfBounds{value} ->
       showString "Index out of bounds: " .
       shows value
 
-    InvalidArgCount {expected, actual} ->
+    InvalidArgCount{expected, actual} ->
       showString "Invalid argument count: expected " .
       shows expected .
       showString " arguments, but got " .
       shows actual
 
-    AssertionFailed {statement} | AssertStatement {predicate} <- statement ->
+    AssertionFailed{statement} | AssertStatement{predicate} <- statement ->
       showString "Assertion failed: " .
       displays predicate
 
-    AssertionFailed {} ->
+    AssertionFailed{} ->
       showString "Assertion failed"

@@ -275,7 +275,7 @@ expression6 requireSideEffects = do
       pure (Left (AccessExpression term open index close))
 
   let leftIsCall = case left of
-        CallExpression {} -> True
+        CallExpression{} -> True
         _ -> False
 
   if not requireSideEffects || leftIsCall then
@@ -337,7 +337,7 @@ arrayExpression = do
 
 callOrVarExpression :: Stream s m Char => ParserT s m Expression
 callOrVarExpression = do
-  SymbolId {name, interval} <- symbolId
+  SymbolId{name, interval} <- symbolId
 
   optionMaybe (try (s *> token "(")) >>= \case
     Nothing -> pure (VarExpression name interval)
@@ -445,14 +445,11 @@ syntax mf = do
 
 keyword :: Stream s m Char => String -> ParserT s m Token
 keyword literal = flip label ("keyword “" ++ literal ++ "”") $ syntax $ do
-  (name, state) <- try $ lookAhead $ do
-    name <- identifier
-    state <- getParserState
-    pure (name, state)
-
+  (name, state) <- try (lookAhead (liftA2 (,) identifier getParserState))
   guard (name == literal)
   setParserState state
   pure Token
+
 
 token :: Stream s m Char => String -> ParserT s m Token
 token literal = syntax $ do

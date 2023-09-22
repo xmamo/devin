@@ -1,25 +1,25 @@
 # Overrides
-- warn: {name: Use explicit module export list}
-- warn: {name: Use module export list}
-- ignore: {name: Use <$>}
-- ignore: {name: Use join}
-- ignore: {name: Avoid lambda using `infix`}
-- ignore: {name: Use tuple-section}
-- group: {name: generalise-for-conciseness, enabled: true}
-- group: {name: extra, enabled: true}
-- group: {name: teaching, enabled: true}
+- warn: { name: Use explicit module export list }
+- warn: { name: Use module export list }
+- ignore: { name: Use <$> }
+- ignore: { name: Use join }
+- ignore: { name: Avoid lambda using `infix` }
+- ignore: { name: Use tuple-section }
+- group: { name: generalise-for-conciseness, enabled: true }
+- group: { name: extra, enabled: true }
+- group: { name: teaching, enabled: true }
 
 # Custom hints
-- warn: {lhs: (>>), rhs: (*>)}
-- warn: {lhs: return, rhs: pure}
-- warn: {lhs: mapM, rhs: traverse}
-- warn: {lhs: mapM_, rhs: traverse_}
-- warn: {lhs: forM, rhs: for}
-- warn: {lhs: forM_, rhs: for_}
-- warn: {lhs: sequence, rhs: sequenceA}
-- warn: {lhs: sequence_, rhs: sequenceA_}
-- warn: {lhs: foldM, rhs: foldlM}
-- warn: {lhs: liftM, rhs: liftA}
-- warn: {lhs: liftM2, rhs: liftA2}
-- warn: {lhs: liftM3, rhs: liftA3}
-- warn: {lhs: ap, rhs: (<*>)}
+- warn: { lhs: (>>), rhs: (*>) }
+- warn: { lhs: return, rhs: pure }
+- warn: { lhs: mapM, rhs: traverse }
+- warn: { lhs: mapM_, rhs: traverse_ }
+- warn: { lhs: forM, rhs: for }
+- warn: { lhs: forM_, rhs: for_ }
+- warn: { lhs: sequence, rhs: sequenceA }
+- warn: { lhs: sequence_, rhs: sequenceA_ }
+- warn: { lhs: foldM, rhs: foldlM }
+- warn: { lhs: liftM, rhs: liftA }
+- warn: { lhs: liftM2, rhs: liftA2 }
+- warn: { lhs: liftM3, rhs: liftA3 }
+- warn: { lhs: ap, rhs: (<*>) }

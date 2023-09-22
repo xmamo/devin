@@ -23,7 +23,7 @@ import Devin.Typer
 
 
 checkDevin :: Devin -> Typer ()
-checkDevin Devin {definitions} = do
+checkDevin Devin{definitions} = do
   for_ definitions checkDefinition1
   for_ definitions checkDefinition2
 
@@ -36,9 +36,9 @@ checkDefinition definition = do
 
 checkDefinition1 :: Definition -> Typer ()
 checkDefinition1 = \case
-  VarDefinition {} -> pure ()
+  VarDefinition{} -> pure ()
 
-  FunDefinition {funId = SymbolId {name}, params, returnInfo} -> do
+  FunDefinition{funId = SymbolId{name}, params, returnInfo} -> do
     paramTs <- for params $ \(_, _, typeInfo) -> case typeInfo of
       Just (_, paramTypeId) -> getType paramTypeId
       Nothing -> pure Unknown
@@ -52,12 +52,12 @@ checkDefinition1 = \case
 
 checkDefinition2 :: Definition -> Typer ()
 checkDefinition2 = \case
-  VarDefinition {varId = SymbolId {name}, value} -> do
+  VarDefinition{varId = SymbolId{name}, value} -> do
     t <- checkExpression value
     defineVarType name t
 
-  FunDefinition {funId, params, returnInfo, body} -> withNewScope $ do
-    for_ params $ \(_, SymbolId {name}, typeInfo) -> case typeInfo of
+  FunDefinition{funId, params, returnInfo, body} -> withNewScope $ do
+    for_ params $ \(_, SymbolId{name}, typeInfo) -> case typeInfo of
       Just (_, paramTypeId) -> do
         paramT <- getType paramTypeId
         defineVarType name paramT
@@ -79,64 +79,64 @@ checkDefinition2 = \case
 
 checkStatement :: Type -> Statement -> Typer Bool
 checkStatement expectedT statement = case statement of
-  DefinitionStatement {definition} -> do
+  DefinitionStatement{definition} -> do
     checkDefinition definition
     pure False
 
-  ExpressionStatement {value} -> do
+  ExpressionStatement{value} -> do
     checkExpression value
     pure False
 
-  IfStatement {predicate, trueBranch} -> do
+  IfStatement{predicate, trueBranch} -> do
     t <- checkExpression predicate
     unless (t <: Bool) (report (InvalidType predicate Bool t))
     withNewScope (checkStatement expectedT trueBranch)
     pure False
 
-  IfElseStatement {predicate, trueBranch, falseBranch} -> do
+  IfElseStatement{predicate, trueBranch, falseBranch} -> do
     t <- checkExpression predicate
     unless (t <: Bool) (report (InvalidType predicate Bool t))
     trueBranchDoesReturn <- withNewScope (checkStatement expectedT trueBranch)
     falseBranchDoesReturn <- withNewScope (checkStatement expectedT falseBranch)
     pure (trueBranchDoesReturn && falseBranchDoesReturn)
 
-  WhileStatement {predicate, body} -> do
+  WhileStatement{predicate, body} -> do
     t <- checkExpression predicate
     unless (t <: Bool) (report (InvalidType predicate Bool t))
     withNewScope (checkStatement expectedT body)
     pure False
 
-  DoWhileStatement {body, predicate} -> do
+  DoWhileStatement{body, predicate} -> do
     doesReturn <- withNewScope (checkStatement expectedT body)
     t <- checkExpression predicate
     unless (t <: Bool) (report (InvalidType predicate Bool t))
     pure doesReturn
 
-  ReturnStatement {result = Just result} -> do
+  ReturnStatement{result = Just result} -> do
     t <- checkExpression result
     unless (t <: expectedT) (report (InvalidType result expectedT t))
     pure True
 
-  ReturnStatement {result = Nothing} -> do
+  ReturnStatement{result = Nothing} -> do
     unless (Unit <: expectedT) (report (MissingReturnValue statement expectedT))
     pure True
 
-  AssertStatement {predicate} -> do
+  AssertStatement{predicate} -> do
     t <- checkExpression predicate
     unless (t <: Bool) (report (InvalidType predicate Bool t))
     pure False
 
-  BreakpointStatement {} -> pure False
+  BreakpointStatement{} -> pure False
 
-  BlockStatement {statements} -> withNewScope $ do
+  BlockStatement{statements} -> withNewScope $ do
     for_ statements $ \case
-      DefinitionStatement {definition} -> checkDefinition1 definition
+      DefinitionStatement{definition} -> checkDefinition1 definition
       _ -> pure ()
 
     foldlM f False statements
 
     where
-      f doesReturn DefinitionStatement {definition} = do
+      f doesReturn DefinitionStatement{definition} = do
         checkDefinition2 definition
         pure doesReturn
 
@@ -147,17 +147,17 @@ checkStatement expectedT statement = case statement of
 
 checkExpression :: Expression -> Typer Type
 checkExpression expression = case expression of
-  IntegerExpression {} -> pure Int
+  IntegerExpression{} -> pure Int
 
-  RationalExpression {} -> pure Float
+  RationalExpression{} -> pure Float
 
-  VarExpression {varName, interval} -> lookupVarType varName >>= \case
+  VarExpression{varName, interval} -> lookupVarType varName >>= \case
     Just (t, _) -> pure t
     Nothing -> report' (UnknownVar varName interval)
 
-  ArrayExpression {elems = []} -> pure (Array Unknown)
+  ArrayExpression{elems = []} -> pure (Array Unknown)
 
-  ArrayExpression {elems = elem : elems} -> do
+  ArrayExpression{elems = elem : elems} -> do
     t <- checkExpression elem
 
     flip loopM elems $ \case
@@ -174,7 +174,7 @@ checkExpression expression = case expression of
           report (InvalidType elem t t')
           pure (Left elems)
 
-  AccessExpression {array, index} -> do
+  AccessExpression{array, index} -> do
     arrayT <- checkExpression array
     indexT <- checkExpression index
 
@@ -187,7 +187,7 @@ checkExpression expression = case expression of
       (Array _, _) -> report' (InvalidType index Int indexT)
       (_, _) -> report' (InvalidType array (Array Unknown) arrayT)
 
-  CallExpression {funId = SymbolId {name, interval}, args} ->
+  CallExpression{funId = SymbolId{name, interval}, args} ->
     lookupFunSignature name >>= \case
       Just ((paramTs, returnT), _) -> go 0 args paramTs
         where
@@ -205,7 +205,7 @@ checkExpression expression = case expression of
 
       Nothing -> report' (UnknownFun name interval)
 
-  UnaryExpression {unary, operand} | PlusOperator {} <- unary -> do
+  UnaryExpression{unary, operand} | PlusOperator{} <- unary -> do
     operandT <- checkExpression operand
 
     case operandT of
@@ -214,7 +214,7 @@ checkExpression expression = case expression of
       Float -> pure Float
       _ -> report' (InvalidUnary unary operandT)
 
-  UnaryExpression {unary, operand} | MinusOperator {} <- unary -> do
+  UnaryExpression{unary, operand} | MinusOperator{} <- unary -> do
     operandT <- checkExpression operand
 
     case operandT of
@@ -223,7 +223,7 @@ checkExpression expression = case expression of
       Float -> pure Float
       _ -> report' (InvalidUnary unary operandT)
 
-  BinaryExpression {left, binary, right} | AddOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | AddOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -235,7 +235,7 @@ checkExpression expression = case expression of
       (Array t1, Array t2) | Just t <- merge t1 t2 -> pure (Array t)
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | SubtractOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | SubtractOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -246,7 +246,7 @@ checkExpression expression = case expression of
       (Float, Float) -> pure Float
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | MultiplyOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | MultiplyOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -259,7 +259,7 @@ checkExpression expression = case expression of
       (Int, Array t) -> pure (Array t)
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | DivideOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | DivideOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -270,7 +270,7 @@ checkExpression expression = case expression of
       (Float, Float) -> pure Float
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | ModuloOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | ModuloOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -280,7 +280,7 @@ checkExpression expression = case expression of
       (Int, Int) -> pure Int
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | EqualOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | EqualOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -290,7 +290,7 @@ checkExpression expression = case expression of
       (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | NotEqualOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | NotEqualOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -300,7 +300,7 @@ checkExpression expression = case expression of
       (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | LessOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | LessOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -310,7 +310,7 @@ checkExpression expression = case expression of
       (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | LessOrEqualOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | LessOrEqualOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -320,7 +320,7 @@ checkExpression expression = case expression of
       (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | GreaterOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | GreaterOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -330,7 +330,7 @@ checkExpression expression = case expression of
       (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | GreaterOrEqualOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | GreaterOrEqualOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -340,7 +340,7 @@ checkExpression expression = case expression of
       (_, _) | Just _ <- merge leftT rightT -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | AndOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | AndOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -350,7 +350,7 @@ checkExpression expression = case expression of
       (Bool, Bool) -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | OrOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | OrOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -360,7 +360,7 @@ checkExpression expression = case expression of
       (Bool, Bool) -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | XorOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | XorOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -370,7 +370,7 @@ checkExpression expression = case expression of
       (Bool, Bool) -> pure Bool
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | PlainAssignOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | PlainAssignOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -379,7 +379,7 @@ checkExpression expression = case expression of
     else
       report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | AddAssignOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | AddAssignOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -390,7 +390,7 @@ checkExpression expression = case expression of
       (Float, Float) -> pure Float
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | SubtractAssignOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | SubtractAssignOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -401,7 +401,7 @@ checkExpression expression = case expression of
       (Float, Float) -> pure Float
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | MultiplyAssignOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | MultiplyAssignOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -413,7 +413,7 @@ checkExpression expression = case expression of
       (Array t, Int) -> pure (Array t)
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | DivideAssignOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | DivideAssignOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -424,7 +424,7 @@ checkExpression expression = case expression of
       (Float, Float) -> pure Float
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  BinaryExpression {left, binary, right} | ModuloAssignOperator {} <- binary -> do
+  BinaryExpression{left, binary, right} | ModuloAssignOperator{} <- binary -> do
     leftT <- checkExpression left
     rightT <- checkExpression right
 
@@ -434,19 +434,19 @@ checkExpression expression = case expression of
       (Int, Int) -> pure Int
       (_, _) -> report' (InvalidBinary binary leftT rightT)
 
-  ParenthesizedExpression {inner} -> checkExpression inner
+  ParenthesizedExpression{inner} -> checkExpression inner
 
 
 getType :: TypeId -> Typer Type
 getType = \case
-  PlainTypeId {name, interval} -> lookupType name >>= \case
+  PlainTypeId{name, interval} -> lookupType name >>= \case
     Just (t, _) -> pure t
 
     Nothing -> do
       report (UnknownType name interval)
       defineType name (Placeholder name)
 
-  ArrayTypeId {innerTypeId} -> do
+  ArrayTypeId{innerTypeId} -> do
     t <- getType innerTypeId
     pure (Array t)
 

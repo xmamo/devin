@@ -30,7 +30,7 @@ instance (Num a, Stream s m t) => Stream (a, s) m t where
 
 getOffset :: Monad m => ParsecT (a, s) u m a
 getOffset = do
-  State {stateInput = (offset, _)} <- getParserState
+  State{stateInput = (offset, _)} <- getParserState
   pure offset
 
 

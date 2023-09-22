@@ -39,7 +39,7 @@ clearSyntaxHighlighting buffer tags startIter endIter = do
 
 
 highlightDevin :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Tags -> Devin -> m ()
-highlightDevin buffer tags Devin {definitions} =
+highlightDevin buffer tags Devin{definitions} =
   for_ definitions (highlightDefinition buffer tags)
 
 
@@ -47,12 +47,12 @@ highlightDefinition ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   a -> Tags -> Definition -> m ()
 highlightDefinition buffer tags = \case
-  VarDefinition {varKeyword, varId, value} -> do
+  VarDefinition{varKeyword, varId, value} -> do
     highlightInterval (keywordTag tags) buffer varKeyword
     highlightInterval (varIdTag tags) buffer varId
     highlightExpression buffer tags value
 
-  FunDefinition {defKeyword, funId, params, returnInfo, body} -> do
+  FunDefinition{defKeyword, funId, params, returnInfo, body} -> do
     highlightInterval (keywordTag tags) buffer defKeyword
     highlightInterval (funIdTag tags) buffer funId
 
@@ -69,47 +69,47 @@ highlightStatement ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   a -> Tags -> Statement -> m ()
 highlightStatement buffer tags = \case
-  DefinitionStatement {definition} ->
+  DefinitionStatement{definition} ->
     highlightDefinition buffer tags definition
 
-  ExpressionStatement {value} ->
+  ExpressionStatement{value} ->
     highlightExpression buffer tags value
 
-  IfStatement {ifKeyword, predicate, trueBranch} -> do
+  IfStatement{ifKeyword, predicate, trueBranch} -> do
     highlightInterval (keywordTag tags) buffer ifKeyword
     highlightExpression buffer tags predicate
     highlightStatement buffer tags trueBranch
 
-  IfElseStatement {ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} -> do
+  IfElseStatement{ifKeyword, predicate, trueBranch, elseKeyword, falseBranch} -> do
     highlightInterval (keywordTag tags) buffer ifKeyword
     highlightExpression buffer tags predicate
     highlightStatement buffer tags trueBranch
     highlightInterval (keywordTag tags) buffer elseKeyword
     highlightStatement buffer tags falseBranch
 
-  WhileStatement {whileKeyword, predicate, body} -> do
+  WhileStatement{whileKeyword, predicate, body} -> do
     highlightInterval (keywordTag tags) buffer whileKeyword
     highlightExpression buffer tags predicate
     highlightStatement buffer tags body
 
-  DoWhileStatement {doKeyword, body, whileKeyword, predicate} -> do
+  DoWhileStatement{doKeyword, body, whileKeyword, predicate} -> do
     highlightInterval (keywordTag tags) buffer doKeyword
     highlightStatement buffer tags body
     highlightInterval (keywordTag tags) buffer whileKeyword
     highlightExpression buffer tags predicate
 
-  ReturnStatement {returnKeyword, result} -> do
+  ReturnStatement{returnKeyword, result} -> do
     highlightInterval (keywordTag tags) buffer returnKeyword
     whenJust result (highlightExpression buffer tags)
 
-  AssertStatement {assertKeyword, predicate} -> do
+  AssertStatement{assertKeyword, predicate} -> do
     highlightInterval (keywordTag tags) buffer assertKeyword
     highlightExpression buffer tags predicate
 
-  BreakpointStatement {breakpointKeyword} ->
+  BreakpointStatement{breakpointKeyword} ->
     highlightInterval (keywordTag tags) buffer breakpointKeyword
 
-  BlockStatement {statements} ->
+  BlockStatement{statements} ->
     for_ statements (highlightStatement buffer tags)
 
 
@@ -117,34 +117,34 @@ highlightExpression ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   a -> Tags -> Expression -> m ()
 highlightExpression buffer tags expression = case expression of
-  IntegerExpression {} ->
+  IntegerExpression{} ->
     highlightInterval (numberTag tags) buffer expression
 
-  RationalExpression {} ->
+  RationalExpression{} ->
     highlightInterval (numberTag tags) buffer expression
 
-  VarExpression {} ->
+  VarExpression{} ->
     highlightInterval (varIdTag tags) buffer expression
 
-  ArrayExpression {elems} ->
+  ArrayExpression{elems} ->
     for_ elems (highlightExpression buffer tags)
 
-  AccessExpression {array, index} -> do
+  AccessExpression{array, index} -> do
     highlightExpression buffer tags array
     highlightExpression buffer tags index
 
-  CallExpression {funId, args} -> do
+  CallExpression{funId, args} -> do
     highlightInterval (funIdTag tags) buffer funId
     for_ args (highlightExpression buffer tags)
 
-  UnaryExpression {unary, operand} -> do
+  UnaryExpression{unary, operand} -> do
     highlightInterval (operatorTag tags) buffer unary
     highlightExpression buffer tags operand
 
-  BinaryExpression {left, binary, right} -> do
+  BinaryExpression{left, binary, right} -> do
     highlightExpression buffer tags left
     highlightInterval (operatorTag tags) buffer binary
     highlightExpression buffer tags right
 
-  ParenthesizedExpression {inner} ->
+  ParenthesizedExpression{inner} ->
     highlightExpression buffer tags inner

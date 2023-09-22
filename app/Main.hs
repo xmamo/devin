@@ -409,7 +409,7 @@ onActivate = do
             tryPutMVar debuggerCond ()
 
           -- Evaluator yield (breakpoint statement):
-          Yield statement evaluator' | BreakpointStatement {} <- statement -> do
+          Yield statement evaluator' | BreakpointStatement{} <- statement -> do
             postGUIASync $ do
               forest <- forestStoreGetForest stateModel
               putMVar var2 forest

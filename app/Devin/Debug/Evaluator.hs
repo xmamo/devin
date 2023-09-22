@@ -47,7 +47,7 @@ stateForest = \case
 
 
 frameForest :: MonadIO m => Frame -> Forest (Text, Text) -> m (Forest (Text, Text))
-frameForest Frame {vars} forest = foldlM f forest vars
+frameForest Frame{vars} forest = foldlM f forest vars
   where
     f varsForest (name, cell) = do
       val <- readCell cell

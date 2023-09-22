@@ -34,7 +34,7 @@ clearBracketsHighlighting buffer tags =
 highlightDevinBrackets ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   a -> Tags -> Gtk.TextIter -> Devin -> m Bool
-highlightDevinBrackets buffer tags insertIter Devin {definitions} =
+highlightDevinBrackets buffer tags insertIter Devin{definitions} =
   anyM (highlightDefinitionBrackets buffer tags insertIter) definitions
 
 
@@ -42,10 +42,10 @@ highlightDefinitionBrackets ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   a -> Tags -> Gtk.TextIter -> Definition -> m Bool
 highlightDefinitionBrackets buffer tags insertIter = \case
-  VarDefinition {value} ->
+  VarDefinition{value} ->
     highlightExpressionBrackets buffer tags insertIter value
 
-  FunDefinition {open, close, body} ->
+  FunDefinition{open, close, body} ->
     orM [
       highlightBrackets buffer tags insertIter open close,
       highlightStatementBrackets buffer tags insertIter body
@@ -56,47 +56,47 @@ highlightStatementBrackets ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   a -> Tags -> Gtk.TextIter -> Statement -> m Bool
 highlightStatementBrackets buffer tags insertIter = \case
-  ReturnStatement {result = Nothing} -> pure False
-  BreakpointStatement {} -> pure False
+  ReturnStatement{result = Nothing} -> pure False
+  BreakpointStatement{} -> pure False
 
-  ExpressionStatement {value} ->
+  ExpressionStatement{value} ->
     highlightExpressionBrackets buffer tags insertIter value
 
-  DefinitionStatement {definition} ->
+  DefinitionStatement{definition} ->
     highlightDefinitionBrackets buffer tags insertIter definition
 
-  IfStatement {predicate, trueBranch} ->
+  IfStatement{predicate, trueBranch} ->
     orM [
       highlightExpressionBrackets buffer tags insertIter predicate,
       highlightStatementBrackets buffer tags insertIter trueBranch
     ]
 
-  IfElseStatement {predicate, trueBranch, falseBranch} ->
+  IfElseStatement{predicate, trueBranch, falseBranch} ->
     orM [
       highlightExpressionBrackets buffer tags insertIter predicate,
       highlightStatementBrackets buffer tags insertIter trueBranch,
       highlightStatementBrackets buffer tags insertIter falseBranch
     ]
 
-  WhileStatement {predicate, body} ->
+  WhileStatement{predicate, body} ->
     orM [
       highlightExpressionBrackets buffer tags insertIter predicate,
       highlightStatementBrackets buffer tags insertIter body
     ]
 
-  DoWhileStatement {body, predicate} ->
+  DoWhileStatement{body, predicate} ->
     orM [
       highlightStatementBrackets buffer tags insertIter body,
       highlightExpressionBrackets buffer tags insertIter predicate
     ]
 
-  ReturnStatement {result = Just result} ->
+  ReturnStatement{result = Just result} ->
     highlightExpressionBrackets buffer tags insertIter result
 
-  AssertStatement {predicate} ->
+  AssertStatement{predicate} ->
     highlightExpressionBrackets buffer tags insertIter predicate
 
-  BlockStatement {open, statements, close} ->
+  BlockStatement{open, statements, close} ->
     orM [
       anyM (highlightStatementBrackets buffer tags insertIter) statements,
       highlightBrackets buffer tags insertIter open close
@@ -107,39 +107,39 @@ highlightExpressionBrackets ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
   a -> Tags -> Gtk.TextIter -> Expression -> m Bool
 highlightExpressionBrackets buffer tags insertIter = \case
-  IntegerExpression {} -> pure False
-  RationalExpression {} -> pure False
-  VarExpression {} -> pure False
+  IntegerExpression{} -> pure False
+  RationalExpression{} -> pure False
+  VarExpression{} -> pure False
 
-  ArrayExpression {open, elems, close} ->
+  ArrayExpression{open, elems, close} ->
     orM [
       anyM (highlightExpressionBrackets buffer tags insertIter) elems,
       highlightBrackets buffer tags insertIter open close
     ]
 
-  AccessExpression {array, open, index, close} ->
+  AccessExpression{array, open, index, close} ->
     orM [
       highlightExpressionBrackets buffer tags insertIter array,
       highlightExpressionBrackets buffer tags insertIter index,
       highlightBrackets buffer tags insertIter open close
     ]
 
-  CallExpression {open, args, close} ->
+  CallExpression{open, args, close} ->
     orM [
       anyM (highlightExpressionBrackets buffer tags insertIter) args,
       highlightBrackets buffer tags insertIter open close
     ]
 
-  UnaryExpression {operand} ->
+  UnaryExpression{operand} ->
     highlightExpressionBrackets buffer tags insertIter operand
 
-  BinaryExpression {left, right} ->
+  BinaryExpression{left, right} ->
     orM [
       highlightExpressionBrackets buffer tags insertIter left,
       highlightExpressionBrackets buffer tags insertIter right
     ]
 
-  ParenthesizedExpression {open, inner, close} ->
+  ParenthesizedExpression{open, inner, close} ->
     orM [
       highlightExpressionBrackets buffer tags insertIter inner,
       highlightBrackets buffer tags insertIter open close

@@ -15,20 +15,20 @@ spec :: Spec
 spec = do
   describe "expression" $ do
     it "should accept fragment 1" $
-      shouldParse expression "1 += 2 " BinaryExpression {
+      shouldParse expression "1 += 2 " BinaryExpression{
         left = IntegerExpression 1 (0, 1),
         binary = AddAssignOperator (2, 4),
         right = IntegerExpression 2 (5, 6)
       }
 
     it "should accept fragment 2" $
-      shouldParse expression "1+ 2*3 -(1) " BinaryExpression {
-        left = BinaryExpression {
+      shouldParse expression "1+ 2*3 -(1) " BinaryExpression{
+        left = BinaryExpression{
           left = IntegerExpression 1 (0, 1),
 
           binary = AddOperator (1, 2),
 
-          right = BinaryExpression {
+          right = BinaryExpression{
             left = IntegerExpression 2 (3, 4),
             binary = MultiplyOperator (4, 5),
             right = IntegerExpression 3 (5, 6)
@@ -37,7 +37,7 @@ spec = do
 
         binary = SubtractOperator (7, 8),
 
-        right = ParenthesizedExpression {
+        right = ParenthesizedExpression{
           open = Token (8, 9),
           inner = IntegerExpression 1 (9, 10),
           close = Token (10, 11)
@@ -45,18 +45,18 @@ spec = do
       }
 
     it "should accept fragment 3" $
-      shouldParse expression "a+ -2.1= f (x, y ,z ) *=88 " BinaryExpression {
+      shouldParse expression "a+ -2.1= f (x, y ,z ) *=88 " BinaryExpression{
         left = VarExpression "a" (0, 1),
 
         binary = AddOperator (1, 2),
 
-        right = BinaryExpression {
+        right = BinaryExpression{
           left = RationalExpression -2.1 (3, 7),
 
           binary = PlainAssignOperator (7, 8),
 
-          right = BinaryExpression {
-            left = CallExpression {
+          right = BinaryExpression{
+            left = CallExpression{
               funId = SymbolId "f" (9, 10),
 
               open = Token (11, 12),
