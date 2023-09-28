@@ -72,8 +72,8 @@ highlightStatement buffer tags = \case
   DefinitionStatement{definition} ->
     highlightDefinition buffer tags definition
 
-  ExpressionStatement{value} ->
-    highlightExpression buffer tags value
+  ExpressionStatement{effect} ->
+    highlightExpression buffer tags effect
 
   IfStatement{ifKeyword, predicate, trueBranch} -> do
     highlightInterval (keywordTag tags) buffer ifKeyword

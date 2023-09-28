@@ -191,7 +191,7 @@ cloneVal = \case
 
 
 compareVals :: MonadIO m => Value -> Value -> m (Either (Type, Type) Ordering)
-compareVals v1 v2 = case (v1, v2) of
+compareVals val1 val2 = case (val1, val2) of
   (Unit, Unit) -> pure (Right EQ)
   (Bool x, Bool y) -> pure (Right (compare x y))
   (Int x, Int y) -> pure (Right (compare x y))
@@ -215,8 +215,8 @@ compareVals v1 v2 = case (v1, v2) of
           Left (t1, t2) -> pure (Left (t1, t2))
 
   (_, _) -> do
-    t1 <- getType v1
-    t2 <- getType v2
+    t1 <- getType val1
+    t2 <- getType val2
     pure (Left (t1, t2))
 
 

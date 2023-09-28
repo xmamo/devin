@@ -57,7 +57,7 @@ data Statement where
   } -> Statement
 
   ExpressionStatement :: {
-    value :: Expression,
+    effect :: Expression,
     semicolon :: Token
   } -> Statement
 
@@ -231,7 +231,7 @@ instance Interval Definition where
 instance Interval Statement where
   start :: Num a => Statement -> a
   start DefinitionStatement{definition} = start definition
-  start ExpressionStatement{value} = start value
+  start ExpressionStatement{effect} = start effect
   start IfStatement{ifKeyword} = start ifKeyword
   start IfElseStatement{ifKeyword} = start ifKeyword
   start WhileStatement{whileKeyword} = start whileKeyword

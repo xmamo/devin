@@ -59,8 +59,8 @@ highlightStatementBrackets buffer tags insertIter = \case
   ReturnStatement{result = Nothing} -> pure False
   BreakpointStatement{} -> pure False
 
-  ExpressionStatement{value} ->
-    highlightExpressionBrackets buffer tags insertIter value
+  ExpressionStatement{effect} ->
+    highlightExpressionBrackets buffer tags insertIter effect
 
   DefinitionStatement{definition} ->
     highlightDefinitionBrackets buffer tags insertIter definition

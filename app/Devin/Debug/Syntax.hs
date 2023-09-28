@@ -68,9 +68,9 @@ statementTree statement = case statement of
   DefinitionStatement{definition} ->
     Node ("DefinitionStatement", "") [definitionTree definition]
 
-  ExpressionStatement{value, semicolon} ->
+  ExpressionStatement{effect, semicolon} ->
     Node ("ExpressionStatement", "") [
-      expressionTree value,
+      expressionTree effect,
       tokenTree ";" semicolon
     ]
 

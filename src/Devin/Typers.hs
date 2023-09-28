@@ -83,8 +83,8 @@ checkStatement expectedT statement = case statement of
     checkDefinition definition
     pure False
 
-  ExpressionStatement{value} -> do
-    checkExpression value
+  ExpressionStatement{effect} -> do
+    checkExpression effect
     pure False
 
   IfStatement{predicate, trueBranch} -> do

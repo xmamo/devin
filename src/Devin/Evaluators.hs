@@ -67,8 +67,8 @@ evalStatement statement = do
       evalDefinition definition
       pure Nothing
 
-    ExpressionStatement{value} -> do
-      evalExpression value
+    ExpressionStatement{effect} -> do
+      evalExpression effect
       pure Nothing
 
     IfStatement{predicate, trueBranch} -> do
