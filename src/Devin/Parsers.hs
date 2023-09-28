@@ -330,11 +330,11 @@ integerExpression = flip label "number" $ try $ syntax $ do
 rationalExpression :: Stream s m Char => ParserT s m Expression
 rationalExpression = flip label "number" $ try $ syntax $ do
   sign <- (char '+' $> 1) <|> (char '-' $> -1) <|> pure 1
-  digits1 <- many1 (satisfy isDigit)
-  digits2 <- char '.' *> many1 (satisfy isDigit)
-  let digits = digits1 ++ digits2
-  let mantissa = foldl (\a d -> 10 * a + toRational (digitToInt d)) 0 digits
-  pure (RationalExpression (sign * mantissa * 0.1 ^ length digits2))
+  intDigits <- many1 (satisfy isDigit)
+  fracDigits <- char '.' *> many1 (satisfy isDigit)
+  let intPart = foldl (\a d -> 10 * a + toRational (digitToInt d)) 0 intDigits
+  let fracPart = foldr (\d a -> 0.1 * (a + toRational (digitToInt d))) 0 fracDigits
+  pure (RationalExpression (sign * (intPart + fracPart)))
 
 
 arrayExpression :: Stream s m Char => ParserT s m Expression
