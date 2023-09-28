@@ -43,9 +43,7 @@ evalDefinition definition = do
 evalDefinition1 :: Definition -> Evaluator ()
 evalDefinition1 definition = case definition of
   VarDefinition{} -> pure ()
-
-  FunDefinition{funId = SymbolId{name}} ->
-    defineFun name (UserDefined definition)
+  FunDefinition{funId = SymbolId{name}} -> defineFun name (UserDefined definition)
 
 
 evalDefinition2 :: Definition -> Evaluator ()
@@ -95,40 +93,36 @@ evalStatement statement = do
           t <- getType cell
           raise (InvalidType predicate Type.Bool t)
 
-    WhileStatement{predicate, body} -> go
-      where
-        go = do
+    WhileStatement{predicate, body} -> untilJustM $ do
+      cell <- evalExpression predicate
+      val <- readCell cell
+
+      case val of
+        Bool False -> pure (Just Nothing)
+
+        Bool True -> withNewFrame Nothing 1 (evalStatement body) >>= \case
+          Just cell -> pure (Just (Just cell))
+          Nothing -> pure Nothing
+
+        _ -> do
+          t <- getType val
+          raise (InvalidType predicate Type.Bool t)
+
+    DoWhileStatement{body, predicate} -> untilJustM $
+      withNewFrame Nothing 1 (evalStatement body) >>= \case
+        Just cell -> pure (Just (Just cell))
+
+        Nothing -> do
           cell <- evalExpression predicate
           val <- readCell cell
 
           case val of
-            Bool False -> pure Nothing
-
-            Bool True -> withNewFrame Nothing 1 (evalStatement body) >>= \case
-              Just cell -> pure (Just cell)
-              Nothing -> go
+            Bool False -> pure (Just Nothing)
+            Bool True -> pure Nothing
 
             _ -> do
               t <- getType val
               raise (InvalidType predicate Type.Bool t)
-
-    DoWhileStatement{body, predicate} -> go
-      where
-        go =
-          withNewFrame Nothing 1 (evalStatement body) >>= \case
-            Just cell -> pure (Just cell)
-
-            Nothing -> do
-              cell <- evalExpression predicate
-              val <- readCell cell
-
-              case val of
-                Bool False -> pure Nothing
-                Bool True -> go
-
-                _ -> do
-                  t <- getType val
-                  raise (InvalidType predicate Type.Bool t)
 
     ReturnStatement{result = Just result} -> do
       cell <- evalExpression result
