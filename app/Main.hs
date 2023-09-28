@@ -17,7 +17,6 @@ import Data.Int
 import Data.IORef
 import Data.Maybe
 import Data.String
-import System.Environment
 import System.Exit
 
 import Data.Tree
@@ -248,9 +247,6 @@ onActivate = do
     -- Run the parser
     parserResult <- parseT devin "" (0, text)
 
-    whenJustM (lookupEnv "DEVIN_PARSER_DELAY") $ \delay ->
-      threadDelay (round (1000000.0 * read delay))
-
     case parserResult of
       -- Parser failure:
       Left parseError -> do
@@ -334,9 +330,6 @@ onActivate = do
         -- Run the type checker
         let typerResult = runTyper (checkDevin syntaxTree) predefinedEnv
 
-        whenJustM (lookupEnv "DEVIN_TYPER_DELAY") $ \delay ->
-          threadDelay (round (1000000.0 * read delay))
-
         case typerResult of
           -- Type checker success:
           ((), env, []) -> do
@@ -395,9 +388,6 @@ onActivate = do
       Just (evaluator, state) -> do
         -- Evaluate a single statement
         (result, state') <- runEvaluatorStep evaluator state
-
-        whenJustM (lookupEnv "DEVIN_EVALUATOR_DELAY") $ \delay ->
-          threadDelay (round (1000000.0 * read delay))
 
         case result of
           -- Evaluator done:
