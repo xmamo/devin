@@ -233,7 +233,7 @@ onActivate = do
   var2 <- newEmptyMVar
   var3 <- newEmptyMVar
 
-  forkIO $ forever $ do
+  forkOS $ forever $ do
     readMVar parseAndTypeCheckCond
 
     postGUIASync $ do
@@ -358,7 +358,7 @@ onActivate = do
   var1 <- newEmptyMVar
   var2 <- newEmptyMVar
 
-  forkIO $ forever $ do
+  forkOS $ forever $ do
     readMVar debuggerCond
 
     postGUIASync $ do

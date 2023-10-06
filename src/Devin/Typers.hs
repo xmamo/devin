@@ -189,6 +189,8 @@ checkExpression expression = case expression of
 
   CallExpression{funId = SymbolId{name, interval}, args} ->
     lookupFunSignature name >>= \case
+      Nothing -> report' (UnknownFun name interval)
+
       Just ((paramTs, returnT), _) -> go 0 args paramTs
         where
           go _ [] [] = pure returnT
@@ -202,8 +204,6 @@ checkExpression expression = case expression of
             let expected = n + length paramTs
             let actual = n + length args
             report' (InvalidArgCount expression expected actual)
-
-      Nothing -> report' (UnknownFun name interval)
 
   UnaryExpression{unary, operand} | PlusOperator{} <- unary -> do
     operandT <- checkExpression operand

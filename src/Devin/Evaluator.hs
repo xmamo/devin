@@ -199,11 +199,8 @@ compareVals val1 val2 = case (val1, val2) of
 
   (Array cells1, Array cells2) -> go (Vector.length cells1) (Vector.length cells2) 0
     where
-      go n1 n2 i | i >= n1 =
-        pure (Right (if i == n2 then EQ else LT))
-
-      go n1 n2 i | i >= n2 =
-        pure (Right (if i == n1 then EQ else GT))
+      go n1 n2 i | i >= n1 || i >= n2 =
+        pure (Right (compare n1 n2))
 
       go n1 n2 i = do
         val1 <- readCell (cells1 ! i)
