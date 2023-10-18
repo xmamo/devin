@@ -534,21 +534,21 @@ patchForestStore model edits view expandPredicate = do
       go path (i + 1) edits
 
     go path i (TreeInsert tree : edits) = do
-      forestStoreInsertTree model path i tree
-      Gtk.treePathAppendIndex path (fromIntegral i)
+      forestStoreInsertTree model path (fromIntegral i) tree
+      Gtk.treePathAppendIndex path i
       expand path
       Gtk.treePathUp path
       go path (i + 1) edits
 
     go path i (TreeDelete _ : edits) = do
-      Gtk.treePathAppendIndex path (fromIntegral i)
+      Gtk.treePathAppendIndex path i
       forestStoreRemove model path
       Gtk.treePathUp path
       go path i edits
 
     go path i (TreeReplace _ tree : edits) = do
-      forestStoreInsertTree model path i tree
-      Gtk.treePathAppendIndex path (fromIntegral i)
+      forestStoreInsertTree model path (fromIntegral i) tree
+      Gtk.treePathAppendIndex path i
       expand path
       Gtk.treePathNext path
       forestStoreRemove model path
@@ -556,7 +556,7 @@ patchForestStore model edits view expandPredicate = do
       go path (i + 1) edits
 
     go path i (TreeUpdate _ edits' : edits) = do
-      Gtk.treePathAppendIndex path (fromIntegral i)
+      Gtk.treePathAppendIndex path i
       go path 0 edits'
       Gtk.treePathUp path
       go path (i + 1) edits

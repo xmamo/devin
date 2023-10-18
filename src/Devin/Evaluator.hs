@@ -73,11 +73,11 @@ data Frame = Frame {
 
 
 data Function
-  = UserDefined Definition
-  | BuiltinNot
+  = BuiltinNot
   | BuiltinLen
   | BuiltinIntToFloat
   | BuiltinFloatToInt
+  | UserDefined Definition
   deriving (Eq, Show, Read, Data)
 
 

@@ -207,32 +207,6 @@ evalExpression expression = case expression of
     argCells <- for args evalExpression
 
     lookupFun name >>= \case
-      Just (UserDefined FunDefinition{params, body}, depth) ->
-        withNewFrame (Just name) (depth + 1) (go 0 params argCells)
-
-        where
-          -- Pass argument by value:
-          go n ((Nothing, SymbolId{name}, _) : params) (argCell : argCells) = do
-            argCell' <- cloneCell argCell
-            defineVar name argCell'
-            go (n + 1) params argCells
-
-          -- Pass argument by reference:
-          go n ((Just _, SymbolId{name}, _) : params) (argCell : argCells) = do
-            defineVar name argCell
-            go (n + 1) params argCells
-
-          -- If argument count is correct:
-          go _ [] [] = evalStatement body >>= \case
-            Just cell -> cloneCell cell
-            Nothing -> newCell Unit
-
-          -- If argument count is incorrect:
-          go n params argCells = do
-            let expected = n + length params
-            let actual = n + length argCells
-            raise (InvalidArgCount expression expected actual)
-
       Just (BuiltinNot, _) | [cell] <- argCells -> do
         val <- readCell cell
 
@@ -284,6 +258,32 @@ evalExpression expression = case expression of
 
       Just (BuiltinFloatToInt, _) ->
         raise (InvalidArgCount expression 1 (length argCells))
+
+      Just (UserDefined FunDefinition{params, body}, depth) ->
+        withNewFrame (Just name) (depth + 1) (go 0 params argCells)
+
+        where
+          -- Pass argument by value:
+          go n ((Nothing, SymbolId{name}, _) : params) (argCell : argCells) = do
+            argCell' <- cloneCell argCell
+            defineVar name argCell'
+            go (n + 1) params argCells
+
+          -- Pass argument by reference:
+          go n ((Just _, SymbolId{name}, _) : params) (argCell : argCells) = do
+            defineVar name argCell
+            go (n + 1) params argCells
+
+          -- If argument count is correct:
+          go _ [] [] = evalStatement body >>= \case
+            Just cell -> cloneCell cell
+            Nothing -> newCell Unit
+
+          -- If argument count is incorrect:
+          go n params argCells = do
+            let expected = n + length params
+            let actual = n + length argCells
+            raise (InvalidArgCount expression expected actual)
 
       _ -> raise (UnknownFun name interval)
 
@@ -498,7 +498,7 @@ evalExpression expression = case expression of
         rightVal <- readCell rightCell
 
         case (leftVal, rightVal) of
-          (Bool x, Bool y) -> newCell (Bool (x && y))
+          (Bool _, Bool y) -> newCell (Bool y)
 
           (_, _) -> do
             leftT <- getType leftVal
@@ -517,7 +517,7 @@ evalExpression expression = case expression of
         rightVal <- readCell rightCell
 
         case (leftVal, rightVal) of
-          (Bool x, Bool y) -> newCell (Bool (x || y))
+          (Bool _, Bool y) -> newCell (Bool y)
 
           (_, _) -> do
             leftT <- getType leftVal

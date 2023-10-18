@@ -377,7 +377,7 @@ instance Display Expression where
       shows integer
 
     RationalExpression{rational} ->
-      showsRatio rational
+      displaysRatio rational
 
     AccessExpression{array, index} ->
       displays array .

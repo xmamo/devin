@@ -146,7 +146,7 @@ expressionTree = \case
     Node ("IntegerExpression", Text.pack (show integer)) []
 
   RationalExpression{rational} ->
-    Node ("RationalExpression", Text.pack (showRatio rational)) []
+    Node ("RationalExpression", Text.pack (displayRatio rational)) []
 
   VarExpression{varName} ->
     Node ("VarExpression", Text.pack varName) []
