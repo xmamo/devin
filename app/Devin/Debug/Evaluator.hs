@@ -66,6 +66,9 @@ displaysVal = \case
   Unit -> pure (showString "unit")
   Bool x -> pure (showString (if x then "true" else "false"))
   Int x -> pure (shows x)
+
+  Float x | isNaN x -> pure (showString "NaN")
+  Float x | isInfinite x -> pure (showString (if x < 0 then "-∞" else "∞"))
   Float x -> pure (showFFloat Nothing x)
 
   Array cells | Vector.null cells -> pure (showString "[]")
