@@ -137,15 +137,15 @@ instance Display Error where
       showString typeName
 
     InvalidUnary{unary, operandT} ->
-      showString "Can’t apply “" .
+      showString "Can’t apply ‘" .
       displays unary .
-      showString "” to " .
+      showString "’ to " .
       displays operandT
 
     InvalidBinary{binary, leftT, rightT} ->
-      showString "Can’t apply “" .
+      showString "Can’t apply ‘" .
       displays binary .
-      showString "” to " .
+      showString "’ to " .
       displays leftT .
       showString " and " .
       displays rightT

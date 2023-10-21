@@ -310,7 +310,7 @@ expression6 requireSideEffects = do
   where
     assignOperator = syntax $ choice
       [
-        (try (char '=' <* notFollowedBy (char '=')) <?> "“=”") $> PlainAssignOperator,
+        (try (char '=' <* notFollowedBy (char '=')) <?> "‘=’") $> PlainAssignOperator,
         text "+=" $> AddAssignOperator,
         text "-=" $> SubtractAssignOperator,
         text "*=" $> MultiplyAssignOperator,
@@ -402,7 +402,7 @@ binaryOperator = syntax $ choice
     text "*=" $> MultiplyAssignOperator,
     text "/=" $> DivideAssignOperator,
     text "%=" $> ModuloAssignOperator,
-    (try (char '=' <* notFollowedBy (char '=')) <?> "“=”") $> PlainAssignOperator,
+    (try (char '=' <* notFollowedBy (char '=')) <?> "‘=’") $> PlainAssignOperator,
     text "*" $> MultiplyOperator,
     text "/" $> DivideOperator,
     text "%" $> ModuloOperator,
@@ -461,7 +461,7 @@ syntax mf = do
 
 
 keyword :: Stream s m Char => String -> ParserT s m Token
-keyword literal = flip label ("keyword “" ++ literal ++ "”") $ syntax $ do
+keyword literal = flip label ("keyword ‘" ++ literal ++ "’") $ syntax $ do
   (name, state) <- try (lookAhead (liftA2 (,) identifier getParserState))
   guard (name == literal)
   setParserState state
@@ -475,7 +475,7 @@ token literal = syntax $ do
 
 
 text :: Stream s m Char => String -> ParserT s m String
-text literal = try (string literal) <?> ("“" ++ literal ++ "”")
+text literal = try (string literal) <?> ("‘" ++ literal ++ "’")
 
 
 -- Regular expression: [\p{L}\p{Nl}\p{Pc}][\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*

@@ -2,7 +2,7 @@
 all: thesis.pdf
 
 thesis.pdf: PhdThesis theorems PhdThesis.cfg theorems.cfg thesis.bib thesis.tex
-	TEXINPUTS=:PhdThesis:theorems latexmk -pdf -Werror thesis.tex
+	TEXINPUTS=:PhdThesis:theorems latexmk -pdflua -Werror thesis.tex -interaction=nonstopmode
 
 PhdThesis: PhdThesis.tbz
 	tar --keep-newer-files -xf PhdThesis.tbz
@@ -28,5 +28,5 @@ clean: mostlyclean
 mostlyclean:
 	if [ -f PhdThesis/Makefile ]; then $(MAKE) -C PhdThesis clean; fi
 	if [ -f theorems/Makefile ]; then $(MAKE) -C theorems clean; fi
-	latexmk -bibtex -C
+	latexmk -C -pdflua -bibtex
 	rm -f *~ *.run.xml pdfa.xmpi
