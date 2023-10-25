@@ -7,6 +7,7 @@
 module Devin.Parsers (
   Parser,
   ParserT,
+  State,
   parse,
   parseT,
   devin,
@@ -32,7 +33,7 @@ import Devin.Parsec hiding (State, parse, token)
 import Devin.Syntax hiding (definition)
 
 
-type Parser s a = ParserT s Identity a
+type Parser s a = Parsec (Int, s) State a
 type ParserT s m a = ParsecT (Int, s) State m a
 newtype State = State { unState :: [Token] -> [Token] }
 
@@ -40,7 +41,8 @@ newtype State = State { unState :: [Token] -> [Token] }
 parse ::
   Stream s Identity t =>
   Parser s a -> SourceName -> (Int, s) -> Either ParseError (a, [Token])
-parse mx sourceName stream = runIdentity (parseT mx sourceName stream)
+parse mx sourceName stream =
+  runIdentity (parseT mx sourceName stream)
 
 
 parseT ::

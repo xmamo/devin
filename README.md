@@ -3,7 +3,7 @@
 This repository contains the Haskell source code for the Devin software
 developed and discussed in my thesis, and the LaTeX source of the thesis itself.
 
-## Running devin on your machine
+## Running Devin on your machine
 
 Precompiled Devin executables can be found in the
 [latest release](https://github.com/xmamo/devin/releases/latest).

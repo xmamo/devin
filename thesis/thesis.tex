@@ -285,7 +285,7 @@
     two \mbox{\texttt{Integer}} values.
   \end{itemize}
 
-  All numeric types support addition, subtraction, multiplication and
+  All numeric types support addition, subtraction, multiplication, and
   comparison. The sign of a number \texttt{x} can be extracted with
   \mbox{\texttt{signum x}}; its absolute value can be computed with
   \mbox{\texttt{abs x}}. The integral data types \mbox{\texttt{Int}},
@@ -639,19 +639,19 @@
   \end{itemize}
 
   This idiom is called \emph{folding} over a list. A higher-order function,
-  \mbox{\texttt{foldList}}, which encapsulates this behavior, can be used to
+  \mbox{\texttt{fold}}, which encapsulates this behavior, can be used to
   implement both \mbox{\texttt{listSum}} and \mbox{\texttt{listProduct}}:
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
-    foldList :: (a -> b -> b) -> b -> [a] -> b
-    foldList _ z [] = z
-    foldList f z (x : xs) = f x (foldList f z xs)
+    fold :: (a -> b -> b) -> b -> [a] -> b
+    fold _ z [] = z
+    fold f z (x : xs) = f x (fold f z xs)
 
     listSum :: Num a => [a] -> a
-    listSum xs = foldList (\x acc -> x + acc) 0 xs
+    listSum xs = fold (\x acc -> x + acc) 0 xs
 
     listProduct :: Num a => [a] -> a
-    listProduct xs = foldList (\x acc -> x * acc) 1 xs
+    listProduct xs = fold (\x acc -> x * acc) 1 xs
   \end{Verbatim}
 
   Given that \mbox{\texttt{(+)}} and \mbox{\texttt{(*)}} already denote the
@@ -660,10 +660,10 @@
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
     listSum :: Num a => [a] -> a
-    listSum xs = foldList (+) 0 xs
+    listSum xs = fold (+) 0 xs
 
     listProduct :: Num a => [a] -> a
-    listProduct xs = foldList (*) 1 xs
+    listProduct xs = fold (*) 1 xs
   \end{Verbatim}
 
   Lists are not the only kind of objects that can be folded over. For example,
@@ -984,8 +984,8 @@
       mx <* my = liftA2 (\x _ -> x) mx my
   \end{Verbatim}
 
-  As explained, \mbox{\texttt{Functor}}'s \mbox{\texttt{fmap}} lifts a unary
-  function \mbox{\texttt{a -> b}} into \mbox{\texttt{f a -> f b}}. The
+  As explained, \mbox{\texttt{Functor}}'s \mbox{\texttt{fmap}} lifts a function
+  \mbox{\texttt{a -> b}} into \mbox{\texttt{f a -> f b}}. The
   \mbox{\texttt{Applicative}} class extends this concept by providing the method
   \mbox{\texttt{liftA2}}, which lifts a binary function
   \mbox{\texttt{a -> b -> c}} into \mbox{\texttt{f a -> f b -> f c}}. Further,
@@ -1057,7 +1057,7 @@
 
   Here, \mbox{\texttt{()}} is the empty tuple, also known as \emph{unit}; its
   value is ignored by the function lifted by \mbox{\texttt{liftA2}}. Using
-  \mbox{\texttt{const x \_ = x}} as defined in Haskell's library,
+  \mbox{\texttt{const x \_ = x}} as defined in Haskell's standard library,
   \mbox{\texttt{amap}} can be simplified to:
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
@@ -1100,7 +1100,7 @@
 
   \section{Behind the syntax of function types}
 
-  As mentioned, the definition
+  As mentioned, the function definition
   \mbox{\texttt{pythagoras x y = sqrt (x {\textasciicircum} 2 + y {\textasciicircum} 2)}}
   is syntactic sugar for
   \mbox{\texttt{pythagoras = \textbackslash x y -> sqrt (x {\textasciicircum} 2 + y {\textasciicircum} 2)}}.
@@ -1116,12 +1116,12 @@
   \mbox{\texttt{x : a}} that yields a closure of argument \mbox{\texttt{y : a}}
   which evaluates the expression
   \mbox{\texttt{sqrt (x {\textasciicircum} 2 + y {\textasciicircum} 2)}}.
-  Encoding multiple arguments in this way is referred to as \emph{currying}, in
-  honor of the mathematician Haskell Brooks Curry. This explains why in the
-  signature \mbox{\texttt{pythagoras :: Floating a => a -> a -> a}} there's no
-  apparent distinction between parameter and return types: because the syntax
-  mirrors how function definitions are desugared. In Haskell, curried functions
-  are generally preferred over other encodings such as tupled arguments (i.e.\
+  Encoding multiple arguments in this way is called \emph{currying}, in honor of
+  the mathematician Haskell Brooks Curry. This explains why in the signature
+  \mbox{\texttt{pythagoras :: Floating a => a -> a -> a}} there's no apparent
+  distinction between parameter and return types: because the syntax mirrors how
+  function definitions are desugared. In Haskell, curried functions are
+  generally preferred over other encodings such as tupled arguments (i.e.\
   \mbox{\texttt{pythagoras' :: Floating a => (a, a) -> a}}).
 
   Since \mbox{\texttt{(->)}} is right associative, the previous definition is
@@ -1291,7 +1291,7 @@
     main :: IO ()
     main = do
       putStr "n := "
-      n <- readLn :: IO Integer
+      n <- readLn @Integer
       putStrLn ("n + 1 = " ++ show (succ n))
   \end{Verbatim}
 
@@ -1336,8 +1336,8 @@
   \mbox{\texttt{runST :: (forall s. ST s a) -> a}}.
 
   The type variables \texttt{s} and \texttt{a} designate some internal state and
-  the kind of value stored by mutable references respectively. The exact meaning
-  of the type \mbox{\texttt{(forall s. ST s a) -> a}} can be safely ignored; in
+  the kind of value stored by mutable references, respectively. The exact
+  meaning of \mbox{\texttt{(forall s. ST s a) -> a}} can be safely ignored; in
   short, the function \mbox{\texttt{runST}} returns the value computed inside
   the \mbox{\texttt{ST}} monad, ensuring that \texttt{s} remains inaccessible to
   the rest of the program.
@@ -1657,12 +1657,13 @@
     \item If $x$ is a literal/unary/parenthesized expression, $x$ is a
     \emph{term};
 
-    \item \mbox{\texttt{$x$/$y$}} are \emph{multiplicative expressions} if $y$
-    is a term and $x$ is either a term or a multiplicative expression;
+    \item \mbox{\texttt{$x$*$y$}} and \mbox{\texttt{$x$/$y$}} are
+    \emph{multiplicative expressions} if $y$ is a term and $x$ is either a term
+    or a multiplicative expression;
 
-    \item \mbox{\texttt{$x$-$y$}} are \emph{additive expressions} if $y$ is
-    either a multiplicative expression or a term, and $x$ is either a
-    multiplicative expression or a term or an additive expression.
+    \item \mbox{\texttt{$x$+$y$}} and \mbox{\texttt{$x$-$y$}} are \emph{additive
+    expressions} if $y$ is either a multiplicative expression or a term, and $x$
+    is either a multiplicative expression or a term or an additive expression.
   \end{itemize}
 
   According to these rules, \texttt{2}, \texttt{3}, \texttt{4} and \texttt{5}
@@ -1773,11 +1774,11 @@
   \label{section:parser-combinators}
 
   There are many ways to recognize some input and generate an associated syntax
-  tree. Much academic research has been conducted, and many implementations of
-  \emph{parser generators} are readily available. These tools, which
-  automatically generate code for parsing a language given its grammar, build
-  upon well-known algorithms, such as those available for LL or LR~\cite{lr}
-  grammar classes, just to throw a few names around.
+  tree. Much academic research has been conducted, and there are many
+  implementations of so-called \emph{parser generators} readily available. These
+  tools, which automatically generate code for parsing a language given its
+  grammar, build upon well-known algorithms, such as those available for LL or
+  LR~\cite{lr} grammar classes, just to throw a few names around.
 
   In this section, we'll see how there's no fundamental need for any generators.
   While such tools are convenient, it isn't too difficult to write a parser from
@@ -1794,7 +1795,7 @@
   and close-parenthesis, in sequence. Parsers can be combined recursively: a
   parser $P$ could depend on a parser $Q$, which in turn depends on $P$\@.
   Consider while statements: the body of the loop is yet another statement,
-  which could be another while statement.
+  which could be a while statement.
 
   The functional approach is perfectly suited for implementing recursive descent
   parsers. In particular, higher-order functions abstract the boilerplate that
@@ -1823,7 +1824,7 @@
     \item The \emph{alternative combinator}. This combinator implements choice.
     It non-deterministically runs $P$ and $Q$ on the same input. If either $P$
     or $Q$ succeeds, the combinator succeeds with the same result as that
-    parser. If both $P$ and $Q$ fail, then the combinator also fails.
+    parser. If both $P$ and $Q$ fail, the combinator also fails.
 
     \item The \emph{option combinator}. This combinator runs a parser zero or
     one time. It tries to run $P$\@. If $P$ succeeds, the combinator succeeds
@@ -1891,7 +1892,7 @@
   fact, Devin.
 
   Alongside Devin, I developed a graphical text editor for the language. The
-  editor features syntax highlighting, error reporting and a simple visual
+  editor features syntax highlighting, error reporting, and a simple visual
   debugger.
 
   \begin{figure}[H]
@@ -1899,6 +1900,8 @@
     \includegraphics[width=0.9\textwidth]{2.png}
     \caption{The graphical editor associated with Devin}
   \end{figure}
+
+  \newpage
 
   \section{Language features}
 
@@ -1927,7 +1930,7 @@
     \mbox{\texttt{[1, 1, 2, 3, 5, 8, 13, 21, 34, 55]}}.
   \end{itemize}
 
-  In addition to the items above, Devin has a \emph{unit type} named
+  In addition to the items above, Devin has a unit type named
   \mbox{\texttt{Unit}}; it is inhabited by one value only: \mbox{\texttt{unit}}.
   When a function has side-effects only, it is marked as returning
   \mbox{\texttt{Unit}}.
@@ -1984,8 +1987,6 @@
 
     \caption{Boolean operators}
   \end{table}
-
-  \pagebreak
 
   Integers and floating-point numbers support addition, subtraction,
   multiplication and division. For integers (but not floats), there's also a
@@ -2047,10 +2048,11 @@
     \caption{Arithmetic operators}
   \end{table}
 
-  Pairs of numbers can be compared with the expressions
-  \mbox{\texttt{$x$ <= $y$}}, \mbox{\texttt{$x$ >= $y$}}. Equality and
-  inequality between any two values can be tested with
-  \mbox{\texttt{$x$ != $y$}}.
+  Values can be compared with the expressions \mbox{\texttt{$x$ < $y$}},
+  \mbox{\texttt{$x$ <= $y$}}, \mbox{\texttt{$x$ > $y$}} and
+  \mbox{\texttt{$x$ >= $y$}}. Equality and inequality between any two values can
+  be tested with \mbox{\texttt{$x$ == $y$}} and \mbox{\texttt{$x$ != $y$}},
+  respectively.
 
   \begin{table}[H]
     \centering
@@ -2197,6 +2199,8 @@
     \caption{Devin's scoping rules visualized}
   \end{Listing}
 
+  \newpage
+
   \subsection{Branching and looping mechanisms}
 
   The following two standard looping constructs are supported:
@@ -2299,12 +2303,11 @@
   breakpoint statements; these instruct the evaluator to pause execution and
   display the current runtime stack, as seen in \autoref{figure:debugger}. The
   execution stack, which maps variables and function arguments to their values,
-  can be viewed from the user interface. Each time a function is called, a new
-  frame is pushed onto the stack; it contains associations between parameter
-  names and the passed values. Variable definitions within the called function
-  add new associations to the newly pushed frame. When the called function
-  returns, the topmost frame is popped off the stack and execution continues
-  normally.
+  can be viewed from the user interface. Each function call pushes a new frame
+  is onto the stack, containing associations between parameter names and their
+  passed values. Variable definitions within the called function add new
+  associations to the newly pushed frame. When the called function returns, the
+  topmost frame is popped off the stack and execution continues normally.
 
   Devin has been designed with simplicity of implementation in mind. In
   particular, Devin's call stack exhibits two properties:
@@ -2330,6 +2333,8 @@
     \caption{The debugger displaying the current state of the stack}
     \label{figure:debugger}
   \end{figure}
+
+  \pagebreak
 
   Runtime errors are handled as well. When an error occurs, the offending code
   fragment is highlighted and a descriptive message dialog is shown to the user.
@@ -2411,7 +2416,7 @@
   Two leaf nodes commonly used across Devin's syntax tree are
   \mbox{\texttt{SymbolId}} and \mbox{\texttt{Token}}. They store information
   about identifiers (e.g., \texttt{x}, \mbox{\texttt{Int}}) and tokens (e.g.,
-  \texttt{\{}, \texttt{\}}, \mbox{\texttt{->}}) respectively. They are defined
+  \texttt{\{}, \texttt{\}}, \mbox{\texttt{->}}), respectively. They are defined
   as follows:
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
@@ -2436,7 +2441,7 @@
   \mbox{\texttt{xor}}, \texttt{=}, \mbox{\texttt{+=}}, \mbox{\texttt{-=}},
   \mbox{\texttt{*=}}, \mbox{\texttt{/=}}, \mbox{\texttt{\%=}} are represented by
   the algebraic data types \mbox{\texttt{UnaryOperator}} and
-  \mbox{\texttt{BinaryOperator}} respectively:
+  \mbox{\texttt{BinaryOperator}}, respectively:
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
     data UnaryOperator
@@ -2628,7 +2633,7 @@
   \end{Verbatim}
 
   Variables and function definitions are represented by
-  \mbox{\texttt{VarDefinition}} and \mbox{\texttt{FunDefinition}}, respectively:
+  \mbox{\texttt{VarDefinition}} and \mbox{\texttt{FunDefinition}}:
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
     data Definition where
@@ -3030,7 +3035,7 @@
   The higher-order function
   \mbox{\texttt{loopM :: Monad m => (a -> m (Either a b)) -> a -> m b}}
   expresses a monadic loop operation where the predicate returns
-  \mbox{\texttt{Left}} as a seed for the next loop or \mbox{\texttt{Right}} to
+  \mbox{\texttt{Left}} as a seed for the next loop, or \mbox{\texttt{Right}} to
   abort the loop. To apply \mbox{\texttt{loopM}} with flipped argument order,
   \mbox{\texttt{flip :: (a -> b -> c) -> b -> a -> c}} is used.
 
@@ -3211,8 +3216,9 @@
   \end{Verbatim}
 
   Expressions with the binary operators \mbox{\texttt{+=}}, \mbox{\texttt{-=}},
-  \mbox{\texttt{*=}}, \mbox{\texttt{/=}}, \mbox{\texttt{\%=}} are type checked
-  considering the shorthands detailed in \autoref{table:assignment-operators}.
+  \mbox{\texttt{*=}}, \mbox{\texttt{/=}} and \mbox{\texttt{\%=}} are type
+  checked considering the shorthands detailed in
+  \autoref{table:assignment-operators}.
 
   The type resulting from function invocations is determined by looking up the
   callee's signature. If a call refers to an unbound identifier, or if the wrong
@@ -3374,9 +3380,9 @@
   \end{Verbatim}
 
   \mbox{\texttt{foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b}}
-  is analogous to \mbox{\texttt{foldl}} (which is a left-associative version of
-  \mbox{\texttt{foldr}} (\autoref{section:higher-order-functions})), except that
-  its result is encapsulated in a monad.
+  is an analogous to \mbox{\texttt{foldl}} (which is a left-associative version
+  of \mbox{\texttt{foldr}} (\autoref{section:higher-order-functions})), except
+  that its result is encapsulated in a monad.
 
   \subsection{Checking variable and function definitions}
 
@@ -3690,7 +3696,7 @@
         Error error -> pure (Left error, state')
   \end{Verbatim}
 
-  To use \mbox{\texttt{Evaluator}s} in a monadic context, instances of
+  To use \mbox{\texttt{Evaluator}s} monadically, instances of
   \mbox{\texttt{Applicative}} and \mbox{\texttt{Monad}} are provided:
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
@@ -3807,11 +3813,11 @@
           Nothing -> go (depth + max 1 poffset) (drop (poffset - 1) frames)
   \end{Verbatim}
 
-  The expressions \mbox{\texttt{frame{funs = funs'}}} and
-  \mbox{\texttt{frame{vars = vars'}}} used in the functions
+  The expressions \mbox{\texttt{frame\{funs = funs'\}}} and
+  \mbox{\texttt{frame\{vars = vars'\}}} used in the functions
   \mbox{\texttt{defineFun}} and \mbox{\texttt{defineVar}} denote \emph{record
   updates}: the record \mbox{\texttt{frame}} is copied, updating the fields
-  \mbox{\texttt{funs}} and \mbox{\texttt{vars}} respectively.
+  \mbox{\texttt{funs}} and \mbox{\texttt{vars}}, respectively.
 
   To run another \mbox{\texttt{Evaluator}} on a modified state where a new
   \mbox{\texttt{Frame}} is added, \mbox{\texttt{withNewFrame}} is provided; when
@@ -3903,9 +3909,9 @@
   Devin arrays are constructed by repeatedly applying a monadic generator
   function, using
   \mbox{\texttt{Vector.unfoldrM :: Monad m => (b -> m (Maybe (a, b))) -> b -> m (Vector a)}}.
-  The generator function yields \mbox{\texttt{Just ($x$, $y$)}} or
-  \mbox{\texttt{Nothing}} if there are no more elements, where $x$ is the next
-  element and $y$ is the new seed.
+  The generator function yields either \mbox{\texttt{Just ($x$, $y$)}}, or
+  \mbox{\texttt{Nothing}} if there are no more elements; $x$ is the next element
+  and $y$ is the new seed.
 
   Next, access to array elements is evaluated by considering the array to access
   and its index. It is not assumed that the type checker has been run before: if
@@ -4190,7 +4196,7 @@
   \mbox{\texttt{toFloat}} and \mbox{\texttt{toInt}} convert an
   \mbox{\texttt{Int}} to a \mbox{\texttt{Float}} and round a
   \mbox{\texttt{Float}} to an \mbox{\texttt{Int}}, respectively. User-defined
-  function calls are evaluated by binding parameter names to the evaluated
+  function calls are handled by binding parameter names to the evaluated
   arguments and then recursively evaluating the callee's body. If a given
   argument is passed by value, a copy of its cell is bound; if it is passed by
   reference, no copy is performed. When a user-defined function's body is
@@ -4447,11 +4453,11 @@
   \subsection{Evaluating variable and function definitions}
 
   In Devin's implementation, the evaluator is independent from the type checker:
-  the environment computed by type checking can't be reused during execution.
-  The evaluator has to maintain the current function and variable bindings in
-  its own state. This leads to some code duplication, as bindings are managed
-  similarly in both the type checker and evaluator; however, implementation is
-  so straightforward that there's little benefit in refactoring.
+  the environment computed by type checking can't be reused during execution;
+  thus, the evaluator needs to maintain its own function and variable bindings.
+  This leads to some code duplication, as bindings are managed similarly in both
+  the type checker and evaluator; however, implementation is so straightforward
+  that there's little benefit in refactoring.
 
   As with type checking, evaluation is performed in two passes. In the first
   pass, function definitions are bound to the current frame; in the second,
@@ -4520,8 +4526,8 @@
   the parser.
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
+    type Parser s a = Parsec (Int, s) [Token] a
     type ParserT s m a = ParsecT (Int, s) [Token] m a
-    type Parser s a = ParserT s Identity a
   \end{Verbatim}
 
   \subsection{Parsing expressions}
@@ -4558,7 +4564,7 @@
 
   Digits are parsed with \mbox{\texttt{satisfy isDigit}}. The parser
   \mbox{\texttt{satisfy $p$}} succeeds for any character for which the predicate
-  $p$ is true and returns the parsed character. The combinator
+  $p$ holds true, and returns the parsed character. The combinator
   \mbox{\texttt{many1 $p$}} applies a parser $p$ one or more times; thus,
   \mbox{\texttt{many1 (satisfy isDigit)}} parses the longest sequence of one or
   more digits.
@@ -4585,7 +4591,7 @@
   \end{Verbatim}
 
   Numbers with decimals are parsed similarly to integers. The dot, parsed with
-  \mbox{\texttt{char '.'}}, is ignored by employing \mbox{\texttt{(*>)}}: this
+  \mbox{\texttt{char '.'}}, is ignored by using \mbox{\texttt{(*>)}}: this
   combinator sequences two parsers, discarding the result of the first operand.
   The expression \texttt{$p$ \$> $q$}, used in both earlier and in the following
   listing, is equivalent to \mbox{\texttt{$p$ *> pure $q$}}.
@@ -4628,7 +4634,7 @@
 
   Two helper functions are used: \mbox{\texttt{token}} and \texttt{s}: the first
   one matches the input string against a sequence of characters, the second one
-  skips zero or more spaces. They are defined as follows:
+  skips zero or more spaces. They are defined as:
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
     token :: Stream s m Char => String -> ParserT s m Token
@@ -5055,7 +5061,7 @@
   GTK+ is a library written in C and meant to be consumed in C. Given its
   popularity, many language bindings exist. Devin's implementation utilizes the
   bindings provided by the package \mbox{\texttt{gi-gtk}}~\cite{gi-gtk}. This
-  package is mostly a thin wrapper on top of GTK+; as a consequence, windows and
+  package is mostly a thin wrapper on top of GTK+; consequently, windows and
   widgets are to be constructed imperatively rather than declaratively.
 
   Devin's UI implementation is complex, requiring almost 1200 lines of code.
@@ -5291,7 +5297,7 @@
   compared to them. Scala, a language for the JVM, has implicit parameters
   built-in; type classes thus emerge naturally \cite{scala-type-classes}. It
   would be interesting to witness an imperative language that forgoes
-  object-orientation completely, opting for a type class-like mechanism instead.
+  object-orientation completely, opting for a type class like mechanism instead.
 
   As for Devin, I implemented enough functionality in order to present a good
   starting point for serious programming language implementation: after all,
@@ -5313,21 +5319,21 @@
   challenging parts of this whole project.
 
   Developing Devin has been insightful for gaining a better understanding of the
-  matter of programming languages. Actual implementation clarified the types of
-  problems that arise and need to be solved; using Haskell for such a
+  matter of programming languages. Actual implementation highlighted the types
+  of challenges that arise and require to be solved; using Haskell for such a
   non-trivial project has taught me how to solve problems functionally, while
-  providing a new perspective on how abstraction can be achieved through a type
-  class like mechanism. While developing Devin, many ideas for new language
-  constructs arose: in particular, the way in which Scala provides and makes use
-  of implicitly passed parameters seems to be of great power. I researched which
-  other techniques besides monads could be used for achieving side-effects in a
-  purely functional way. One possible alternative is to use so-called
-  \emph{algebraic effects}, a topic which is subject of ongoing research;
-  languages such as Koka~\cite{koka} provide a way of experimenting with such
-  features. With an unbounded amount of time at hand, it would've been
-  interesting to develop a purely functional language with implicit parameters
-  and an effect system. Alas, this project has taken long enough; still, I'm
-  quite satisfied with what I learned from this experience.
+  providing a new perspective on achieving abstraction through type classes.
+  While developing Devin, many ideas for new language constructs arose: in
+  particular, the way in which Scala provides and makes use of implicitly passed
+  parameters seems to be of great power. I researched which other techniques
+  besides monads could be used for achieving side-effects in a purely functional
+  way. One possible alternative is to use so-called \emph{algebraic effects}, a
+  topic which is subject of ongoing research; languages such as Koka~\cite{koka}
+  provide a way of experimenting with such features. With an unbounded amount of
+  time at hand, it would've been interesting to develop a purely functional
+  language with implicit parameters and an effect system. Alas, this project has
+  taken long enough; still, I'm quite satisfied with what I learned from this
+  experience.
 
   \backmatter
 

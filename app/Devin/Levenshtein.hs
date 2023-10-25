@@ -55,9 +55,11 @@ levenshteinBy eq xs ys =
       row0 = NonEmpty.scanl f (0, id) ys
       (cost, editDL) = NonEmpty.last (foldl nextRow row0 xs)
    in (cost, editDL [])
+
   where
     nextRow ((cost, editDL) :| cells) x =
       go (cost + 1, editDL . (Delete x :)) ((cost, editDL) :| cells) ys
+
       where
         go wCell (nwCell :| nCell : cells) (y : ys) =
           let cell = nextCell wCell nwCell nCell x y

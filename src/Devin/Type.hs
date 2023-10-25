@@ -24,6 +24,17 @@ data Type
   deriving (Show, Read, Data)
 
 
+instance Display Type where
+  displays :: Type -> ShowS
+  displays Unknown = showChar '?'
+  displays Unit = showString "Unit"
+  displays Bool = showString "Bool"
+  displays Int = showString "Int"
+  displays Float = showString "Float"
+  displays (Array t) = showChar '[' . displays t . showChar ']'
+  displays (Placeholder name) = showString name
+
+
 (<:) :: Type -> Type -> Bool
 t1 <: t2 = isJust (merge t1 t2)
 
@@ -38,14 +49,3 @@ merge Float Float = Just Float
 merge (Array t1) (Array t2) = Array <$> merge t1 t2
 merge (Placeholder n1) (Placeholder n2) | n1 == n2 = Just (Placeholder n1)
 merge _ _ = Nothing
-
-
-instance Display Type where
-  displays :: Type -> ShowS
-  displays Unknown = showChar '?'
-  displays Unit = showString "Unit"
-  displays Bool = showString "Bool"
-  displays Int = showString "Int"
-  displays Float = showString "Float"
-  displays (Array t) = showChar '[' . displays t . showChar ']'
-  displays (Placeholder name) = showString name
