@@ -26,11 +26,11 @@ import qualified Data.Text as Text
 import Text.Parsec.Error
 
 import Control.Monad.Extra
-import Data.List.Extra
 
 import Data.GI.Base.GObject
 import qualified GI.GObject as G
 import qualified GI.Gio as G
+import qualified GI.Gdk as Gdk
 import qualified GI.Gtk as Gtk
 import qualified GI.GtkSource as GtkSource
 import Data.GI.Gtk.ModelView.CellLayout
@@ -69,8 +69,18 @@ main = Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
 
 onActivate :: (Gtk.IsApplication a, ?self :: a) => G.ApplicationActivateCallback
 onActivate = do
-  let noTextTagTable = Nothing @Gtk.TextTagTable
-  let noAdjustment = Nothing @Gtk.Adjustment
+  -- Set a fallback .monospace class for systems that lack it, such as KDE:
+
+  provider <- Gtk.cssProviderNew
+  Gtk.cssProviderLoadFromData provider ".monospace { font-family: monospace; }"
+
+  displayManager <- Gdk.displayManagerGet
+  displays <- Gdk.displayManagerListDisplays displayManager
+
+  for_ displays $ \display -> do
+    screen <- Gdk.displayGetDefaultScreen display
+    let priority = fromIntegral Gtk.STYLE_PROVIDER_PRIORITY_FALLBACK
+    Gtk.styleContextAddProviderForScreen screen provider priority
 
   -- Build the UI:
 
@@ -86,7 +96,7 @@ onActivate = do
   Gtk.containerAdd headerBar stopButton
   Gtk.containerAdd headerBar playButton
 
-  codeBuffer <- GtkSource.bufferNew noTextTagTable
+  codeBuffer <- GtkSource.bufferNew (Nothing @Gtk.TextTagTable)
   GtkSource.bufferSetHighlightSyntax codeBuffer False
   GtkSource.bufferSetHighlightMatchingBrackets codeBuffer False
 
@@ -101,11 +111,18 @@ onActivate = do
   Gtk.treeViewSetEnableSearch blankView False
   Gtk.treeViewSetGridLines blankView Gtk.TreeViewGridLinesVertical
 
+  context <- Gtk.widgetGetStyleContext blankView
+  Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
+  Gtk.styleContextHasClass context Gtk.STYLE_CLASS_MONOSPACE
+
   syntaxTreeModel <- forestStoreNew []
   syntaxTreeView <- Gtk.treeViewNewWithModel syntaxTreeModel
   Gtk.treeViewSetHeadersVisible syntaxTreeView False
   Gtk.treeViewSetEnableSearch syntaxTreeView False
   Gtk.treeViewSetGridLines syntaxTreeView Gtk.TreeViewGridLinesVertical
+
+  context <- Gtk.widgetGetStyleContext syntaxTreeView
+  Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
 
   stateModel <- forestStoreNew []
   stateView <- Gtk.treeViewNewWithModel stateModel
@@ -113,18 +130,27 @@ onActivate = do
   Gtk.treeViewSetEnableSearch stateView False
   Gtk.treeViewSetGridLines stateView Gtk.TreeViewGridLinesVertical
 
+  context <- Gtk.widgetGetStyleContext stateView
+  Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
+
   logModel <- seqStoreNew []
   logView <- Gtk.treeViewNewWithModel logModel
   Gtk.treeViewSetHeadersVisible logView False
   Gtk.treeViewSetEnableSearch logView False
 
-  codeScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  context <- Gtk.widgetGetStyleContext logView
+  Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
+
+  let adjustment = Nothing @Gtk.Adjustment
+  codeScrolledWindow <- Gtk.scrolledWindowNew adjustment adjustment
   Gtk.containerAdd codeScrolledWindow codeTextView
 
-  rightScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  let adjustment = Nothing @Gtk.Adjustment
+  rightScrolledWindow <- Gtk.scrolledWindowNew adjustment adjustment
   Gtk.containerAdd rightScrolledWindow blankView
 
-  logScrolledWindow <- Gtk.scrolledWindowNew noAdjustment noAdjustment
+  let adjustment = Nothing @Gtk.Adjustment
+  logScrolledWindow <- Gtk.scrolledWindowNew adjustment adjustment
   Gtk.containerAdd logScrolledWindow logView
 
   horizontalPaned <- Gtk.panedNew Gtk.OrientationHorizontal
@@ -150,7 +176,6 @@ onActivate = do
   -- Set up columns for syntaxTreeView, stateView, logView:
 
   renderer <- Gtk.cellRendererTextNew
-  Gtk.setCellRendererTextFamily renderer "monospace"
 
   appendColumnWithDataFunction syntaxTreeView syntaxTreeModel renderer $ \row ->
     Gtk.setCellRendererTextText renderer (fst row)
@@ -455,30 +480,32 @@ onActivate = do
 
               (line, column) <- getLineColumn startIter
               let string = showsLineColumn (line, column) (' ' : display error)
-              let text = Text.pack ("<tt>" ++ escapeHTML string ++ "</tt>")
 
               headerBar <- Gtk.headerBarNew
               Gtk.headerBarSetTitle headerBar (Just "Error")
               Gtk.headerBarSetShowCloseButton headerBar True
 
-              dialog <- new' Gtk.MessageDialog
+              messageDialog <- new' Gtk.MessageDialog
                 [
                   Gtk.constructMessageDialogMessageType Gtk.MessageTypeError,
                   Gtk.constructMessageDialogButtons Gtk.ButtonsTypeClose,
-                  Gtk.constructMessageDialogText text,
-                  Gtk.constructMessageDialogUseMarkup True
+                  Gtk.constructMessageDialogText (Text.pack string)
                 ]
 
-              Gtk.windowSetTitlebar dialog (Just headerBar)
-              Gtk.windowSetTransientFor dialog (Just window)
-              Gtk.widgetShowAll dialog
-              Gtk.dialogRun dialog
+              messageArea <- Gtk.messageDialogGetMessageArea messageDialog
+              context <- Gtk.widgetGetStyleContext messageArea
+              Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
+
+              Gtk.windowSetTitlebar messageDialog (Just headerBar)
+              Gtk.windowSetTransientFor messageDialog (Just window)
+              Gtk.widgetShowAll messageDialog
+              Gtk.dialogRun messageDialog
 
               -- Prepare for cleanup. Since debuggerCond is signalled, the
               -- debugger worker thread should proceed by reverting back to the
               -- initial window state.
 
-              Gtk.widgetDestroy dialog
+              Gtk.widgetDestroy messageDialog
               Gtk.textBufferRemoveTag codeBuffer (errorTag tags) startIter endIter
               writeIORef evaluatorAndStateRef Nothing
               tryPutMVar debuggerCond ()
