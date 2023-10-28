@@ -75,8 +75,8 @@ onActivate = do
   provider <- Gtk.cssProviderNew
   Gtk.cssProviderLoadFromData provider ".monospace { font-family: monospace; }"
 
-  displayManager <- Gdk.displayManagerGet
-  displays <- Gdk.displayManagerListDisplays displayManager
+  manager <- Gdk.displayManagerGet
+  displays <- Gdk.displayManagerListDisplays manager
 
   for_ displays $ \display -> do
     screen <- Gdk.displayGetDefaultScreen display
@@ -228,14 +228,20 @@ onActivate = do
     Gtk.widgetSetSensitive playButton False
     Gtk.widgetSetSensitive stopButton True
 
-    whenM (isNothing <$> readIORef evaluatorAndStateRef) $ do
-      Gtk.textViewSetEditable codeTextView False
-      setChild rightScrolledWindow stateView
+    readIORef evaluatorAndStateRef >>= \case
+      Nothing -> do
+        Gtk.textViewSetEditable codeTextView False
+        setChild rightScrolledWindow stateView
 
-      Just syntaxTree <- readIORef syntaxTreeRef
-      let evaluator = evalDevin syntaxTree
-      state <- makePredefinedState
-      writeIORef evaluatorAndStateRef (Just (evaluator, state))
+        Just syntaxTree <- readIORef syntaxTreeRef
+        let evaluator = evalDevin syntaxTree
+        state <- makePredefinedState
+        writeIORef evaluatorAndStateRef (Just (evaluator, state))
+
+      Just _ -> do
+        -- Clear previous highlighting
+        (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+        Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
     tryPutMVar debuggerCond ()
 
@@ -418,8 +424,6 @@ onActivate = do
 
             postGUIASync $ do
               -- Highlight the breakpoint statement
-              (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-              Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
               highlightInterval (highlightTag tags) codeBuffer statement
 
               -- Update the evaluator state preview
@@ -443,10 +447,6 @@ onActivate = do
             postGUIASync $ void $ do
               -- Disable the stop button
               Gtk.widgetSetSensitive stopButton False
-
-              -- Clear previous highlighting
-              (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-              Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
               -- Highlight the segment of code which caused the error
               startIter <- Gtk.textBufferGetIterAtOffset codeBuffer (start error)
