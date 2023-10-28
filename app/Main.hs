@@ -27,6 +27,7 @@ import Text.Parsec.Error
 
 import Control.Monad.Extra
 
+import Data.GI.Base
 import Data.GI.Base.GObject
 import qualified GI.GObject as G
 import qualified GI.Gio as G
@@ -84,10 +85,14 @@ onActivate = do
 
   -- Build the UI:
 
-  stopButton <- Gtk.buttonNewFromIconName (Just "media-playback-stop-symbolic") 1
+  let iconName = Just "media-playback-stop-symbolic"
+  let iconSize = fromIntegral (fromEnum Gtk.IconSizeButton)
+  stopButton <- Gtk.buttonNewFromIconName iconName iconSize
   Gtk.widgetSetSensitive stopButton False
 
-  playButton <- Gtk.buttonNewFromIconName (Just "media-playback-start-symbolic") 1
+  let iconName = Just "media-playback-start-symbolic"
+  let iconSize = fromIntegral (fromEnum Gtk.IconSizeButton)
+  playButton <- Gtk.buttonNewFromIconName iconName iconSize
   Gtk.widgetSetSensitive playButton False
 
   headerBar <- Gtk.headerBarNew
@@ -110,36 +115,27 @@ onActivate = do
   Gtk.treeViewSetHeadersVisible blankView False
   Gtk.treeViewSetEnableSearch blankView False
   Gtk.treeViewSetGridLines blankView Gtk.TreeViewGridLinesVertical
-
-  context <- Gtk.widgetGetStyleContext blankView
-  Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
-  Gtk.styleContextHasClass context Gtk.STYLE_CLASS_MONOSPACE
+  addMonospaceClass blankView
 
   syntaxTreeModel <- forestStoreNew []
   syntaxTreeView <- Gtk.treeViewNewWithModel syntaxTreeModel
   Gtk.treeViewSetHeadersVisible syntaxTreeView False
   Gtk.treeViewSetEnableSearch syntaxTreeView False
   Gtk.treeViewSetGridLines syntaxTreeView Gtk.TreeViewGridLinesVertical
-
-  context <- Gtk.widgetGetStyleContext syntaxTreeView
-  Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
+  addMonospaceClass syntaxTreeView
 
   stateModel <- forestStoreNew []
   stateView <- Gtk.treeViewNewWithModel stateModel
   Gtk.treeViewSetHeadersVisible stateView False
   Gtk.treeViewSetEnableSearch stateView False
   Gtk.treeViewSetGridLines stateView Gtk.TreeViewGridLinesVertical
-
-  context <- Gtk.widgetGetStyleContext stateView
-  Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
+  addMonospaceClass stateView
 
   logModel <- seqStoreNew []
   logView <- Gtk.treeViewNewWithModel logModel
   Gtk.treeViewSetHeadersVisible logView False
   Gtk.treeViewSetEnableSearch logView False
-
-  context <- Gtk.widgetGetStyleContext logView
-  Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
+  addMonospaceClass logView
 
   let adjustment = Nothing @Gtk.Adjustment
   codeScrolledWindow <- Gtk.scrolledWindowNew adjustment adjustment
@@ -166,6 +162,28 @@ onActivate = do
   Gtk.windowSetTitlebar window (Just headerBar)
   Gtk.containerAdd window verticalPaned
 
+  -- Set up the columns for syntaxTreeView, stateView, logView:
+
+  renderer <- Gtk.cellRendererTextNew
+
+  addColumnWithDataFunction syntaxTreeView syntaxTreeModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (fst row)
+
+  addColumnWithDataFunction syntaxTreeView syntaxTreeModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (snd row)
+
+  addColumnWithDataFunction stateView stateModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (fst row)
+
+  addColumnWithDataFunction stateView stateModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (snd row)
+
+  addColumnWithDataFunction logView logModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (fst row)
+
+  addColumnWithDataFunction logView logModel renderer $ \row ->
+    Gtk.setCellRendererTextText renderer (snd row)
+
   -- Set up the the tag table. This is needed for syntax highlighting.
 
   scheme <- GtkSource.bufferGetStyleScheme codeBuffer
@@ -173,29 +191,7 @@ onActivate = do
   tagTable <- Gtk.textBufferGetTagTable codeBuffer
   applyTags tags tagTable
 
-  -- Set up columns for syntaxTreeView, stateView, logView:
-
-  renderer <- Gtk.cellRendererTextNew
-
-  appendColumnWithDataFunction syntaxTreeView syntaxTreeModel renderer $ \row ->
-    Gtk.setCellRendererTextText renderer (fst row)
-
-  appendColumnWithDataFunction syntaxTreeView syntaxTreeModel renderer $ \row ->
-    Gtk.setCellRendererTextText renderer (snd row)
-
-  appendColumnWithDataFunction stateView stateModel renderer $ \row ->
-    Gtk.setCellRendererTextText renderer (fst row)
-
-  appendColumnWithDataFunction stateView stateModel renderer $ \row ->
-    Gtk.setCellRendererTextText renderer (snd row)
-
-  appendColumnWithDataFunction logView logModel renderer $ \row ->
-    Gtk.setCellRendererTextText renderer (fst row)
-
-  appendColumnWithDataFunction logView logModel renderer $ \row ->
-    Gtk.setCellRendererTextText renderer (snd row)
-
-  -- Set up codeBuffer callbacks for "changed" and "notify::cursor-position"
+  -- Set up the codeBuffer callbacks for "changed" and "notify::cursor-position"
   -- signals. The former callback signals that parsing, type checking, and
   -- syntax highlighting need to be performed again; the latter takes care of
   -- highlighting matching braces.
@@ -216,7 +212,7 @@ onActivate = do
       insertIter <- Gtk.textBufferGetIterAtMark ?self insertMark
       highlightDevinBrackets ?self tags insertIter syntaxTree
 
-  -- Set up playButton and stopButton callbacks for "clicked" signals.
+  -- Set up the playButton and stopButton callbacks for "clicked" signals.
   --
   -- The play button exhibits different behavior depending on context:
   -- initially, its function is to start the debugging process; pressing it
@@ -234,9 +230,7 @@ onActivate = do
 
     whenM (isNothing <$> readIORef evaluatorAndStateRef) $ do
       Gtk.textViewSetEditable codeTextView False
-      Just widget <- Gtk.binGetChild rightScrolledWindow
-      Gtk.containerRemove rightScrolledWindow widget
-      Gtk.containerAdd rightScrolledWindow stateView
+      setChild rightScrolledWindow stateView
 
       Just syntaxTree <- readIORef syntaxTreeRef
       let evaluator = evalDevin syntaxTree
@@ -291,7 +285,7 @@ onActivate = do
         postGUIASync $ do
           writeIORef syntaxTreeRef Nothing
 
-          -- Clear any previous highlighting
+          -- Clear previous highlighting
           (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
           clearSyntaxHighlighting codeBuffer tags startIter endIter
           clearBracketsHighlighting codeBuffer tags startIter endIter
@@ -302,9 +296,7 @@ onActivate = do
           Gtk.textBufferApplyTag codeBuffer (errorTag tags) startIter endIter
 
           -- Hide the syntax tree preview
-          Just widget <- Gtk.binGetChild rightScrolledWindow
-          Gtk.containerRemove rightScrolledWindow widget
-          Gtk.containerAdd rightScrolledWindow blankView
+          setChild rightScrolledWindow blankView
 
           -- Update the error log
           patchSeqStore logModel edits
@@ -323,7 +315,7 @@ onActivate = do
         postGUIASync $ do
           writeIORef syntaxTreeRef (Just syntaxTree)
 
-          -- Clear any previous highlighting
+          -- Clear previous highlighting
           (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
           clearSyntaxHighlighting codeBuffer tags startIter endIter
           clearBracketsHighlighting codeBuffer tags startIter endIter
@@ -338,12 +330,8 @@ onActivate = do
           insertIter <- Gtk.textBufferGetIterAtMark codeBuffer insertMark
           highlightDevinBrackets codeBuffer tags insertIter syntaxTree
 
-          -- Show the syntax tree preview
-          Just widget <- Gtk.binGetChild rightScrolledWindow
-          Gtk.containerRemove rightScrolledWindow widget
-          Gtk.containerAdd rightScrolledWindow syntaxTreeView
-
-          -- Update the syntax tree preview
+          -- Show and update the syntax tree preview
+          setChild rightScrolledWindow syntaxTreeView
           let expandPredicate (label, _) = not (Text.isSuffixOf "Expression" label)
           patchForestStore syntaxTreeModel edits syntaxTreeView expandPredicate
           Gtk.treeViewColumnsAutosize syntaxTreeView
@@ -395,7 +383,7 @@ onActivate = do
 
     case evaluatorAndState of
       Nothing -> postGUIASync $ do
-        -- Clear any previous highlighting
+        -- Clear previous highlighting
         (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
         Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
@@ -406,9 +394,7 @@ onActivate = do
         Gtk.widgetSetSensitive playButton True
         Gtk.widgetSetSensitive stopButton False
         Gtk.textViewSetEditable codeTextView True
-        Just widget <- Gtk.binGetChild rightScrolledWindow
-        Gtk.containerRemove rightScrolledWindow widget
-        Gtk.containerAdd rightScrolledWindow syntaxTreeView
+        setChild rightScrolledWindow syntaxTreeView
 
       Just (evaluator, state) -> do
         -- Evaluate a single statement
@@ -458,7 +444,7 @@ onActivate = do
               -- Disable the stop button
               Gtk.widgetSetSensitive stopButton False
 
-              -- Clear any previous highlighting
+              -- Clear previous highlighting
               (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
               Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
@@ -493,8 +479,7 @@ onActivate = do
                 ]
 
               messageArea <- Gtk.messageDialogGetMessageArea messageDialog
-              context <- Gtk.widgetGetStyleContext messageArea
-              Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
+              addMonospaceClass messageArea
 
               Gtk.windowSetTitlebar messageDialog (Just headerBar)
               Gtk.windowSetTransientFor messageDialog (Just window)
@@ -517,10 +502,23 @@ onActivate = do
   Gtk.widgetShowAll window
 
 
-appendColumnWithDataFunction ::
+addMonospaceClass :: (Gtk.IsWidget a, MonadIO m) => a -> m ()
+addMonospaceClass widget = do
+  context <- Gtk.widgetGetStyleContext widget
+  Gtk.styleContextAddClass context Gtk.STYLE_CLASS_MONOSPACE
+
+
+setChild :: (Gtk.IsBin a, Gtk.IsWidget b, MonadIO m) => a -> b -> m ()
+setChild bin widget = do
+  let bin' = bin `asA` Gtk.Bin
+  whenJustM (Gtk.binGetChild bin') (Gtk.containerRemove bin')
+  Gtk.containerAdd bin' widget
+
+
+addColumnWithDataFunction ::
   (Gtk.IsTreeView a, IsTypedTreeModel model, Gtk.IsTreeModel (model row), Gtk.IsCellRenderer cell) =>
   a -> model row -> cell -> (row -> IO ()) -> IO Int32
-appendColumnWithDataFunction view model renderer f = do
+addColumnWithDataFunction view model renderer f = do
   column <- Gtk.treeViewColumnNew
   Gtk.cellLayoutPackStart column renderer True
   cellLayoutSetDataFunction column renderer model f
