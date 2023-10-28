@@ -1,7 +1,7 @@
 cabal-version: 2.2
 
 name: devin
-version: 1.2.1
+version: 1.3.0
 synopsis: Devin programming language
 author: Matteo Morena
 category: Language
