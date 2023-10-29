@@ -90,7 +90,7 @@ executable devin
     haskell-gi-overloading == 0.0,
     haskell-gi-base,
     gi-gobject,
-    gi-gio >= 2.0.30,
+    gi-gio,
     gi-gdk,
     gi-gtk < 4,
     gi-gtksource,
