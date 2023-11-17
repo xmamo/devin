@@ -1067,7 +1067,7 @@
 
   Extending \mbox{\texttt{Applicative}}, there's the \mbox{\texttt{Monad}} type
   class. It defines the \emph{bind operator} \mbox{\texttt{(>>=)}}, along with
-  \mbox{\texttt{(>>)}} and \mbox{\texttt{return}}. These last two functions are
+  \mbox{\texttt{(>>)}} and \mbox{\texttt{return}}. These last two methods are
   maintained for backwards compatibility and can be ignored by readers.
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
@@ -1138,7 +1138,7 @@
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
     pythagoras :: Floating a => (->) a ((->) a a)
-    pythagoras = \a -> \b -> sqrt (a ^ 2 + b ^ 2)
+    pythagoras = \x -> (\y -> sqrt (x ^ 2 + y ^ 2))
   \end{Verbatim}
 
   It's worth mentioning that since \mbox{\texttt{(->)}} is a type constructor,
@@ -1172,20 +1172,21 @@
 
     public class Main {
         public static void main(String[] args) {
-            try (Scanner scanner = new Scanner(System.in)) {
-                // Computation 1
-                System.out.print("n := ");
+            Scanner scanner = new Scanner(System.in);
 
-                // Computation 2
-                int n = scanner.nextInt();
+            // Computation 1
+            System.out.print("n := ");
 
-                // Computation 3
-                if (n < 0)
-                    System.out.println("n < 0");
-                else if (n > 0)
-                    System.out.println("n > 0");
-                else
-                    System.out.println("n = 0");
+            // Computation 2
+            int n = scanner.nextInt();
+
+            // Computation 3
+            if (n < 0) {
+                System.out.println("n < 0");
+            } else if (n > 0) {
+                System.out.println("n > 0");
+            } else {
+                System.out.println("n = 0");
             }
         }
     }
@@ -1784,7 +1785,7 @@
   While such tools are convenient, it isn't too difficult to write a parser from
   scratch, using a technique called \emph{recursive descent parsing}. Recursive
   descent parsers are used by the GCC compiler and the V8 JavaScript
-  engines~\cite{recursive-descent-parsing}, among others.
+  engine~\cite{recursive-descent-parsing}, among others.
 
   Recursive descent parsing is a method to construct parsers using a collection
   of recursive functions. The simplest functions parse the atoms, or
@@ -1794,8 +1795,8 @@
   can be built by using the parsers for open-parenthesis, number, comma, number,
   and close-parenthesis, in sequence. Parsers can be combined recursively: a
   parser $P$ could depend on a parser $Q$, which in turn depends on $P$\@.
-  Consider while statements: the body of the loop is yet another statement,
-  which could be a while statement.
+  Consider while statements: the body of a loop is yet another statement, which
+  could be a while statement.
 
   The functional approach is perfectly suited for implementing recursive descent
   parsers. In particular, higher-order functions abstract the boilerplate that
@@ -1807,7 +1808,7 @@
   that takes some input string and returns either an error or some result along
   with the remaining input. For instance, applying the function to parse an
   integer on the input string \mbox{\texttt{20*2+2}} yields the pair
-  \mbox{$\left(20, \mathtt{*2+2}\right)$}.
+  \mbox{$\left(20, \texttt{*2+2}\right)$}.
 
   Many libraries provide a framework for working with parser combinators. There
   is usually some overlap between different combinator libraries, as they all
@@ -1822,9 +1823,9 @@
     combinator also fails.
 
     \item The \emph{alternative combinator}. This combinator implements choice.
-    It non-deterministically runs $P$ and $Q$ on the same input. If either $P$
-    or $Q$ succeeds, the combinator succeeds with the same result as that
-    parser. If both $P$ and $Q$ fail, the combinator also fails.
+    It non-de\-ter\-min\-is\-ti\-cal\-ly runs $P$ and $Q$ on the same input. If
+    either $P$ or $Q$ succeeds, the combinator succeeds with the same result as
+    that parser. If both $P$ and $Q$ fail, the combinator also fails.
 
     \item The \emph{option combinator}. This combinator runs a parser zero or
     one time. It tries to run $P$\@. If $P$ succeeds, the combinator succeeds
@@ -1877,8 +1878,8 @@
     \item A \emph{syntax highlighter} would use the information stored in the
     syntax tree to perform syntax highlighting: displaying program text in
     different colors depending on semantic meaning. The syntax tree employed by
-    a highlighter needs to be rather concrete, as each node has to be associated
-    with a position in the input string.
+    a highlighter needs to be rather concrete, given that each node has to be
+    associated with a position in the input string.
   \end{itemize}
 
   \newpage
@@ -1908,7 +1909,7 @@
   Devin is an imperative programming language with lexical variable scoping and
   support for recursive function definitions. Syntactically, it's similar to any
   C descendant; among others, it supports variable definition and assignment,
-  while loops, do-while loops and branching via if and if-else statements.
+  while loops, do-while loops, and branching via if and if-else statements.
 
   \subsection{Data types}
 
@@ -1916,15 +1917,15 @@
 
   \begin{itemize}
     \item \mbox{\texttt{Bool}}, for the boolean values \mbox{\texttt{true}},
-    \mbox{\texttt{false}};
+    \mbox{\texttt{false}}.
 
     \item \mbox{\texttt{Int}}, for 64-bit integers denoted by sequences of
-    digits like \mbox{\texttt{42}};
+    digits like \mbox{\texttt{42}}.
 
     \item \mbox{\texttt{Float}}, for double-precision floating-point numbers
     like \mbox{\texttt{0.0}} and \mbox{\texttt{3.14}}. The presence of the
     fractional part distinguishes integers from floats. Contrary to C,
-    exponential notation like \mbox{\texttt{1E100}} is not supported;
+    exponential notation like \mbox{\texttt{1E100}} is not supported.
 
     \item \mbox{\texttt{[$T$]}}, for arrays like
     \mbox{\texttt{[1, 1, 2, 3, 5, 8, 13, 21, 34, 55]}}.
@@ -2049,7 +2050,7 @@
   \end{table}
 
   Values can be compared with the expressions \mbox{\texttt{$x$ < $y$}},
-  \mbox{\texttt{$x$ <= $y$}}, \mbox{\texttt{$x$ > $y$}} and
+  \mbox{\texttt{$x$ <= $y$}}, \mbox{\texttt{$x$ > $y$}}, and
   \mbox{\texttt{$x$ >= $y$}}. Equality and inequality between any two values can
   be tested with \mbox{\texttt{$x$ == $y$}} and \mbox{\texttt{$x$ != $y$}},
   respectively.
@@ -2094,7 +2095,7 @@
     \caption{Relational operators}
   \end{table}
 
-  Variables and array elements can be assigned using the \texttt{=} operator.
+  Variables and array elements can be assigned to using the \texttt{=} operator.
   Like many languages, Devin features a few shorthands as well.
 
   \begin{table}[H]
@@ -2229,7 +2230,7 @@
 
   For example, the assertion \mbox{\texttt{assert n >= 0}} can be used as the
   first statement of a function calculating the factorial of \texttt{n}, as the
-  result is not defined if \mbox{$\mathtt{n} < 0$}.
+  result is not defined if \mbox{$\texttt{n} < 0$}.
 
   \subsection{Function definition and application}
 
@@ -2302,12 +2303,12 @@
   {\blacktriangleright} button. The execution state can be observed with
   breakpoint statements; these instruct the evaluator to pause execution and
   display the current runtime stack, as seen in \autoref{figure:debugger}. The
-  execution stack, which maps variables and function arguments to their values,
-  can be viewed from the user interface. Each function call pushes a new frame
-  is onto the stack, containing associations between parameter names and their
-  passed values. Variable definitions within the called function add new
-  associations to the newly pushed frame. When the called function returns, the
-  topmost frame is popped off the stack and execution continues normally.
+  stack, which maps variables and function arguments to their values, can be
+  viewed from the user interface. Each function call pushes a new frame is onto
+  the stack, containing associations between parameter names and their passed
+  values. Variable definitions within the called function add new associations
+  to the newly pushed frame. When the called function returns, the topmost frame
+  is popped off the stack and execution continues normally.
 
   Devin has been designed with simplicity of implementation in mind. In
   particular, Devin's call stack exhibits two properties:
@@ -3168,8 +3169,8 @@
   \mbox{\texttt{>=}}. Type checking ensures that both operands are of the same
   type; if they are, expressions with such operators yield a
   \mbox{\texttt{Bool}}; as we'll see, the semantic meaning of comparing
-  non-numeric values is lexicographic ordering. Type checking is implemented in
-  the same way for all six comparison operators:
+  non-numeric values is lexicographical ordering. Type checking is implemented
+  in the same way for all six comparison operators:
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
     checkExpression BinaryExpression{left, binary, right}
@@ -3250,14 +3251,15 @@
   \subsection{Checking statements}
 
   The function \mbox{\texttt{checkStatement :: Type -> Statement -> Typer Bool}}
-  performs type checking on statements. A type must be provided: on return
-  statements, \mbox{\texttt{checkStatement}} verifies that the returned value is
-  of the given type.
+  type checks statements. A type must be provided: on return statements,
+  \mbox{\texttt{checkStatement}} verifies that the returned value is of the
+  given type.
 
-  Inside functions, return statements may signal control to be returned to the
-  callee. The function \mbox{\texttt{checkStatement}} wraps a
-  \mbox{\texttt{Bool}} which is \mbox{\texttt{True}} if control is guaranteed to
-  be returned to the callee and \mbox{\texttt{False}} otherwise.
+  Inside functions, return statements may signal control to be
+  \mbox{\texttt{return}ed} to the callee. The function
+  \mbox{\texttt{checkStatement}} wraps a \mbox{\texttt{Bool}} which is
+  \mbox{\texttt{True}} if control is guaranteed to be returned to the callee, or
+  \mbox{\texttt{False}} otherwise.
 
   Expression and definition statements are trivial to check. In both cases, type
   checking is delegated to the relevant function.
@@ -3536,7 +3538,7 @@
 
   To operate on cells, the \mbox{\texttt{newCell}}, \mbox{\texttt{readCell}} and
   \mbox{\texttt{writeCell}} functions are provided. These create, read from, and
-  modify cells respectively.
+  modify cells, respectively.
 
   \begin{Verbatim}[gobble=4,fontsize=\small]
     newCell :: MonadIO m => Value -> m Cell
@@ -3560,8 +3562,8 @@
   in many monadic stacks.
 
   The functions \mbox{\texttt{cloneCell}} and \mbox{\texttt{cloneVal}} clone
-  cells and values respectively. As we'll see, these are needed to implement the
-  pass by value evaluation strategy. To clone arrays,
+  cells and values, respectively. As we'll see, these are needed to implement
+  the pass by value evaluation strategy. To clone arrays,
   \mbox{\texttt{Vector.forM :: Monad m => Vector a -> (a -> m b) -> m (Vector b)}}
   is used; this function applies a monadic action to the elements of a vector,
   collecting the results.
@@ -3757,11 +3759,11 @@
   during search:
 
   \begin{itemize}
-    \item When \mbox{$\mathtt{poffset} = 1$}, the previous frame coincides with
+    \item When \mbox{$\texttt{poffset} = 1$}, the previous frame coincides with
     the lexical parent: only the current frame needs to be skipped to reach its
     parent.
 
-    \item When \mbox{$\mathtt{poffset} > 1$}, the previous frame doesn't
+    \item When \mbox{$\texttt{poffset} > 1$}, the previous frame doesn't
     coincide with the lexical parent: more than one frame needs to be skipped to
     reach the parent.
 
@@ -4303,7 +4305,7 @@
 
   The function
   \mbox{\texttt{evalStatement :: Statement -> Evaluator (Maybe Cell)}} evaluates
-  statements; its result is \mbox{\texttt{Just}} for statements returning
+  single statements; its result is \mbox{\texttt{Just}} for statements returning
   control, and \mbox{\texttt{Nothing}} otherwise.
 
   The following two base cases are trivial (\mbox{\texttt{evalDefinitions}}'s
@@ -4632,7 +4634,7 @@
   is empty and the next character must be a \texttt{]}; otherwise, zero or more
   comma-expression pairs are parsed.
 
-  Two helper functions are used: \mbox{\texttt{token}} and \texttt{s}: the first
+  Two helper functions are used: \mbox{\texttt{token}} and \texttt{s}; the first
   one matches the input string against a sequence of characters, the second one
   skips zero or more spaces. They are defined as:
 
@@ -5069,10 +5071,10 @@
   highlight two of them:
 
   \begin{itemize}
-    \item Source code editing features are provided on top of the GtkSourceView
-    library. This library provides a text widget which can be edited by users;
-    there's built-in support for showing line numbers, automatic indentation,
-    and syntax highlighting.
+    \item Source code editing features are provided on top of GtkSourceView.
+    This library provides a text widget which can be edited by users; there's
+    built-in support for showing line numbers, automatic indentation, and syntax
+    highlighting.
 
     \pagebreak
 
