@@ -10,6 +10,7 @@ module Main (main) where
 
 import Prelude hiding (getLine)
 import Control.Concurrent
+import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Foldable
@@ -22,6 +23,7 @@ import System.Exit
 import Data.Tree
 
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 
 import Text.Parsec.Error
 
@@ -30,6 +32,7 @@ import Control.Monad.Extra
 import Data.GI.Base
 import Data.GI.Base.GObject
 import qualified GI.GObject as G
+import qualified GI.GLib as GLib
 import qualified GI.Gio as G
 import qualified GI.Gdk as Gdk
 import qualified GI.Gtk as Gtk
@@ -44,7 +47,7 @@ import Devin.Display
 import Devin.Evaluator
 import Devin.Evaluators
 import Devin.Interval
-import Devin.Parsec hiding (Error)
+import Devin.Parsec hiding (Error, try)
 import Devin.Parsers
 import Devin.Syntax
 import Devin.Typer
@@ -70,6 +73,10 @@ main = Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
 
 onActivate :: (Gtk.IsApplication a, ?self :: a) => G.ApplicationActivateCallback
 onActivate = do
+  userConfigDirName <- GLib.getUserConfigDir
+  configDirName <- GLib.buildFilenamev [userConfigDirName, "devin"]
+  codeFileName <- GLib.buildFilenamev [configDirName, "main.devin"]
+
   -- Set a fallback .monospace class for systems that lack it, such as KDE:
 
   provider <- Gtk.cssProviderNew
@@ -251,6 +258,24 @@ onActivate = do
     writeIORef evaluatorAndStateRef Nothing
     tryPutMVar debuggerCond ()
 
+  -- Set up the window callback for "delete-event" signals.
+
+  Gtk.onWidgetDeleteEvent window $ const $ do
+    (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+    code <- Gtk.textIterGetText startIter endIter
+    GLib.mkdirWithParents configDirName 0o755
+    Text.writeFile codeFileName code
+    pure False
+
+  -- Load $XDG_CONFIG_HOME/devin/main.devin:
+
+  try @IOException $ do
+    code <- Text.readFile codeFileName
+    Gtk.textBufferSetText codeBuffer code (fromIntegral (Text.length code))
+
+    startIter <- Gtk.textBufferGetStartIter codeBuffer
+    Gtk.textBufferPlaceCursor codeBuffer startIter
+
   -- Start the worker thread responsible for parsing, type checking, and
   -- performing syntax highlighting:
 
@@ -263,19 +288,19 @@ onActivate = do
 
     postGUIASync $ do
       (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-      text <- Gtk.textIterGetText startIter endIter
+      code <- Gtk.textIterGetText startIter endIter
       takeMVar parseAndTypeCheckCond
-      putMVar var1 text
+      putMVar var1 code
 
-    text <- takeMVar var1
+    code <- takeMVar var1
 
     -- Run the parser
-    parserResult <- parseT devin "" (0, text)
+    parserResult <- parseT devin "" (0, code)
 
     case parserResult of
       -- Parser failure:
       Left parseError -> do
-        offset <- toOffsetT (errorPos parseError) text
+        offset <- toOffsetT (errorPos parseError) code
         let messages = errorMessages parseError
 
         postGUIASync $ do
