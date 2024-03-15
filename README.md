@@ -41,7 +41,7 @@ system.
   If you don’t have MSYS2 already installed, run:
 
   ```Batchfile
-  winget install --id MSYS2.MSYS2 --exact
+  winget install --id MSYS2.MSYS2 --interactive
   ```
 
   In a MSYS2 shell, execute the following command:
