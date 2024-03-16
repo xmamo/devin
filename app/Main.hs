@@ -264,7 +264,7 @@ onActivate = do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     code <- Gtk.textIterGetText startIter endIter
     GLib.mkdirWithParents configDirName 0o755
-    Text.writeFile codeFileName code
+    try @IOException (Text.writeFile codeFileName code)
     pure False
 
   -- Load $XDG_CONFIG_HOME/devin/main.devin:
