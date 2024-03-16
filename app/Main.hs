@@ -240,6 +240,13 @@ onActivate = do
         Gtk.textViewSetEditable codeTextView False
         setChild rightScrolledWindow stateView
 
+        -- Save Devin code to $XDG_CONFIG_HOME/devin/main.devin
+        (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
+        code <- Gtk.textIterGetText startIter endIter
+        GLib.mkdirWithParents configDirName 0o755
+        try @IOException (Text.writeFile codeFileName code)
+
+        -- Set up the evaluator and its state
         Just syntaxTree <- readIORef syntaxTreeRef
         let evaluator = evalDevin syntaxTree
         state <- makePredefinedState
@@ -250,6 +257,7 @@ onActivate = do
         (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
         Gtk.textBufferRemoveTag codeBuffer (highlightTag tags) startIter endIter
 
+    -- Signal to start or resume debugging
     tryPutMVar debuggerCond ()
 
   Gtk.onButtonClicked stopButton $ void $ do
@@ -258,7 +266,8 @@ onActivate = do
     writeIORef evaluatorAndStateRef Nothing
     tryPutMVar debuggerCond ()
 
-  -- Set up the window callback for "delete-event" signals.
+  -- Set up the window callback for "delete-event" signals, which saves Devin
+  -- code to $XDG_CONFIG_HOME/devin/main.devin:
 
   Gtk.onWidgetDeleteEvent window $ const $ do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
@@ -267,7 +276,7 @@ onActivate = do
     try @IOException (Text.writeFile codeFileName code)
     pure False
 
-  -- Load $XDG_CONFIG_HOME/devin/main.devin:
+  -- Load Devin code from $XDG_CONFIG_HOME/devin/main.devin:
 
   try @IOException $ do
     code <- Text.readFile codeFileName
