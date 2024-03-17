@@ -32,7 +32,7 @@ import Control.Monad.Extra
 import Data.GI.Base
 import Data.GI.Base.GObject
 import qualified GI.GObject as G
-import qualified GI.GLib as GLib
+import qualified GI.GLib as G
 import qualified GI.Gio as G
 import qualified GI.Gdk as Gdk
 import qualified GI.Gtk as Gtk
@@ -73,9 +73,9 @@ main = Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
 
 onActivate :: (Gtk.IsApplication a, ?self :: a) => G.ApplicationActivateCallback
 onActivate = do
-  userConfigDirName <- GLib.getUserConfigDir
-  configDirName <- GLib.buildFilenamev [userConfigDirName, "devin"]
-  codeFileName <- GLib.buildFilenamev [configDirName, "main.devin"]
+  userConfigDirName <- G.getUserConfigDir
+  configDirName <- G.buildFilenamev [userConfigDirName, "devin"]
+  codeFileName <- G.buildFilenamev [configDirName, "main.devin"]
 
   -- Set a fallback .monospace class for systems that lack it, such as KDE:
 
@@ -243,7 +243,7 @@ onActivate = do
         -- Save Devin code to $XDG_CONFIG_HOME/devin/main.devin
         (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
         code <- Gtk.textIterGetText startIter endIter
-        GLib.mkdirWithParents configDirName 0o755
+        G.mkdirWithParents configDirName 0o755
         try @IOException (Text.writeFile codeFileName code)
 
         -- Set up the evaluator and its state
@@ -272,7 +272,7 @@ onActivate = do
   Gtk.onWidgetDeleteEvent window $ const $ do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     code <- Gtk.textIterGetText startIter endIter
-    GLib.mkdirWithParents configDirName 0o755
+    G.mkdirWithParents configDirName 0o755
     try @IOException (Text.writeFile codeFileName code)
     pure False
 
