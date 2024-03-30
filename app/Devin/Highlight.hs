@@ -4,9 +4,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Devin.Highlight (
-  Tags (..),
-  generateTags,
-  applyTags,
+  HighlightingTags (..),
+  getHighlightingTags,
+  addHighlightingTags,
   highlightInterval
 ) where
 
@@ -24,7 +24,7 @@ import qualified GI.GtkSource as GtkSource
 import Devin.Interval
 
 
-data Tags = Tags {
+data HighlightingTags = HighlightingTags {
   highlightTag :: GtkSource.Tag,
   bracketTag :: GtkSource.Tag,
   keywordTag :: GtkSource.Tag,
@@ -38,8 +38,10 @@ data Tags = Tags {
 } deriving Eq
 
 
-generateTags :: (GtkSource.IsStyleScheme a, MonadIO m) => Maybe a -> m Tags
-generateTags scheme = do
+getHighlightingTags ::
+  (GtkSource.IsStyleScheme a, MonadIO m) =>
+  Maybe a -> m HighlightingTags
+getHighlightingTags scheme = do
   languageManager <- GtkSource.languageManagerGetDefault
   defaultLanguage <- GtkSource.languageManagerGetLanguage languageManager "def"
 
@@ -54,11 +56,13 @@ generateTags scheme = do
   tag09 <- getTag defaultLanguage scheme "def:comment"
   tag10 <- getTag defaultLanguage scheme "def:error"
 
-  pure (Tags tag01 tag02 tag03 tag04 tag05 tag06 tag07 tag08 tag09 tag10)
+  pure (HighlightingTags tag01 tag02 tag03 tag04 tag05 tag06 tag07 tag08 tag09 tag10)
 
 
-applyTags :: (Gtk.IsTextTagTable a, MonadIO m) => Tags -> a -> m Bool
-applyTags tags tagTable = do
+addHighlightingTags ::
+  (Gtk.IsTextTagTable a, MonadIO m) =>
+  a -> HighlightingTags -> m Bool
+addHighlightingTags tagTable tags = do
   Gtk.textTagTableAdd tagTable (highlightTag tags)
   Gtk.textTagTableAdd tagTable (bracketTag tags)
   Gtk.textTagTableAdd tagTable (keywordTag tags)

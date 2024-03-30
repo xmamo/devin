@@ -1,15 +1,16 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Devin.Debug.Evaluator (
   stateForest,
-  frameForest
+  displayVal,
+  displaysVal
 ) where
 
 import Control.Monad.IO.Class
 import Data.Foldable
+import Data.String
 import Numeric
 
 import Data.Tree
@@ -39,26 +40,22 @@ stateForest = \case
       go result [] = pure (Node ("—", "") result, [])
 
       go result (frame : frames) = do
-        result' <- frameForest frame result
+        result' <- foldlM f result (vars frame)
 
         case label frame of
           Nothing -> go result' frames
           Just label -> pure (Node (Text.pack label, "") result', frames)
 
-
-frameForest :: MonadIO m => Frame -> Forest (Text, Text) -> m (Forest (Text, Text))
-frameForest Frame{vars} forest = foldlM f forest vars
-  where
-    f varsForest (name, cell) = do
-      val <- readCell cell
-      s <- displayVal val
-      pure (Node (Text.pack name, Text.pack s) [] : varsForest)
+      f varsForest (name, cell) = do
+        val <- readCell cell
+        valText <- displayVal val
+        pure (Node (Text.pack name, valText) [] : varsForest)
 
 
-displayVal :: MonadIO m => Value -> m String
+displayVal :: (MonadIO m, IsString a) => Value -> m a
 displayVal val = do
   s <- displaysVal val
-  pure (s "")
+  pure (fromString (s ""))
 
 
 displaysVal :: MonadIO m => Value -> m ShowS

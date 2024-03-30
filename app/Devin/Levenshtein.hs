@@ -145,6 +145,7 @@ treeDiffHelper :: (a -> a -> Bool) -> Tree a -> Tree a -> TreeEdit a
 treeDiffHelper eq tree1 tree2 =
   let edits = forestDiffBy eq (subForest tree1) (subForest tree2)
    in if all isCopy edits then TreeCopy tree1 tree2 else TreeUpdate tree1 edits
+
   where
     isCopy (TreeCopy _ _) = True
     isCopy _ = False

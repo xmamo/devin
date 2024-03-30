@@ -26,21 +26,21 @@ import Devin.Highlight
 
 clearBracketsHighlighting ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Tags -> Gtk.TextIter -> Gtk.TextIter -> m ()
+  a -> HighlightingTags -> Gtk.TextIter -> Gtk.TextIter -> m ()
 clearBracketsHighlighting buffer tags =
   Gtk.textBufferRemoveTag buffer (bracketTag tags)
 
 
 highlightDevinBrackets ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Tags -> Gtk.TextIter -> Devin -> m Bool
+  a -> HighlightingTags -> Gtk.TextIter -> Devin -> m Bool
 highlightDevinBrackets buffer tags insertIter Devin{definitions} =
   anyM (highlightDefinitionBrackets buffer tags insertIter) definitions
 
 
 highlightDefinitionBrackets ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Tags -> Gtk.TextIter -> Definition -> m Bool
+  a -> HighlightingTags -> Gtk.TextIter -> Definition -> m Bool
 highlightDefinitionBrackets buffer tags insertIter = \case
   VarDefinition{value} ->
     highlightExpressionBrackets buffer tags insertIter value
@@ -54,7 +54,7 @@ highlightDefinitionBrackets buffer tags insertIter = \case
 
 highlightStatementBrackets ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Tags -> Gtk.TextIter -> Statement -> m Bool
+  a -> HighlightingTags -> Gtk.TextIter -> Statement -> m Bool
 highlightStatementBrackets buffer tags insertIter = \case
   ReturnStatement{result = Nothing} -> pure False
   BreakpointStatement{} -> pure False
@@ -105,7 +105,7 @@ highlightStatementBrackets buffer tags insertIter = \case
 
 highlightExpressionBrackets ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Tags -> Gtk.TextIter -> Expression -> m Bool
+  a -> HighlightingTags -> Gtk.TextIter -> Expression -> m Bool
 highlightExpressionBrackets buffer tags insertIter = \case
   IntegerExpression{} -> pure False
   RationalExpression{} -> pure False
@@ -148,17 +148,17 @@ highlightExpressionBrackets buffer tags insertIter = \case
 
 highlightBrackets ::
   (Gtk.IsTextBuffer a, Interval b, Interval c, MonadIO m) =>
-  a -> Tags -> Gtk.TextIter -> b -> c -> m Bool
+  a -> HighlightingTags -> Gtk.TextIter -> b -> c -> m Bool
 highlightBrackets buffer tags insertIter open close = do
   openStartIter <- Gtk.textBufferGetIterAtOffset buffer (start open)
   openEndIter <- Gtk.textBufferGetIterAtOffset buffer (end open)
   closeStartIter <- Gtk.textBufferGetIterAtOffset buffer (start close)
   closeEndIter <- Gtk.textBufferGetIterAtOffset buffer (end close)
 
-  applyParenthesisTag <- anyM (Gtk.textIterEqual insertIter)
+  applyBracketTag <- anyM (Gtk.textIterEqual insertIter)
     [openStartIter, openEndIter, closeStartIter, closeEndIter]
 
-  if applyParenthesisTag then do
+  if applyBracketTag then do
     Gtk.textBufferApplyTag buffer (bracketTag tags) openStartIter openEndIter
     Gtk.textBufferApplyTag buffer (bracketTag tags) closeStartIter closeEndIter
     pure True

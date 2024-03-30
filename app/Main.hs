@@ -77,18 +77,18 @@ onActivate = do
   configDirName <- G.buildFilenamev [userConfigDirName, "devin"]
   codeFileName <- G.buildFilenamev [configDirName, "main.devin"]
 
-  -- Set a fallback .monospace class for systems that lack it, such as KDE:
+  -- Add a fallback .monospace class for systems that lack it, such as KDE:
 
-  provider <- Gtk.cssProviderNew
-  Gtk.cssProviderLoadFromData provider ".monospace { font-family: monospace; }"
+  cssProvider <- Gtk.cssProviderNew
+  Gtk.cssProviderLoadFromData cssProvider ".monospace { font-family: monospace; }"
 
-  manager <- Gdk.displayManagerGet
-  displays <- Gdk.displayManagerListDisplays manager
+  displayManager <- Gdk.displayManagerGet
+  displays <- Gdk.displayManagerListDisplays displayManager
 
   for_ displays $ \display -> do
     screen <- Gdk.displayGetDefaultScreen display
     let priority = fromIntegral Gtk.STYLE_PROVIDER_PRIORITY_FALLBACK
-    Gtk.styleContextAddProviderForScreen screen provider priority
+    Gtk.styleContextAddProviderForScreen screen cssProvider priority
 
   -- Build the UI:
 
@@ -102,27 +102,15 @@ onActivate = do
   playButton <- Gtk.buttonNewFromIconName iconName iconSize
   Gtk.widgetSetSensitive playButton False
 
-  headerBar <- Gtk.headerBarNew
-  Gtk.headerBarSetTitle headerBar (Just "Devin")
-  Gtk.headerBarSetShowCloseButton headerBar True
-  Gtk.containerAdd headerBar stopButton
-  Gtk.containerAdd headerBar playButton
-
   codeBuffer <- GtkSource.bufferNew (Nothing @Gtk.TextTagTable)
   GtkSource.bufferSetHighlightSyntax codeBuffer False
   GtkSource.bufferSetHighlightMatchingBrackets codeBuffer False
 
-  codeTextView <- GtkSource.viewNewWithBuffer codeBuffer
-  GtkSource.viewSetShowLineNumbers codeTextView True
-  GtkSource.viewSetAutoIndent codeTextView True
-  GtkSource.viewSetTabWidth codeTextView 4
-  Gtk.textViewSetMonospace codeTextView True
-
-  blankView <- Gtk.treeViewNew
-  Gtk.treeViewSetHeadersVisible blankView False
-  Gtk.treeViewSetEnableSearch blankView False
-  Gtk.treeViewSetGridLines blankView Gtk.TreeViewGridLinesVertical
-  addMonospaceClass blankView
+  codeView <- GtkSource.viewNewWithBuffer codeBuffer
+  GtkSource.viewSetShowLineNumbers codeView True
+  GtkSource.viewSetAutoIndent codeView True
+  GtkSource.viewSetTabWidth codeView 4
+  Gtk.textViewSetMonospace codeView True
 
   syntaxTreeModel <- forestStoreNew []
   syntaxTreeView <- Gtk.treeViewNewWithModel syntaxTreeModel
@@ -144,9 +132,15 @@ onActivate = do
   Gtk.treeViewSetEnableSearch logView False
   addMonospaceClass logView
 
+  blankView <- Gtk.treeViewNew
+  Gtk.treeViewSetHeadersVisible blankView False
+  Gtk.treeViewSetEnableSearch blankView False
+  Gtk.treeViewSetGridLines blankView Gtk.TreeViewGridLinesVertical
+  addMonospaceClass blankView
+
   let adjustment = Nothing @Gtk.Adjustment
   codeScrolledWindow <- Gtk.scrolledWindowNew adjustment adjustment
-  Gtk.containerAdd codeScrolledWindow codeTextView
+  Gtk.containerAdd codeScrolledWindow codeView
 
   let adjustment = Nothing @Gtk.Adjustment
   rightScrolledWindow <- Gtk.scrolledWindowNew adjustment adjustment
@@ -163,6 +157,12 @@ onActivate = do
   verticalPaned <- Gtk.panedNew Gtk.OrientationVertical
   Gtk.panedPack1 verticalPaned horizontalPaned True False
   Gtk.panedPack2 verticalPaned logScrolledWindow False False
+
+  headerBar <- Gtk.headerBarNew
+  Gtk.headerBarSetTitle headerBar (Just "Devin")
+  Gtk.headerBarSetShowCloseButton headerBar True
+  Gtk.containerAdd headerBar stopButton
+  Gtk.containerAdd headerBar playButton
 
   window <- Gtk.applicationWindowNew ?self
   Gtk.windowSetDefaultSize window 1024 576
@@ -193,12 +193,12 @@ onActivate = do
 
   -- Set up the the tag table. This is needed for syntax highlighting.
 
-  scheme <- GtkSource.bufferGetStyleScheme codeBuffer
-  tags <- generateTags scheme
+  styleScheme <- GtkSource.bufferGetStyleScheme codeBuffer
+  tags <- getHighlightingTags styleScheme
   tagTable <- Gtk.textBufferGetTagTable codeBuffer
-  applyTags tags tagTable
+  addHighlightingTags tagTable tags
 
-  -- Set up the codeBuffer callbacks for "changed" and "notify::cursor-position"
+  -- Connect codeBuffer callbacks for "changed" and "notify::cursor-position"
   -- signals. The former callback signals that parsing, type checking, and
   -- syntax highlighting need to be performed again; the latter takes care of
   -- highlighting matching braces.
@@ -219,7 +219,7 @@ onActivate = do
       insertIter <- Gtk.textBufferGetIterAtMark ?self insertMark
       highlightDevinBrackets ?self tags insertIter syntaxTree
 
-  -- Set up the playButton and stopButton callbacks for "clicked" signals.
+  -- Connect playButton and stopButton callbacks for "clicked" signals.
   --
   -- The play button exhibits different behavior depending on context:
   -- initially, its function is to start the debugging process; pressing it
@@ -237,7 +237,7 @@ onActivate = do
 
     readIORef evaluatorAndStateRef >>= \case
       Nothing -> do
-        Gtk.textViewSetEditable codeTextView False
+        Gtk.textViewSetEditable codeView False
         setChild rightScrolledWindow stateView
 
         -- Save Devin code to $XDG_CONFIG_HOME/devin/main.devin
@@ -266,8 +266,8 @@ onActivate = do
     writeIORef evaluatorAndStateRef Nothing
     tryPutMVar debuggerCond ()
 
-  -- Set up the window callback for "delete-event" signals, which saves Devin
-  -- code to $XDG_CONFIG_HOME/devin/main.devin:
+  -- Connect window callback for "delete-event" signals, which saves the current
+  -- Devin code to $XDG_CONFIG_HOME/devin/main.devin:
 
   Gtk.onWidgetDeleteEvent window $ const $ do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
@@ -319,7 +319,7 @@ onActivate = do
           putMVar var2 (list, (line, column))
 
         (list, (line, column)) <- takeMVar var2
-        let list' = [(showLineColumn (line, column), showMessages messages)]
+        let list' = [(displayLineColumn (line, column), showMessages messages)]
         let edits = diff list list'
 
         postGUIASync $ do
@@ -388,6 +388,7 @@ onActivate = do
           ((), env, []) -> do
             let (hasMain, _, _) = runTyper checkHasMain env
             postGUIASync (Gtk.widgetSetSensitive playButton hasMain)
+
             where
               checkHasMain = lookupFunSignature "main" >>= \case
                 Just (([], _), _) -> pure True
@@ -402,7 +403,7 @@ onActivate = do
 
             -- Append the error description to the log
             (line, column) <- getLineColumn startIter
-            let datum = (showLineColumn (line, column), Text.pack (display error))
+            let datum = (displayLineColumn (line, column), Text.pack (display error))
             seqStoreAppend logModel datum
             Gtk.treeViewColumnsAutosize logView
 
@@ -433,7 +434,7 @@ onActivate = do
         -- Revert back to the initial window state
         Gtk.widgetSetSensitive playButton True
         Gtk.widgetSetSensitive stopButton False
-        Gtk.textViewSetEditable codeTextView True
+        Gtk.textViewSetEditable codeView True
         setChild rightScrolledWindow syntaxTreeView
 
       Just (evaluator, state) -> do
@@ -499,7 +500,7 @@ onActivate = do
               -- To get around this, we use new' from haskell-gi-base.
 
               (line, column) <- getLineColumn startIter
-              let string = showsLineColumn (line, column) (' ' : display error)
+              let string = displaysLineColumn (line, column) (' ' : display error)
 
               headerBar <- Gtk.headerBarNew
               Gtk.headerBarSetTitle headerBar (Just "Error")
@@ -560,22 +561,23 @@ addColumnWithDataFunction view model renderer f = do
 
 
 patchSeqStore :: MonadIO m => SeqStore a -> [Edit a] -> m ()
-patchSeqStore model = flip foldM_ 0 $ \i edit -> case edit of
-  Copy _ _ ->
-    pure (i + 1)
+patchSeqStore model = foldM_ f 0
+  where
+    f i (Copy _ _) =
+      pure (i + 1)
 
-  Insert x -> do
-    seqStoreInsert model i x
-    pure (i + 1)
+    f i (Insert x) = do
+      seqStoreInsert model i x
+      pure (i + 1)
 
-  Delete _ -> do
-    seqStoreRemove model i
-    pure i
+    f i (Delete _) = do
+      seqStoreRemove model i
+      pure i
 
-  Replace _ x -> do
-    seqStoreInsert model i x
-    seqStoreRemove model (i + 1)
-    pure (i + 1)
+    f i (Replace _ x) = do
+      seqStoreInsert model i x
+      seqStoreRemove model (i + 1)
+      pure (i + 1)
 
 
 patchForestStore ::
@@ -634,13 +636,6 @@ patchForestStore model edits view expandPredicate = do
         Gtk.treePathUp path
 
 
-getLineColumn :: (Num a, MonadIO m) => Gtk.TextIter -> m (a, a)
-getLineColumn iter = do
-  line <- getLine iter
-  column <- getColumn iter
-  pure (line, column)
-
-
 getLine :: (Num a, MonadIO m) => Gtk.TextIter -> m a
 getLine iter = do
   line <- Gtk.textIterGetLine iter
@@ -662,13 +657,20 @@ getColumn iter = do
       pure (Left (column + 1))
 
 
-showsLineColumn :: Show a => (a, a) -> ShowS
-showsLineColumn (line, column) =
+getLineColumn :: (Num a, MonadIO m) => Gtk.TextIter -> m (a, a)
+getLineColumn iter = do
+  line <- getLine iter
+  column <- getColumn iter
+  pure (line, column)
+
+
+displayLineColumn :: (Show a, IsString b) => (a, a) -> b
+displayLineColumn (line, column) = fromString (displaysLineColumn (line, column) "")
+
+
+displaysLineColumn :: Show a => (a, a) -> ShowS
+displaysLineColumn (line, column) =
   showChar '[' . shows line . showChar ':' . shows column . showChar ']'
-
-
-showLineColumn :: (Show a, IsString b) => (a, a) -> b
-showLineColumn (line, column) = fromString (showsLineColumn (line, column) "")
 
 
 showMessages :: IsString a => [Message] -> a

@@ -26,7 +26,7 @@ import Devin.Highlight
 
 clearSyntaxHighlighting ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Tags -> Gtk.TextIter -> Gtk.TextIter -> m ()
+  a -> HighlightingTags -> Gtk.TextIter -> Gtk.TextIter -> m ()
 clearSyntaxHighlighting buffer tags startIter endIter = do
   Gtk.textBufferRemoveTag buffer (keywordTag tags) startIter endIter
   Gtk.textBufferRemoveTag buffer (varIdTag tags) startIter endIter
@@ -38,14 +38,16 @@ clearSyntaxHighlighting buffer tags startIter endIter = do
   Gtk.textBufferRemoveTag buffer (errorTag tags) startIter endIter
 
 
-highlightDevin :: (Gtk.IsTextBuffer a, MonadIO m) => a -> Tags -> Devin -> m ()
+highlightDevin ::
+  (Gtk.IsTextBuffer a, MonadIO m) =>
+  a -> HighlightingTags -> Devin -> m ()
 highlightDevin buffer tags Devin{definitions} =
   for_ definitions (highlightDefinition buffer tags)
 
 
 highlightDefinition ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Tags -> Definition -> m ()
+  a -> HighlightingTags -> Definition -> m ()
 highlightDefinition buffer tags = \case
   VarDefinition{varKeyword, varId, value} -> do
     highlightInterval (keywordTag tags) buffer varKeyword
@@ -67,7 +69,7 @@ highlightDefinition buffer tags = \case
 
 highlightStatement ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Tags -> Statement -> m ()
+  a -> HighlightingTags -> Statement -> m ()
 highlightStatement buffer tags = \case
   DefinitionStatement{definition} ->
     highlightDefinition buffer tags definition
@@ -115,7 +117,7 @@ highlightStatement buffer tags = \case
 
 highlightExpression ::
   (Gtk.IsTextBuffer a, MonadIO m) =>
-  a -> Tags -> Expression -> m ()
+  a -> HighlightingTags -> Expression -> m ()
 highlightExpression buffer tags expression = case expression of
   IntegerExpression{} ->
     highlightInterval (numberTag tags) buffer expression
