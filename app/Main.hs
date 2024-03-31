@@ -241,7 +241,7 @@ onActivate = do
         -- Save Devin code to $XDG_CONFIG_HOME/devin/main.devin
         (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
         code <- Gtk.textIterGetText startIter endIter
-        G.mkdirWithParents configDirName 0o755
+        G.mkdirWithParents configDirName 0o777
         try @IOException (Text.writeFile codeFileName code)
 
         -- Set up the evaluator and its state
@@ -270,7 +270,7 @@ onActivate = do
   Gtk.onWidgetDeleteEvent window $ const $ do
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     code <- Gtk.textIterGetText startIter endIter
-    G.mkdirWithParents configDirName 0o755
+    G.mkdirWithParents configDirName 0o777
     try @IOException (Text.writeFile codeFileName code)
     pure Gdk.EVENT_PROPAGATE
 
