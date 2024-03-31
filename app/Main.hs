@@ -171,24 +171,22 @@ onActivate = do
 
   -- Set up the columns for syntaxTreeView, stateView, logView:
 
-  renderer <- Gtk.cellRendererTextNew
-
-  addColumnWithDataFunction syntaxTreeView syntaxTreeModel renderer $ \row ->
+  appendColumnWithDataFunction syntaxTreeView syntaxTreeModel $ \renderer row ->
     Gtk.setCellRendererTextText renderer (fst row)
 
-  addColumnWithDataFunction syntaxTreeView syntaxTreeModel renderer $ \row ->
+  appendColumnWithDataFunction syntaxTreeView syntaxTreeModel $ \renderer row ->
     Gtk.setCellRendererTextText renderer (snd row)
 
-  addColumnWithDataFunction stateView stateModel renderer $ \row ->
+  appendColumnWithDataFunction stateView stateModel $ \renderer row ->
     Gtk.setCellRendererTextText renderer (fst row)
 
-  addColumnWithDataFunction stateView stateModel renderer $ \row ->
+  appendColumnWithDataFunction stateView stateModel $ \renderer row ->
     Gtk.setCellRendererTextText renderer (snd row)
 
-  addColumnWithDataFunction logView logModel renderer $ \row ->
+  appendColumnWithDataFunction logView logModel $ \renderer row ->
     Gtk.setCellRendererTextText renderer (fst row)
 
-  addColumnWithDataFunction logView logModel renderer $ \row ->
+  appendColumnWithDataFunction logView logModel $ \renderer row ->
     Gtk.setCellRendererTextText renderer (snd row)
 
   -- Set up the the tag table. This is needed for syntax highlighting.
@@ -550,13 +548,14 @@ setChild bin widget = do
   Gtk.containerAdd bin' widget
 
 
-addColumnWithDataFunction ::
-  (Gtk.IsTreeView a, IsTypedTreeModel model, Gtk.IsTreeModel (model row), Gtk.IsCellRenderer cell) =>
-  a -> model row -> cell -> (row -> IO ()) -> IO Int32
-addColumnWithDataFunction view model renderer f = do
+appendColumnWithDataFunction ::
+  (Gtk.IsTreeView a, IsTypedTreeModel model, Gtk.IsTreeModel (model row), MonadIO m) =>
+  a -> model row -> (Gtk.CellRendererText -> row -> IO ()) -> m Int32
+appendColumnWithDataFunction view model f = do
+  renderer <- Gtk.cellRendererTextNew
   column <- Gtk.treeViewColumnNew
+  cellLayoutSetDataFunction column renderer model (f renderer)
   Gtk.cellLayoutPackStart column renderer True
-  cellLayoutSetDataFunction column renderer model f
   Gtk.treeViewAppendColumn view column
 
 
