@@ -272,7 +272,7 @@ onActivate = do
     code <- Gtk.textIterGetText startIter endIter
     G.mkdirWithParents configDirName 0o755
     try @IOException (Text.writeFile codeFileName code)
-    pure False
+    pure Gdk.EVENT_PROPAGATE
 
   -- Load Devin code from $XDG_CONFIG_HOME/devin/main.devin:
 
