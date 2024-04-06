@@ -165,7 +165,7 @@ onActivate = do
   Gtk.containerAdd headerBar playButton
 
   window <- Gtk.applicationWindowNew ?self
-  Gtk.windowSetDefaultSize window 1024 576
+  Gtk.windowSetDefaultSize window 1280 720
   Gtk.windowSetTitlebar window (Just headerBar)
   Gtk.containerAdd window verticalPaned
 
