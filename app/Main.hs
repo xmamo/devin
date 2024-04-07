@@ -77,6 +77,10 @@ onActivate = do
   configDirName <- G.buildFilenamev [userConfigDirName, "devin"]
   codeFileName <- G.buildFilenamev [configDirName, "main.devin"]
 
+  userCacheDirName <- G.getUserCacheDir
+  cacheDirName <- G.buildFilenamev [userCacheDirName, "devin"]
+  keyFileName <- G.buildFilenamev [cacheDirName, "ui.ini"]
+
   -- Add a fallback .monospace class for systems that lack it, such as KDE:
 
   cssProvider <- Gtk.cssProviderNew
@@ -196,6 +200,42 @@ onActivate = do
   tagTable <- Gtk.textBufferGetTagTable codeBuffer
   addHighlightingTags tagTable tags
 
+  -- Load the last UI state from $XDG_CACHE_HOME/devin/ui.ini:
+
+  keyFile <- G.keyFileNew
+
+  try @GError $ do
+    G.keyFileLoadFromFile keyFile keyFileName [G.KeyFileFlagsKeepComments]
+
+    try @GError (G.keyFileGetIntegerList keyFile "window" "size") >>= \case
+      Right [width, height] -> Gtk.windowSetDefaultSize window width height
+      _ -> pure ()
+
+    try @GError $ do
+      value <- G.keyFileGetValue keyFile "window" "maximized"
+      let maximized = Text.stripEnd value `elem` ["true", "1"]
+      when maximized (Gtk.windowMaximize window)
+
+  -- Connect window callbacks for "window-state-event" and "configure-event"
+  -- signals. These keep track of the UI state which needs to be saved.
+
+  Gtk.onWidgetWindowStateEvent window $ \event -> do
+    state <- Gdk.getEventWindowStateNewWindowState event
+    let maximized = Gdk.WindowStateMaximized `elem` state
+    G.keyFileSetBoolean keyFile "window" "maximized" maximized
+    pure Gdk.EVENT_PROPAGATE
+
+  Gtk.onWidgetConfigureEvent window $ const $ do
+    try @GError $ do
+      value <- G.keyFileGetValue keyFile "window" "maximized"
+      let maximized = Text.stripEnd value `elem` ["true", "1"]
+
+      unless maximized $ do
+        (width, height) <- Gtk.windowGetSize ?self
+        G.keyFileSetIntegerList keyFile "window" "size" [width, height]
+
+    pure Gdk.EVENT_PROPAGATE
+
   -- Connect codeBuffer callbacks for "changed" and "notify::cursor-position"
   -- signals. The former callback signals that parsing, type checking, and
   -- syntax highlighting need to be performed again; the latter takes care of
@@ -238,12 +278,6 @@ onActivate = do
         Gtk.textViewSetEditable codeView False
         setChild rightScrolledWindow stateView
 
-        -- Save Devin code to $XDG_CONFIG_HOME/devin/main.devin
-        (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
-        code <- Gtk.textIterGetText startIter endIter
-        G.mkdirWithParents configDirName 0o777
-        try @IOException (Text.writeFile codeFileName code)
-
         -- Set up the evaluator and its state
         Just syntaxTree <- readIORef syntaxTreeRef
         let evaluator = evalDevin syntaxTree
@@ -264,17 +298,22 @@ onActivate = do
     writeIORef evaluatorAndStateRef Nothing
     tryPutMVar debuggerCond ()
 
-  -- Connect window callback for "delete-event" signals, which saves the current
-  -- Devin code to $XDG_CONFIG_HOME/devin/main.devin:
+  -- Connect window callback for "delete-event" signals:
 
   Gtk.onWidgetDeleteEvent window $ const $ do
+    -- Save the current Devin code to $XDG_CONFIG_HOME/devin/main.devin
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     code <- Gtk.textIterGetText startIter endIter
     G.mkdirWithParents configDirName 0o777
     try @IOException (Text.writeFile codeFileName code)
+
+    -- Save the current UI state to $XDG_CACHE_HOME/devin/ui.ini
+    G.mkdirWithParents cacheDirName 0o777
+    try @GError (G.keyFileSaveToFile keyFile (Text.pack keyFileName))
+
     pure Gdk.EVENT_PROPAGATE
 
-  -- Load Devin code from $XDG_CONFIG_HOME/devin/main.devin:
+  -- Load the last Devin code from $XDG_CONFIG_HOME/devin/main.devin:
 
   try @IOException $ do
     code <- Text.readFile codeFileName
