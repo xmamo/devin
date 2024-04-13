@@ -73,13 +73,10 @@ main = Gtk.applicationNew Nothing [G.ApplicationFlagsDefaultFlags] >>= \case
 
 onActivate :: (Gtk.IsApplication a, ?self :: a) => G.ApplicationActivateCallback
 onActivate = do
-  userConfigDirName <- G.getUserConfigDir
-  configDirName <- G.buildFilenamev [userConfigDirName, "devin"]
-  codeFileName <- G.buildFilenamev [configDirName, "main.devin"]
-
-  userCacheDirName <- G.getUserCacheDir
-  cacheDirName <- G.buildFilenamev [userCacheDirName, "devin"]
-  keyFileName <- G.buildFilenamev [cacheDirName, "ui.ini"]
+  userStateDirName <- G.getUserStateDir
+  stateDirName <- G.buildFilenamev [userStateDirName, "devin"]
+  keyFileName <- G.buildFilenamev [stateDirName, "ui.ini"]
+  codeFileName <- G.buildFilenamev [stateDirName, "main.devin"]
 
   -- Add a fallback .monospace class for systems that lack it, such as KDE:
 
@@ -200,7 +197,7 @@ onActivate = do
   tagTable <- Gtk.textBufferGetTagTable codeBuffer
   addHighlightingTags tagTable tags
 
-  -- Load the last UI state from $XDG_CACHE_HOME/devin/ui.ini:
+  -- Load the last UI state from $XDG_STATE_HOME/devin/ui.ini:
 
   keyFile <- G.keyFileNew
 
@@ -301,19 +298,19 @@ onActivate = do
   -- Connect window callback for "delete-event" signals:
 
   Gtk.onWidgetDeleteEvent window $ const $ do
-    -- Save the current Devin code to $XDG_CONFIG_HOME/devin/main.devin
+    -- Save the current Devin code to $XDG_STATE_HOME/devin/main.devin
     (startIter, endIter) <- Gtk.textBufferGetBounds codeBuffer
     code <- Gtk.textIterGetText startIter endIter
-    G.mkdirWithParents configDirName 0o777
+    G.mkdirWithParents stateDirName 0o777
     try @IOException (Text.writeFile codeFileName code)
 
-    -- Save the current UI state to $XDG_CACHE_HOME/devin/ui.ini
-    G.mkdirWithParents cacheDirName 0o777
+    -- Save the current UI state to $XDG_STATE_HOME/devin/ui.ini
+    G.mkdirWithParents stateDirName 0o777
     try @GError (G.keyFileSaveToFile keyFile (Text.pack keyFileName))
 
     pure Gdk.EVENT_PROPAGATE
 
-  -- Load the last Devin code from $XDG_CONFIG_HOME/devin/main.devin:
+  -- Load the last Devin code from $XDG_STATE_HOME/devin/main.devin:
 
   try @IOException $ do
     code <- Text.readFile codeFileName
