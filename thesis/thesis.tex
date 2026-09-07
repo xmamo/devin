@@ -317,7 +317,7 @@
     dot2D :: (Double, Double) -> (Double, Double) -> Double
     dot2D (x1, y1) (x2, y2) = x1 * x2 + y1 * y2
 
-    magnitude2D :: Vector2D -> Double
+    magnitude2D :: (Double, Double) -> Double
     magnitude2D v = sqrt (dot2D v v)
   \end{Verbatim}
 
