@@ -20,7 +20,6 @@ module Devin.Typer (
   report
 ) where
 
-import Control.Applicative
 import Data.Data
 
 import Devin.Error

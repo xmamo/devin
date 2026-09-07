@@ -16,8 +16,6 @@ import qualified Data.Set as Set
 
 import Data.Text (Text)
 
-import Control.Monad.Extra
-
 import qualified GI.Gtk as Gtk
 import qualified GI.GtkSource as GtkSource
 
@@ -88,13 +86,13 @@ getTag ::
   (GtkSource.IsLanguage a, GtkSource.IsStyleScheme b, MonadIO m) =>
   Maybe a -> Maybe b -> Text -> m GtkSource.Tag
 getTag language scheme styleId = do
-  maybeStyle <- case (scheme, language) of
+  style <- case (scheme, language) of
     (Just scheme, Just language) -> getStyle language scheme styleId
     (Just scheme, Nothing) -> GtkSource.styleSchemeGetStyle scheme styleId
     (Nothing, _) -> pure Nothing
 
   tag <- GtkSource.tagNew Nothing
-  whenJust maybeStyle (\style -> GtkSource.styleApply style tag)
+  GtkSource.styleApply style tag
   pure tag
 
 

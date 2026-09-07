@@ -33,7 +33,6 @@ module Devin.Evaluator (
   raise
 ) where
 
-import Control.Applicative
 import Control.Monad.IO.Class
 import Data.Data
 import Data.Int

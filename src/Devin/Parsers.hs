@@ -21,7 +21,6 @@ module Devin.Parsers (
   comment
 ) where
 
-import Control.Applicative hiding ((<|>), many)
 import Control.Monad
 import Data.Char
 import Data.Functor

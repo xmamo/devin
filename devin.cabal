@@ -92,9 +92,9 @@ executable devin
     gi-gobject,
     gi-glib,
     gi-gio,
-    gi-gdk,
-    gi-gtk < 4,
-    gi-gtksource,
+    gi-gdk3,
+    gi-gtk3,
+    gi-gtksource3,
     gi-gtk-hs,
 
     -- Others
